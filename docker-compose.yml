@@ -1,0 +1,89 @@
+# Levanta todo el entorno del 8/10:  docker compose up --build
+#
+# Todo entra por Traefik (único proxy inverso, informe 6.3):
+#   Portal del comercio:     http://portal.localhost:8000
+#   Backoffice del operador: http://backoffice.localhost:8000
+#   API:                     http://api.localhost:8000/api/envios   (salud: /health, /ready, /live)
+#   Panel de Traefik:        http://localhost:8081
+#
+# Monitoreos siguientes: redis, rabbitmq, worker, seguimiento, aspire-dashboard,
+# segunda réplica de la api y TLS con Let's Encrypt (solo en la nube).
+services:
+  traefik:
+    image: traefik:v3
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --api.dashboard=true
+      - --api.insecure=true
+    ports:
+      - "8000:80"
+      - "8081:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ultimamilla
+      POSTGRES_USER: ultimamilla
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ultimamilla_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ultimamilla -d ultimamilla"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/UltimaMilla.Api/Dockerfile
+    environment:
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.services.api.loadbalancer.server.port=8080"
+      # Health check activo: Traefik saca del pool a la instancia que falla /ready (informe 2.2)
+      - "traefik.http.services.api.loadbalancer.healthcheck.path=/ready"
+      - "traefik.http.services.api.loadbalancer.healthcheck.interval=5s"
+
+  portal:
+    build:
+      context: .
+      dockerfile: src/UltimaMilla.Web.Portal/Dockerfile
+    environment:
+      Api__BaseUrl: "http://api:8080/"
+    depends_on:
+      - api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portal.rule=Host(`portal.localhost`)"
+      - "traefik.http.routers.portal.entrypoints=web"
+      - "traefik.http.services.portal.loadbalancer.server.port=8080"
+
+  backoffice:
+    build:
+      context: .
+      dockerfile: src/UltimaMilla.Web.Backoffice/Dockerfile
+    environment:
+      Api__BaseUrl: "http://api:8080/"
+    depends_on:
+      - api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backoffice.rule=Host(`backoffice.localhost`)"
+      - "traefik.http.routers.backoffice.entrypoints=web"
+      - "traefik.http.services.backoffice.loadbalancer.server.port=8080"
+
+volumes:
+  pgdata:

@@ -1,0 +1,143 @@
+@page "/"
+@inject EnviosApiClient Api
+
+<PageTitle>Nuevo envío</PageTitle>
+
+<h1>Nuevo envío</h1>
+
+@if (errorDeCarga is not null)
+{
+    <p class="error">@errorDeCarga</p>
+}
+else if (cuentas is null)
+{
+    <p>Cargando…</p>
+}
+else
+{
+    <EditForm Model="modelo" OnValidSubmit="GuardarAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <fieldset>
+            <legend>Cuenta comercial</legend>
+            <label for="cuenta">Comercio y operador</label>
+            <InputSelect id="cuenta" @bind-Value="modelo.CuentaComercialId">
+                <option value="">Elegí una cuenta…</option>
+                @foreach (var c in cuentas)
+                {
+                    <option value="@c.Id">@c.ComercioNombre → @c.OperadorNombre</option>
+                }
+            </InputSelect>
+            <p class="nota">Provisorio: desde el 15/10 la cuenta sale del usuario que inicia sesión.</p>
+
+            <label for="referencia">Referencia del pedido</label>
+            <InputText id="referencia" @bind-Value="modelo.ReferenciaExterna" />
+
+            <label for="modalidad">Modalidad</label>
+            <InputSelect id="modalidad" @bind-Value="modelo.Modalidad">
+                <option value="Estandar">Estándar</option>
+                <option value="Urgente">Urgente</option>
+            </InputSelect>
+        </fieldset>
+
+        <fieldset>
+            <legend>Destinatario</legend>
+            <label for="nombre">Nombre</label>
+            <InputText id="nombre" @bind-Value="modelo.DestinatarioNombre" />
+
+            <label for="telefono">Teléfono (opcional)</label>
+            <InputText id="telefono" @bind-Value="modelo.DestinatarioTelefono" />
+
+            <div class="fila">
+                <div>
+                    <label for="calle">Calle</label>
+                    <InputText id="calle" @bind-Value="modelo.Calle" />
+                </div>
+                <div>
+                    <label for="numero">Número</label>
+                    <InputText id="numero" @bind-Value="modelo.Numero" />
+                </div>
+            </div>
+            <div class="fila">
+                <div>
+                    <label for="localidad">Localidad</label>
+                    <InputText id="localidad" @bind-Value="modelo.Localidad" />
+                </div>
+                <div>
+                    <label for="departamento">Departamento</label>
+                    <InputText id="departamento" @bind-Value="modelo.Departamento" />
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Bulto</legend>
+            <div class="fila">
+                <div>
+                    <label for="peso">Peso (kg)</label>
+                    <InputNumber id="peso" @bind-Value="modelo.PesoKg" />
+                </div>
+                <div>
+                    <label for="alto">Alto (cm)</label>
+                    <InputNumber id="alto" @bind-Value="modelo.AltoCm" />
+                </div>
+                <div>
+                    <label for="ancho">Ancho (cm)</label>
+                    <InputNumber id="ancho" @bind-Value="modelo.AnchoCm" />
+                </div>
+                <div>
+                    <label for="profundidad">Profundidad (cm)</label>
+                    <InputNumber id="profundidad" @bind-Value="modelo.ProfundidadCm" />
+                </div>
+            </div>
+            <p class="nota">Un bulto por ahora; la API ya acepta varios.</p>
+        </fieldset>
+
+        <button type="submit" disabled="@guardando">@(guardando ? "Guardando…" : "Dar de alta")</button>
+    </EditForm>
+
+    @if (mensaje is not null)
+    {
+        <p class="@(exito ? "ok" : "error")">@mensaje</p>
+    }
+}
+
+@code {
+    private IReadOnlyList<CuentaComercialItem>? cuentas;
+    private NuevoEnvioModel modelo = new();
+    private string? errorDeCarga;
+    private string? mensaje;
+    private bool exito;
+    private bool guardando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            cuentas = (await Api.ListarCuentasAsync()).Where(c => c.Activa).ToList();
+        }
+        catch (HttpRequestException)
+        {
+            errorDeCarga = "No se pudo conectar con la API. ¿Está levantada?";
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        guardando = true;
+        mensaje = null;
+
+        var resultado = await Api.CrearAsync(modelo);
+        exito = resultado.Exito;
+        mensaje = resultado.Mensaje;
+
+        if (exito)
+        {
+            // Se conserva la cuenta elegida para cargar varios envíos seguidos.
+            modelo = new NuevoEnvioModel { CuentaComercialId = modelo.CuentaComercialId };
+        }
+
+        guardando = false;
+    }
+}

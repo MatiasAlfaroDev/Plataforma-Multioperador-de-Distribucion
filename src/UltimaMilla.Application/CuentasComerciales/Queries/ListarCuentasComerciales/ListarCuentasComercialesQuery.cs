@@ -1,0 +1,3 @@
+namespace UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
+
+public sealed record ListarCuentasComercialesQuery;

@@ -1,0 +1,58 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Envíos";
+}
+
+<h1>Envíos</h1>
+
+<form method="get">
+    <label for="operador">Operador</label>
+    <select id="operador" name="operadorId">
+        <option value="">Todos</option>
+        @foreach (var o in Model.Operadores)
+        {
+            <option value="@o.Id" selected="@(Model.OperadorId == o.Id)">@o.Nombre</option>
+        }
+    </select>
+    <button type="submit">Ver</button>
+</form>
+<p class="nota">Provisorio: desde el 15/10 cada usuario ve solo los envíos de su operador.</p>
+
+@if (Model.Error is not null)
+{
+    <p class="error">@Model.Error</p>
+}
+else if (Model.Envios.Count == 0)
+{
+    <p>No hay envíos. Dá de alta uno desde el Portal del comercio.</p>
+}
+else
+{
+    <p>@Model.Envios.Count envío(s)</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Referencia</th><th>Operador</th><th>Comercio</th><th>Destinatario</th>
+                <th>Dirección</th><th>Bultos</th><th>Peso (kg)</th><th>Modalidad</th><th>Estado</th><th>Alta</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in Model.Envios)
+            {
+                <tr>
+                    <td>@e.ReferenciaExterna</td>
+                    <td><span class="operador" style="background:@Model.ColorDe(e.OperadorId)"></span>@e.OperadorNombre</td>
+                    <td>@e.ComercioNombre</td>
+                    <td>@e.DestinatarioNombre</td>
+                    <td>@e.Direccion</td>
+                    <td>@e.CantidadBultos</td>
+                    <td>@e.PesoTotalKg</td>
+                    <td>@e.Modalidad</td>
+                    <td>@e.Estado</td>
+                    <td>@e.FechaAlta.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

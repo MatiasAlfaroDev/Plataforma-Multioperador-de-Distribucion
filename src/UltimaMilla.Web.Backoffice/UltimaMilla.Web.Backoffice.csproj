@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- El Backoffice consume la API por HTTP; no accede a la base (ADR-001). -->
+</Project>
