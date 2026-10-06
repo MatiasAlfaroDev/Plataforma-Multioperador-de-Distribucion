@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/UltimaMilla.Domain/UltimaMilla.Domain.csproj" />
+    <Project Path="src/UltimaMilla.Application/UltimaMilla.Application.csproj" />
+    <Project Path="src/UltimaMilla.Infrastructure/UltimaMilla.Infrastructure.csproj" />
+    <Project Path="src/UltimaMilla.Api/UltimaMilla.Api.csproj" />
+    <Project Path="src/UltimaMilla.Web.Portal/UltimaMilla.Web.Portal.csproj" />
+    <Project Path="src/UltimaMilla.Web.Backoffice/UltimaMilla.Web.Backoffice.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/UltimaMilla.UnitTests/UltimaMilla.UnitTests.csproj" />
+    <Project Path="tests/UltimaMilla.Architecture.Tests/UltimaMilla.Architecture.Tests.csproj" />
+  </Folder>
+</Solution>

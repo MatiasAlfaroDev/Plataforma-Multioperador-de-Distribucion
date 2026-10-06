@@ -1,0 +1,11 @@
+body { font-family: system-ui, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+header { padding-bottom: .5rem; border-bottom: 1px solid #ddd; margin-bottom: 1rem; }
+fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 1rem 0; padding: .5rem 1rem 1rem; }
+legend { font-weight: 600; }
+label { display: block; margin: .7rem 0 .2rem; font-weight: 600; }
+input, select { width: 100%; padding: .5rem; box-sizing: border-box; }
+.fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; }
+button { margin-top: 1rem; padding: .6rem 1.2rem; }
+.nota { color: #666; font-size: .9rem; }
+.ok { color: #16692e; }
+.error, .validation-message, .validation-errors { color: #b3261e; }

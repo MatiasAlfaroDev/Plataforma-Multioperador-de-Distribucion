@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain no referencia ningún proyecto ni paquete: es el centro de Clean Architecture (ADR-001). -->
+</Project>
