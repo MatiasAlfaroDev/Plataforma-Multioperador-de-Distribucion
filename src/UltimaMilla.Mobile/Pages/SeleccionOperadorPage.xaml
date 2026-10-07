@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:UltimaMilla.Mobile.ViewModels"
+             xmlns:models="clr-namespace:UltimaMilla.Mobile.Models"
+             x:Class="UltimaMilla.Mobile.Pages.SeleccionOperadorPage"
+             x:DataType="vm:SeleccionOperadorViewModel"
+             Title="Elegí tu operador">
+
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="12">
+
+        <Label Text="Provisorio: desde el 15/10 el operador sale del inicio de sesión."
+               FontSize="13" TextColor="Gray" />
+
+        <Label Grid.Row="1" Text="{Binding Error}" TextColor="Red" IsVisible="{Binding HayError}" />
+
+        <RefreshView Grid.Row="2" Command="{Binding CargarCommand}" IsRefreshing="{Binding EstaCargando}">
+            <CollectionView ItemsSource="{Binding Operadores}">
+                <CollectionView.EmptyView>
+                    <Label Text="No hay operadores (¿la API está levantada?)" HorizontalOptions="Center" Margin="0,24" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:OperadorItem">
+                        <Border Margin="0,6" Padding="16" StrokeShape="RoundRectangle 10">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SeleccionOperadorViewModel}}, Path=ElegirCommand}"
+                                    CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12">
+                                <BoxView Color="{Binding ColorMarca}" WidthRequest="14" HeightRequest="14" CornerRadius="7" VerticalOptions="Center" />
+                                <Label Text="{Binding Nombre}" FontSize="18" VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+</ContentPage>

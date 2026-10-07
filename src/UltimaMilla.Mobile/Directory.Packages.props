@@ -1,0 +1,9 @@
+<Project>
+  <!--
+    La plantilla de MAUI pone la versión en cada PackageReference, así que acá se
+    desactiva la gestión central de versiones de la raíz (Directory.Packages.props).
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>
