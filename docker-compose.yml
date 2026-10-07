@@ -4,6 +4,7 @@
 #   Portal del comercio:     http://portal.localhost:8000
 #   Backoffice del operador: http://backoffice.localhost:8000
 #   API:                     http://api.localhost:8000/api/envios   (salud: /health, /ready, /live)
+#   API desde la app móvil:  http://10.0.2.2:8000/api/...  (emulador) o http://localhost:8000/api/... (Windows)
 #   Panel de Traefik:        http://localhost:8081
 #
 # Monitoreos siguientes: redis, rabbitmq, worker, seguimiento, aspire-dashboard,
@@ -50,7 +51,8 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+      # Host para el navegador; PathPrefix para la app móvil (el emulador Android entra por 10.0.2.2:8000)
+      - "traefik.http.routers.api.rule=Host(`api.localhost`) || PathPrefix(`/api`)"
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.services.api.loadbalancer.server.port=8080"
       # Health check activo: Traefik saca del pool a la instancia que falla /ready (informe 2.2)
