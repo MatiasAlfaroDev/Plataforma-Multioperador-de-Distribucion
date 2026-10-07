@@ -1,3 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <!-- El Portal no referencia Domain ni Infrastructure: habla con la API por HTTP (ADR-001). -->
+  <ItemGroup>
+    <!-- Observabilidad: la instrumentación de HttpClient es la que encadena la traza con la API. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+  </ItemGroup>
 </Project>

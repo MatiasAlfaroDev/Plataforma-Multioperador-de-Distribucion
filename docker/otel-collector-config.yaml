@@ -1,0 +1,34 @@
+# Collector de OpenTelemetry (stack-tecnologico.md §3): las aplicaciones hablan OTLP solo
+# contra el Collector, y el backend de visualización es una decisión de compose, no de código.
+# En desarrollo exporta al Aspire dashboard; en la nube, a Prometheus y Tempo.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  otlp/aspire:
+    endpoint: aspire-dashboard:18889
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/aspire]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/aspire]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/aspire]

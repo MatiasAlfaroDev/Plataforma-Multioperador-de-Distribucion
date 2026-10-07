@@ -28,8 +28,9 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Crea la base y carga los datos iniciales al arrancar, reintentando mientras PostgreSQL
-    /// termina de levantar en Docker.
+    /// Crea la base y carga los datos iniciales. La corre un solo proceso: el servicio
+    /// `inicializador` del compose, que arranca con `depends_on: postgres service_healthy`
+    /// y termina. Las réplicas de la API no la llaman.
     /// PROVISORIO para el 8/10: antes del 15/10 se reemplaza EnsureCreated por migraciones
     /// con dotnet-ef (informe 6.6, RNF 6.4). Ver README, "Pendientes".
     /// </summary>
@@ -38,19 +39,7 @@ public static class DependencyInjection
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        for (var intento = 1; ; intento++)
-        {
-            try
-            {
-                await db.Database.EnsureCreatedAsync(ct);
-                break;
-            }
-            catch (Exception) when (intento < 10)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(3), ct);
-            }
-        }
-
+        await db.Database.EnsureCreatedAsync(ct);
         await DbSeeder.SembrarAsync(db, ct);
     }
 }

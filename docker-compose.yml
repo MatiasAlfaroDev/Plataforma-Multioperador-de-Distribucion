@@ -6,9 +6,10 @@
 #   API:                     http://api.localhost:8000/api/envios   (salud: /health, /ready, /live)
 #   API desde la app móvil:  http://10.0.2.2:8000/api/...  (emulador) o http://localhost:8000/api/... (Windows)
 #   Panel de Traefik:        http://localhost:8081
+#   Panel de RabbitMQ:       http://rabbit.localhost:8000
+#   Observabilidad:          http://aspire.localhost:8000
 #
-# Monitoreos siguientes: redis, rabbitmq, worker, seguimiento, aspire-dashboard,
-# segunda réplica de la api y TLS con Let's Encrypt (solo en la nube).
+# Monitoreos siguientes: worker, seguimiento y TLS con Let's Encrypt (solo en la nube).
 services:
   traefik:
     image: traefik:v3
@@ -40,15 +41,95 @@ services:
       timeout: 5s
       retries: 10
 
+  # Caché distribuido y coordinación (RNF 6.7). Todavía no lo consume ningún código:
+  # entra con el caché del 22/10 y como backplane de SignalR y Data Protection.
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Broker de mensajes (RNF 6.8). Todavía no lo consume ningún código: entra con el outbox
+  # y el Worker del 29/10. El panel de administración va por Traefik.
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ultimamilla}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ultimamilla_dev}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq.rule=Host(`rabbit.localhost`)"
+      - "traefik.http.routers.rabbitmq.entrypoints=web"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
+
+  # Única superficie de telemetría de las aplicaciones (RNF 6.12, stack-tecnologico.md §3).
+  # Al arrancar avisa tres veces que no alcanza el 18889 del dashboard: es la carrera de
+  # arranque, el cliente gRPC reintenta y conecta solo. El dashboard no tiene healthcheck
+  # porque su imagen no trae shell.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    command: --config=/etc/otelcol-contrib/config.yaml
+    volumes:
+      - ./docker/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      aspire-dashboard:
+        condition: service_started
+
+  # Visualización en desarrollo: logs, métricas y trazas correlacionadas sin configurar nada.
+  # En la nube este lugar lo ocupan Prometheus, Tempo y Grafana.
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.aspire.rule=Host(`aspire.localhost`)"
+      - "traefik.http.routers.aspire.entrypoints=web"
+      - "traefik.http.services.aspire.loadbalancer.server.port=18888"
+
+  # Prepara el esquema y los datos de demostración una sola vez y termina. Las réplicas de la
+  # API esperan a que haya salido bien, así ninguna siembra en paralelo. Comparte imagen con
+  # `api`, así que se construye una sola vez. Acá entra `dotnet ef database update` el 15/10.
+  inicializador:
+    build:
+      context: .
+      dockerfile: src/UltimaMilla.Api/Dockerfile
+    image: ultimamilla-api:local
+    environment:
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
+      Inicializacion__SoloInicializar: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: src/UltimaMilla.Api/Dockerfile
+    image: ultimamilla-api:local
+    # Dos instancias balanceadas por Traefik (RNF 6.13). No hay container_name a propósito:
+    # con uno fijo Docker no puede crear la segunda réplica.
+    deploy:
+      replicas: 2
     environment:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
+      # Telemetría: el SDK lee estas dos variables solo (no hay endpoint en el código).
+      # Las dos réplicas comparten nombre de servicio; el dashboard las separa por instancia.
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_SERVICE_NAME: "api"
     depends_on:
       postgres:
         condition: service_healthy
+      inicializador:
+        condition: service_completed_successfully
     labels:
       - "traefik.enable=true"
       # Host para el navegador; PathPrefix para la app móvil (el emulador Android entra por 10.0.2.2:8000)
@@ -64,7 +145,11 @@ services:
       context: .
       dockerfile: src/UltimaMilla.Web.Portal/Dockerfile
     environment:
-      Api__BaseUrl: "http://api:8080/"
+      # Por Traefik y no por `api:8080`: el DNS de Docker hace round-robin sin chequeo de
+      # salud, Traefik saca del pool la réplica que falla /ready antes de enrutarle tráfico.
+      Api__BaseUrl: "http://traefik/"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_SERVICE_NAME: "portal"
     depends_on:
       - api
     labels:
@@ -78,7 +163,11 @@ services:
       context: .
       dockerfile: src/UltimaMilla.Web.Backoffice/Dockerfile
     environment:
-      Api__BaseUrl: "http://api:8080/"
+      # Por Traefik y no por `api:8080`: el DNS de Docker hace round-robin sin chequeo de
+      # salud, Traefik saca del pool la réplica que falla /ready antes de enrutarle tráfico.
+      Api__BaseUrl: "http://traefik/"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_SERVICE_NAME: "backoffice"
     depends_on:
       - api
     labels:

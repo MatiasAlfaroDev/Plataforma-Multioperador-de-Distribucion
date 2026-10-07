@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using UltimaMilla.Api.Errores;
 using UltimaMilla.Api.Salud;
 using UltimaMilla.Application;
@@ -23,9 +26,31 @@ builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks()
     .AddCheck<BaseDeDatosHealthCheck>("base-de-datos", tags: ["ready"]);
 
+// Telemetría (RNF 6.12): logs, métricas y trazas salen por OTLP al Collector, y es él el que
+// decide el backend (docker/otel-collector-config.yaml). El destino y el nombre del servicio
+// los pone el compose: OTEL_EXPORTER_OTLP_ENDPOINT y OTEL_SERVICE_NAME.
+builder.Logging.AddOpenTelemetry(o => o.IncludeFormattedMessage = true);
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t
+        // Sin el filtro, el health check de Traefik cada 5s por réplica aporta dos spans
+        // (/ready y su SELECT 1) y tapa las trazas de negocio en el dashboard.
+        .AddAspNetCoreInstrumentation(o => o.Filter = ctx => !EsSonda(ctx.Request.Path))
+        // Npgsql 10 trae su propio ActivitySource, así que cada consulta es una span sin
+        // agregar paquetes; el de EF Core solo existe en beta.
+        .AddSource("Npgsql"))
+    .WithMetrics(m => m.AddAspNetCoreInstrumentation())
+    .UseOtlpExporter();
+
 var app = builder.Build();
 
-await app.Services.InicializarBaseDeDatosAsync();
+// Un solo proceso prepara la base. El servicio `inicializador` del compose corre con esta
+// variable en true y termina; las réplicas de la API no inicializan nada, porque dos
+// sembrando a la vez contra una base vacía violan el índice único. Acá entra MigrateAsync (15/10).
+if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
+{
+    await app.Services.InicializarBaseDeDatosAsync();
+    return;
+}
 
 app.UseExceptionHandler();
 app.MapOpenApi();   // contrato en /openapi/v1.json (Scalar se agrega con la API pública)
@@ -56,6 +81,11 @@ api.MapGet("/envios", async (Guid? operadorId, ListarEnviosHandler handler, Canc
     Results.Ok(await handler.Handle(new ListarEnviosQuery(operadorId), ct)));
 
 app.Run();
+
+// Las sondas de salud no se instrumentan: al descartarse la span del request, la consulta
+// de Npgsql queda sin padre grabado y el muestreo la descarta también.
+static bool EsSonda(PathString ruta) =>
+    ruta.StartsWithSegments("/health") || ruta.StartsWithSegments("/ready") || ruta.StartsWithSegments("/live");
 
 // Permite usar Program en las pruebas de integración más adelante.
 public partial class Program { }
