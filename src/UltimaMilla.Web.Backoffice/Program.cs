@@ -8,6 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddHttpClient<EnviosApiClient>(c =>
     c.BaseAddress = new Uri(builder.Configuration["Api:BaseUrl"] ?? "http://localhost:5080/"));
+builder.Services.AddHttpClient<TarifasApiClient>(c =>
+    c.BaseAddress = new Uri(builder.Configuration["Api:BaseUrl"] ?? "http://localhost:5080/"));
 
 // Telemetría (RNF 6.12): sale por OTLP al Collector, igual que la API. La instrumentación de
 // HttpClient es la que propaga el traceparent, y por eso la traza se ve de punta a punta:

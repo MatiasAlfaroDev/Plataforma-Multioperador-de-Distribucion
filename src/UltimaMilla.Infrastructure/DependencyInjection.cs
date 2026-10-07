@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<IVersionTarifariaRepository, VersionTarifariaRepository>();
         services.AddScoped<IOperadorRepository, OperadorRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IZonaCoberturaRepository, ZonaCoberturaRepository>();
         return services;
     }
 
