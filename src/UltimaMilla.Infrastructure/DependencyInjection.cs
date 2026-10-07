@@ -22,6 +22,7 @@ public static class DependencyInjection
 
         services.AddScoped<IEnvioRepository, EnvioRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
+        services.AddScoped<IVersionTarifariaRepository, VersionTarifariaRepository>();
         services.AddScoped<IOperadorRepository, OperadorRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         return services;

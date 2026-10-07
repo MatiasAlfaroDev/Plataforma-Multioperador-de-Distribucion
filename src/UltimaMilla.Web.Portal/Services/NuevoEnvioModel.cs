@@ -32,10 +32,22 @@ public sealed class NuevoEnvioModel
     [Required(ErrorMessage = "El departamento es obligatorio.")]
     public string Departamento { get; set; } = "Montevideo";
 
+    public List<NuevoBultoModel> Bultos { get; set; } =
+    [
+        new()
+    ];
+}
+public sealed class NuevoBultoModel
+{
     [Range(0.001, 1000, ErrorMessage = "El peso debe estar entre 0,001 y 1000 kg.")]
     public decimal PesoKg { get; set; } = 1;
 
-    [Range(1, 500)] public int AltoCm { get; set; } = 20;
-    [Range(1, 500)] public int AnchoCm { get; set; } = 20;
-    [Range(1, 500)] public int ProfundidadCm { get; set; } = 20;
+    [Range(1, 500, ErrorMessage = "El alto debe estar entre 1 y 500 cm.")]
+    public int AltoCm { get; set; } = 20;
+
+    [Range(1, 500, ErrorMessage = "El ancho debe estar entre 1 y 500 cm.")]
+    public int AnchoCm { get; set; } = 20;
+
+    [Range(1, 500, ErrorMessage = "La profundidad debe estar entre 1 y 500 cm.")]
+    public int ProfundidadCm { get; set; } = 20;
 }

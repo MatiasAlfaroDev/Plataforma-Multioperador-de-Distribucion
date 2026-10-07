@@ -27,10 +27,13 @@ public sealed class EnviosApiClient(HttpClient http)
             numero = m.Numero,
             localidad = m.Localidad,
             departamento = m.Departamento,
-            bultos = new[]
+            bultos = m.Bultos.Select(b => new
             {
-                new { pesoKg = m.PesoKg, altoCm = m.AltoCm, anchoCm = m.AnchoCm, profundidadCm = m.ProfundidadCm }
-            }
+                pesoKg = b.PesoKg,
+                altoCm = b.AltoCm,
+                anchoCm = b.AnchoCm,
+                profundidadCm = b.ProfundidadCm
+            }).ToArray()
         };
 
         try

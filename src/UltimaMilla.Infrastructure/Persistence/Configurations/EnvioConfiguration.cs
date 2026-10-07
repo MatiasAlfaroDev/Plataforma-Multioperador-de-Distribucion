@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
+using UltimaMilla.Domain.Configuracion;
 
 namespace UltimaMilla.Infrastructure.Persistence.Configurations;
 
@@ -17,8 +18,12 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         builder.Property(e => e.Modalidad).HasConversion<string>().HasMaxLength(16);
         builder.Property(e => e.Estado).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.TarifaCalculada).HasPrecision(12, 2);
+        builder.HasOne<VersionTarifaria>()
+            .WithMany()
+            .HasForeignKey(e => e.VersionTarifariaId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Ignore(e => e.PesoTotalKg);
-
+        builder.Ignore(e => e.VolumenTotalMetrosCubicos);
         // Concurrencia optimista con la columna de sistema xmin de PostgreSQL (informe 6.1 y 6.4).
         builder.Property<uint>("Version").IsRowVersion();
 

@@ -16,6 +16,7 @@ public sealed record EnvioItem(
     string Direccion,
     int CantidadBultos,
     decimal PesoTotalKg,
+    decimal? TarifaCalculada,
     DateTimeOffset FechaAlta);
 
 public sealed class EnviosApiClient(HttpClient http)

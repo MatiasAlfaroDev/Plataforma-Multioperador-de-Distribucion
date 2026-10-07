@@ -12,6 +12,7 @@ namespace UltimaMilla.Application.Envios.Commands.CrearEnvio;
 public sealed class CrearEnvioHandler(
     IEnvioRepository envios,
     ICuentaComercialRepository cuentas,
+    IVersionTarifariaRepository tarifas,
     IUnitOfWork unitOfWork,
     IValidator<CrearEnvioCommand> validator,
     TimeProvider reloj)
@@ -26,6 +27,7 @@ public sealed class CrearEnvioHandler(
         var referencia = command.ReferenciaExterna.Trim();
         if (await envios.ExisteReferenciaAsync(cuenta.Id, referencia, ct))
             throw new ConflictoException($"Ya existe un envío con la referencia '{referencia}' en esta cuenta.");
+        var ahora = reloj.GetUtcNow();
 
         var envio = Envio.Crear(
             cuenta,
@@ -34,8 +36,24 @@ public sealed class CrearEnvioHandler(
             new Destinatario(command.DestinatarioNombre, command.DestinatarioTelefono),
             new Direccion(command.Calle, command.Numero, command.Localidad, command.Departamento),
             command.Bultos.Select(b => new NuevoBulto(b.PesoKg, b.AltoCm, b.AnchoCm, b.ProfundidadCm)).ToList(),
-            reloj.GetUtcNow());
+            ahora);
 
+        var versionTarifaria = await tarifas.ObtenerVigenteAsync(
+            cuenta.OperadorId,
+            command.Departamento,
+            ahora,
+            ct)
+            ?? throw new NoEncontradoException(
+                $"No existe una tarifa vigente para el departamento '{command.Departamento}'.");
+
+        var tarifaCalculada = versionTarifaria.Calcular(
+            envio.PesoTotalKg,
+            envio.VolumenTotalMetrosCubicos,
+            envio.Modalidad);
+
+        envio.AplicarTarifa(
+            versionTarifaria.Id,
+            tarifaCalculada);
         await envios.AgregarAsync(envio, ct);
         await unitOfWork.GuardarCambiosAsync(ct);
         return envio.Id;

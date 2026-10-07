@@ -34,7 +34,7 @@ else
         <thead>
             <tr>
                 <th>Referencia</th><th>Operador</th><th>Comercio</th><th>Destinatario</th>
-                <th>Dirección</th><th>Bultos</th><th>Peso (kg)</th><th>Modalidad</th><th>Estado</th><th>Alta</th>
+                <th>Dirección</th><th>Bultos</th><th>Peso (kg)</th><th>Modalidad</th><th>Estado</th><th>Tarifa</th><th>Alta</th>
             </tr>
         </thead>
         <tbody>
@@ -50,6 +50,11 @@ else
                     <td>@e.PesoTotalKg</td>
                     <td>@e.Modalidad</td>
                     <td>@e.Estado</td>
+                    <td>
+                        @(e.TarifaCalculada.HasValue
+                            ? $"$ {e.TarifaCalculada.Value:N2}"
+                            : "Sin tarifa")
+                    </td>
                     <td>@e.FechaAlta.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy HH:mm")</td>
                 </tr>
             }

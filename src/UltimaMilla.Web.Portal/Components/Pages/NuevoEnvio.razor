@@ -72,26 +72,51 @@ else
         </fieldset>
 
         <fieldset>
-            <legend>Bulto</legend>
-            <div class="fila">
-                <div>
-                    <label for="peso">Peso (kg)</label>
-                    <InputNumber id="peso" @bind-Value="modelo.PesoKg" />
+            <legend>Bultos</legend>
+
+            @for (var i = 0; i < modelo.Bultos.Count; i++)
+            {
+                var indice = i;
+                var bulto = modelo.Bultos[indice];
+
+                <div class="bulto">
+                    <h3>Bulto @(indice + 1)</h3>
+
+                    <div class="fila">
+                        <div>
+                            <label>Peso (kg)</label>
+                            <InputNumber @bind-Value="bulto.PesoKg" />
+                        </div>
+
+                        <div>
+                            <label>Alto (cm)</label>
+                            <InputNumber @bind-Value="bulto.AltoCm" />
+                        </div>
+
+                        <div>
+                            <label>Ancho (cm)</label>
+                            <InputNumber @bind-Value="bulto.AnchoCm" />
+                        </div>
+
+                        <div>
+                            <label>Profundidad (cm)</label>
+                            <InputNumber @bind-Value="bulto.ProfundidadCm" />
+                        </div>
+                    </div>
+
+                    @if (modelo.Bultos.Count > 1)
+                    {
+                        <button type="button"
+                                @onclick="() => EliminarBulto(indice)">
+                            Eliminar bulto
+                        </button>
+                    }
                 </div>
-                <div>
-                    <label for="alto">Alto (cm)</label>
-                    <InputNumber id="alto" @bind-Value="modelo.AltoCm" />
-                </div>
-                <div>
-                    <label for="ancho">Ancho (cm)</label>
-                    <InputNumber id="ancho" @bind-Value="modelo.AnchoCm" />
-                </div>
-                <div>
-                    <label for="profundidad">Profundidad (cm)</label>
-                    <InputNumber id="profundidad" @bind-Value="modelo.ProfundidadCm" />
-                </div>
-            </div>
-            <p class="nota">Un bulto por ahora; la API ya acepta varios.</p>
+            }
+
+            <button type="button" @onclick="AgregarBulto">
+                + Agregar bulto
+            </button>
         </fieldset>
 
         <button type="submit" disabled="@guardando">@(guardando ? "Guardando…" : "Dar de alta")</button>
@@ -139,5 +164,15 @@ else
         }
 
         guardando = false;
+    }
+    private void AgregarBulto()
+    {
+        modelo.Bultos.Add(new NuevoBultoModel());
+    }
+
+    private void EliminarBulto(int indice)
+    {
+        if (modelo.Bultos.Count > 1)
+            modelo.Bultos.RemoveAt(indice);
     }
 }
