@@ -13,4 +13,5 @@ public sealed record EnvioDto(
     string Direccion,
     int CantidadBultos,
     decimal PesoTotalKg,
+    decimal? TarifaCalculada,
     DateTimeOffset FechaAlta);

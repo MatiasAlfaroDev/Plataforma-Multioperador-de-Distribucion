@@ -25,6 +25,7 @@ public sealed class ListarEnviosHandler(IEnvioRepository envios, ICuentaComercia
                     e.Direccion.ToString(),
                     e.Bultos.Count,
                     e.PesoTotalKg,
+                    e.TarifaCalculada,
                     e.FechaAlta);
             })
             .ToList();

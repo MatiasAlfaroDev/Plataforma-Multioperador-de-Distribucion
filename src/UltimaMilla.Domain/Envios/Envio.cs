@@ -19,13 +19,13 @@ public class Envio : AuditableEntity, ITenantEntity
     public Destinatario Destinatario { get; private set; } = null!;
     public Direccion Direccion { get; private set; } = null!;
     public DateTimeOffset FechaAlta { get; private set; }
-
-    /// <summary>Se completa cuando exista el cuadro tarifario versionado (monitoreos siguientes).</summary>
     public decimal? TarifaCalculada { get; private set; }
+    public Guid? VersionTarifariaId { get; private set; }
 
     public IReadOnlyCollection<Bulto> Bultos => _bultos;
 
     public decimal PesoTotalKg => _bultos.Sum(b => b.PesoKg);
+    public decimal VolumenTotalMetrosCubicos => _bultos.Sum(b => b.VolumenMetrosCubicos);
 
     // Constructor vacío que necesita EF Core para materializar desde la base.
     private Envio() { }
@@ -68,5 +68,22 @@ public class Envio : AuditableEntity, ITenantEntity
             envio._bultos.Add(Bulto.Crear($"{referencia}-{i + 1}", bultos[i]));
 
         return envio;
+    }
+    public void AplicarTarifa(
+        Guid versionTarifariaId,
+        decimal tarifaCalculada)
+    {
+        if (versionTarifariaId == Guid.Empty)
+            throw new ArgumentException(
+                "La versión tarifaria es obligatoria.",
+                nameof(versionTarifariaId));
+
+        if (tarifaCalculada < 0)
+            throw new ArgumentException(
+                "La tarifa calculada no puede ser negativa.",
+                nameof(tarifaCalculada));
+
+        VersionTarifariaId = versionTarifariaId;
+        TarifaCalculada = tarifaCalculada;
     }
 }

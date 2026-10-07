@@ -9,6 +9,8 @@ public class Bulto
     public int AltoCm { get; private set; }
     public int AnchoCm { get; private set; }
     public int ProfundidadCm { get; private set; }
+    public decimal VolumenMetrosCubicos =>
+    (decimal)AltoCm * AnchoCm * ProfundidadCm / 1_000_000m;
 
     private Bulto() { }
 
