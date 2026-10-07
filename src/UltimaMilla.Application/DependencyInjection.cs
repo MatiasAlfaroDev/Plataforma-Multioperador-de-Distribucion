@@ -4,6 +4,9 @@ using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciale
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
+using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
+using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
+using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 
 namespace UltimaMilla.Application;
 
@@ -18,6 +21,9 @@ public static class DependencyInjection
         services.AddScoped<ListarEnviosHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
         services.AddScoped<ListarOperadoresHandler>();
+        services.AddScoped<ActualizarTarifaHandler>();
+        services.AddScoped<ObtenerTarifaVigenteHandler>();
+        services.AddScoped<ListarZonasHandler>();
         return services;
     }
 }

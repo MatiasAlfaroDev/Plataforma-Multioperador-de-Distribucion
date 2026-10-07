@@ -33,4 +33,27 @@ public sealed class VersionTarifariaRepository(AppDbContext db)
             .OrderByDescending(v => v.VigenciaDesde)
             .FirstOrDefaultAsync(ct);
     }
+
+    public async Task<VersionTarifaria?> ObtenerVigentePorZonaAsync(
+        Guid operadorId,
+        Guid zonaCoberturaId,
+        DateTimeOffset fecha,
+        CancellationToken ct)
+    {
+        return await db.VersionesTarifarias
+            .Where(v =>
+                v.OperadorId == operadorId &&
+                v.ZonaCoberturaId == zonaCoberturaId &&
+                v.VigenciaDesde <= fecha &&
+                (v.VigenciaHasta == null || fecha < v.VigenciaHasta))
+            .OrderByDescending(v => v.VigenciaDesde)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task AgregarAsync(
+        VersionTarifaria version,
+        CancellationToken ct)
+    {
+        await db.VersionesTarifarias.AddAsync(version, ct);
+    }
 }

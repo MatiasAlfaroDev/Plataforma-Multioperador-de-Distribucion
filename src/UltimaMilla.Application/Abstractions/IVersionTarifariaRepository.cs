@@ -13,4 +13,14 @@ public interface IVersionTarifariaRepository
         string departamento,
         DateTimeOffset fecha,
         CancellationToken ct);
+
+    Task<VersionTarifaria?> ObtenerVigentePorZonaAsync(
+        Guid operadorId,
+        Guid zonaCoberturaId,
+        DateTimeOffset fecha,
+        CancellationToken ct);
+
+    Task AgregarAsync(
+        VersionTarifaria version,
+        CancellationToken ct);
 }

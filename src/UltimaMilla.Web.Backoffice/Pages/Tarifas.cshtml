@@ -1,0 +1,112 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.TarifasModel
+@{
+    ViewData["Title"] = "Configuración de tarifas";
+}
+
+<h1>Configuración de tarifas</h1>
+
+<p>Seleccioná un operador y una zona para consultar o modificar su tarifa vigente.</p>
+
+@if (TempData["Mensaje"] is string mensaje)
+{
+    <div>
+        <strong>@mensaje</strong>
+    </div>
+}
+
+<form method="get">
+    <div>
+        <label for="operadorId">Operador</label>
+        <select id="operadorId"
+                name="operadorId"
+                onchange="this.form.submit()">
+            <option value="">Seleccionar operador</option>
+
+            @foreach (var operador in Model.Operadores)
+            {
+                <option value="@operador.Id"
+                        selected="@(Model.OperadorId == operador.Id)">
+                    @operador.Nombre
+                </option>
+            }
+        </select>
+    </div>
+
+    @if (Model.OperadorId.HasValue)
+    {
+        <div>
+            <label for="zonaCoberturaId">Zona</label>
+            <select id="zonaCoberturaId"
+                    name="zonaCoberturaId"
+                    onchange="this.form.submit()">
+                <option value="">Seleccionar zona</option>
+
+                @foreach (var zona in Model.Zonas)
+                {
+                    <option value="@zona.Id"
+                            selected="@(Model.ZonaCoberturaId == zona.Id)">
+                        @zona.Nombre (@zona.Departamento)
+                    </option>
+                }
+            </select>
+        </div>
+    }
+</form>
+
+@if (Model.OperadorId.HasValue && Model.ZonaCoberturaId.HasValue)
+{
+    <hr />
+
+    <h2>Tarifa vigente</h2>
+
+    @if (Model.VigenciaDesde.HasValue)
+    {
+        <p>
+            Vigente desde:
+            @Model.VigenciaDesde.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+        </p>
+    }
+
+    <form method="post">
+        <input type="hidden" asp-for="OperadorId" />
+        <input type="hidden" asp-for="ZonaCoberturaId" />
+        <input type="hidden" asp-for="CuadroTarifarioId" />
+
+        <div>
+            <label asp-for="PrecioBase">Precio base</label>
+            <input asp-for="PrecioBase" type="number" min="0" step="0.01" />
+        </div>
+
+        <div>
+            <label asp-for="PrecioPorKg">Precio por kg</label>
+            <input asp-for="PrecioPorKg" type="number" min="0" step="0.01" />
+        </div>
+
+        <div>
+            <label asp-for="PrecioPorMetroCubico">Precio por m³</label>
+            <input asp-for="PrecioPorMetroCubico" type="number" min="0" step="0.01" />
+        </div>
+
+        <div>
+            <label asp-for="RecargoUrgentePorcentaje">Recargo urgente (%)</label>
+            <input asp-for="RecargoUrgentePorcentaje"
+                   type="number"
+                   min="0"
+                   step="0.01" />
+        </div>
+
+        <div>
+            <label asp-for="BonificacionPorcentaje">Bonificación (%)</label>
+            <input asp-for="BonificacionPorcentaje"
+                   type="number"
+                   min="0"
+                   max="100"
+                   step="0.01" />
+        </div>
+
+        <br />
+
+        <button type="submit">Guardar nueva tarifa</button>
+    </form>
+}

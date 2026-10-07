@@ -17,7 +17,14 @@
     </style>
 </head>
 <body>
-    <header><strong>Backoffice del operador</strong> · Plataforma de última milla</header>
+    <header>
+        <strong>Backoffice del operador</strong> · Plataforma de última milla
+        <nav style="margin-top: .75rem;">
+            <a asp-page="/Index">Envíos</a>
+            <span> · </span>
+            <a asp-page="/Tarifas">Tarifas</a>
+        </nav>
+    </header>
     <main>@RenderBody()</main>
 </body>
 </html>
