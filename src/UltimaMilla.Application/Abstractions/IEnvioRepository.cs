@@ -6,8 +6,15 @@ namespace UltimaMilla.Application.Abstractions;
 public interface IEnvioRepository
 {
     Task AgregarAsync(Envio envio, CancellationToken ct);
-    Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct);
 
-    /// <summary>Lista envíos con sus bultos; si viene operadorId, filtra por ese operador.</summary>
-    Task<IReadOnlyList<Envio>> ListarAsync(Guid? operadorId, CancellationToken ct);
+    Task<bool> ExisteReferenciaAsync(
+        Guid cuentaComercialId,
+        string referenciaExterna,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Lista los envíos visibles para el tenant actual.
+    /// El aislamiento por OperadorId lo aplica globalmente AppDbContext.
+    /// </summary>
+    Task<IReadOnlyList<Envio>> ListarAsync(CancellationToken ct);
 }

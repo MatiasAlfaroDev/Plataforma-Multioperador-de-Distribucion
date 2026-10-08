@@ -1,7 +1,7 @@
 namespace UltimaMilla.Application.Envios.Queries.ListarEnvios;
 
 /// <summary>
-/// Lista envíos. OperadorId opcional filtra por operador.
-/// Desde el 15/10 el operador saldrá del token del usuario y no de este parámetro.
+/// Lista los envíos visibles para el tenant actual.
+/// El operador se obtiene del contexto autenticado y no desde un parámetro enviado por el cliente.
 /// </summary>
-public sealed record ListarEnviosQuery(Guid? OperadorId);
+public sealed record ListarEnviosQuery;

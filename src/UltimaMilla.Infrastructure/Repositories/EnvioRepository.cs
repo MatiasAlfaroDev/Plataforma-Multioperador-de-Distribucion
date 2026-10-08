@@ -10,16 +10,19 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
     public async Task AgregarAsync(Envio envio, CancellationToken ct) =>
         await db.Envios.AddAsync(envio, ct);
 
-    public Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct) =>
-        db.Envios.AnyAsync(e => e.CuentaComercialId == cuentaComercialId && e.ReferenciaExterna == referenciaExterna, ct);
+    public Task<bool> ExisteReferenciaAsync(
+        Guid cuentaComercialId,
+        string referenciaExterna,
+        CancellationToken ct) =>
+        db.Envios.AnyAsync(
+            e => e.CuentaComercialId == cuentaComercialId
+                 && e.ReferenciaExterna == referenciaExterna,
+            ct);
 
-    public async Task<IReadOnlyList<Envio>> ListarAsync(Guid? operadorId, CancellationToken ct)
-    {
-        var consulta = db.Envios.AsNoTracking().Include(e => e.Bultos).AsQueryable();
-
-        if (operadorId is Guid id)
-            consulta = consulta.Where(e => e.OperadorId == id);
-
-        return await consulta.OrderByDescending(e => e.FechaAlta).ToListAsync(ct);
-    }
+    public async Task<IReadOnlyList<Envio>> ListarAsync(CancellationToken ct) =>
+        await db.Envios
+            .AsNoTracking()
+            .Include(e => e.Bultos)
+            .OrderByDescending(e => e.FechaAlta)
+            .ToListAsync(ct);
 }

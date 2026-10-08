@@ -2,17 +2,24 @@ using UltimaMilla.Application.Abstractions;
 
 namespace UltimaMilla.Application.Envios.Queries.ListarEnvios;
 
-public sealed class ListarEnviosHandler(IEnvioRepository envios, ICuentaComercialRepository cuentas)
+public sealed class ListarEnviosHandler(
+    IEnvioRepository envios,
+    ICuentaComercialRepository cuentas)
 {
-    public async Task<IReadOnlyList<EnvioDto>> Handle(ListarEnviosQuery query, CancellationToken ct)
+    public async Task<IReadOnlyList<EnvioDto>> Handle(
+        ListarEnviosQuery query,
+        CancellationToken ct)
     {
-        var lista = await envios.ListarAsync(query.OperadorId, ct);
-        var cuentasPorId = (await cuentas.ListarResumenAsync(ct)).ToDictionary(c => c.Id);
+        var lista = await envios.ListarAsync(ct);
+
+        var cuentasPorId = (await cuentas.ListarResumenAsync(ct))
+            .ToDictionary(c => c.Id);
 
         return lista
             .Select(e =>
             {
                 cuentasPorId.TryGetValue(e.CuentaComercialId, out var cuenta);
+
                 return new EnvioDto(
                     e.Id,
                     e.ReferenciaExterna,

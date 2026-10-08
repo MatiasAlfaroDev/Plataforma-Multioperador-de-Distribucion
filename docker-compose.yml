@@ -31,7 +31,7 @@ services:
       POSTGRES_USER: ultimamilla
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ultimamilla_dev}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
