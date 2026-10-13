@@ -8,6 +8,7 @@ using UltimaMilla.Infrastructure.Persistence.Interceptors;
 using UltimaMilla.Infrastructure.Persistence.Seed;
 using UltimaMilla.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Hosting;
 
 namespace UltimaMilla.Infrastructure;
 
@@ -90,7 +91,14 @@ public static class DependencyInjection
         .AddRoles<IdentityRole<Guid>>()
         .AddEntityFrameworkStores<AppDbContext>()
         .AddSignInManager()
-        .AddDefaultTokenProviders();    
+        .AddDefaultTokenProviders();   
+
+        // ---------------------------------------------------------
+        // AUTENTICACIÓN
+        // ---------------------------------------------------------
+
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
 
         // ---------------------------------------------------------
         // REPOSITORIOS
@@ -141,15 +149,32 @@ public static class DependencyInjection
         }
 
         await DbSeeder.SembrarAsync(
-            db,
-            tenantScope,
-            ct);var userManager = scope.ServiceProvider
-        .GetRequiredService<UserManager<ApplicationUser>>();
+    db,
+    tenantScope,
+    ct);
 
-        await IdentitySeeder.SembrarAsync(
-            userManager,
-            db);
+var userManager = scope.ServiceProvider
+    .GetRequiredService<UserManager<ApplicationUser>>();
 
-    
+await IdentitySeeder.SembrarAsync(
+    userManager,
+    db);
+
+// Usuario comercial de prueba, solo en desarrollo.
+// Usuarios comerciales de prueba, solo en desarrollo.
+if (scope.ServiceProvider
+    .GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>()
+    .IsDevelopment())
+{
+    // Usuario de Tienda Norte
+    await IdentitySeeder.SembrarComercioPruebaAsync(
+        userManager,
+        db);
+
+    // Usuario de Moda Express
+    await IdentitySeeder.SembrarModaExpressPruebaAsync(
+        userManager,
+        db);
+}
     }
 }

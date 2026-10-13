@@ -1,24 +1,12 @@
 
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using UltimaMilla.Infrastructure.Identity;
-using UltimaMilla.Infrastructure.Persistence;
+using FluentValidation;
+using UltimaMilla.Application.Auth.Commands.Login;
+using UltimaMilla.Application.Auth.Commands.Register;
 
 namespace UltimaMilla.Api.Auth;
 
 public static class AuthEndpoints
 {
-    // Datos que recibimos al iniciar sesión.
-    public record LoginRequest(
-        string Email,
-        string Password,
-        Guid? OperadorId);
-
-    // Registra la ruta POST /api/auth/login.
     public static RouteGroupBuilder MapAuthEndpoints(
         this IEndpointRouteBuilder app)
     {
@@ -28,143 +16,120 @@ public static class AuthEndpoints
         grupo.MapPost("/login", LoginAsync)
             .AllowAnonymous();
 
+        grupo.MapPost("/register", RegisterAsync)
+            .AllowAnonymous();
+
         return grupo;
     }
 
     private static async Task<IResult> LoginAsync(
-        LoginRequest request,
-        UserManager<ApplicationUser> userManager,
-        AppDbContext db,
-        IConfiguration configuration)
+        LoginCommand command,
+        LoginHandler handler,
+        CancellationToken ct)
     {
-        // 1. Validar que ingresaron correo y contraseña.
-        if (string.IsNullOrWhiteSpace(request.Email) ||
-            string.IsNullOrWhiteSpace(request.Password))
+        // 1. Validar los datos recibidos.
+        // 2. Ejecutar el caso de uso de autenticación.
+        LoginResult resultado;
+
+        try
+        {
+            resultado = await handler.Handle(command, ct);
+        }
+        catch (ValidationException ex)
         {
             return Results.BadRequest(new
             {
-                mensaje = "Correo y contraseña son obligatorios."
+                mensaje = "Los datos ingresados no son válidos.",
+                errores = ex.Errors.Select(e => e.ErrorMessage)
             });
         }
 
-        // 2. Buscar al usuario mediante Identity.
-        var usuario = await userManager.FindByEmailAsync(
-            request.Email.Trim());
-
-        if (usuario is null || !usuario.Activo)
-            return Results.Unauthorized();
-
-        // 3. Comprobar si la cuenta está bloqueada.
-        if (await userManager.IsLockedOutAsync(usuario))
-            return Results.Unauthorized();
-
-        // 4. Validar la contraseña.
-        var passwordValida = await userManager.CheckPasswordAsync(
-            usuario,
-            request.Password);
-
-        if (!passwordValida)
+        // 3. Convertir el resultado en una respuesta HTTP.
+        return resultado.Status switch
         {
-            await userManager.AccessFailedAsync(usuario);
-            return Results.Unauthorized();
-        }
+            LoginStatus.Exitoso when resultado.Response is not null
+                => Results.Ok(resultado.Response),
 
-        // 5. Buscar los operadores a los que pertenece.
-        var operadores = await db.UsuariosOperadores
-            .AsNoTracking()
-            .Where(x => x.UsuarioId == usuario.Id)
-            .ToListAsync();
+            LoginStatus.CredencialesInvalidas
+                => Results.Unauthorized(),
 
-        // Si tiene un solo operador, lo seleccionamos.
-        // Si tiene varios, debe indicar cuál quiere utilizar.
-        var pertenencia = request.OperadorId.HasValue
-            ? operadores.FirstOrDefault(x =>
-                x.OperadorId == request.OperadorId.Value)
-            : operadores.Count == 1
-                ? operadores[0]
-                : null;
-
-        if (pertenencia is null)
+            LoginStatus.OperadorNoAutorizado
+    => Results.Json(
+        new
         {
-            return Results.Json(new
+            mensaje = "No se pudo determinar un contexto autorizado."
+        },
+        statusCode: StatusCodes.Status403Forbidden),
+
+        LoginStatus.ComercioNoAutorizado
+            => Results.Json(
+                new
+                {
+                    mensaje = "No se pudo determinar un contexto autorizado."
+                },
+                statusCode: StatusCodes.Status403Forbidden),
+
+        LoginStatus.TipoContextoInvalido
+            => Results.BadRequest(new
             {
-                mensaje = "No se pudo determinar un operador autorizado."
-            },
-            statusCode: StatusCodes.Status403Forbidden);
-        }
+                mensaje = "El tipo de contexto debe ser OPERADOR o COMERCIO."
+            }),
 
-        // 6. Reiniciar el contador de intentos fallidos.
-        await userManager.ResetAccessFailedCountAsync(usuario);
+        _ => Results.Problem(
+            "No se pudo procesar el inicio de sesión.")
+                };
+    }
 
-        // 7. Crear los claims del usuario autenticado.
-        var claims = new List<Claim>
+    
+private static async Task<IResult> RegisterAsync(
+    RegisterCommand command,
+    RegisterHandler handler,
+    CancellationToken ct)
+{
+    RegisterResult resultado;
+
+    try
+    {
+        resultado = await handler.Handle(command, ct);
+    }
+    catch (ValidationException ex)
+    {
+        return Results.BadRequest(new
         {
-            new(
-                JwtRegisteredClaimNames.Sub,
-                usuario.Id.ToString()),
-
-            new(
-                JwtRegisteredClaimNames.Email,
-                usuario.Email ?? request.Email),
-
-            new(
-                "operador_id",
-                pertenencia.OperadorId.ToString()),
-
-            new(
-                ClaimTypes.Role,
-                pertenencia.Rol),
-
-            new(
-                JwtRegisteredClaimNames.Jti,
-                Guid.NewGuid().ToString())
-        };
-
-        // 8. Obtener la configuración JWT de User Secrets.
-        var clave = configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException(
-                "Falta configurar Jwt:Key.");
-
-        var issuer = configuration["Jwt:Issuer"]
-            ?? throw new InvalidOperationException(
-                "Falta configurar Jwt:Issuer.");
-
-        var audience = configuration["Jwt:Audience"]
-            ?? throw new InvalidOperationException(
-                "Falta configurar Jwt:Audience.");
-
-        // 9. Firmar el token.
-        var credenciales = new SigningCredentials(
-            new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(clave)),
-            SecurityAlgorithms.HmacSha256);
-
-        var expiracion = DateTime.UtcNow.AddHours(2);
-
-        var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: claims,
-            expires: expiracion,
-            signingCredentials: credenciales);
-
-        // 10. Devolver el token y los datos del usuario.
-        return Results.Ok(new
-        {
-            accessToken = new JwtSecurityTokenHandler()
-                .WriteToken(token),
-
-            tokenType = "Bearer",
-            expiresAt = expiracion,
-
-            usuario = new
-            {
-                usuario.Id,
-                usuario.Email,
-                usuario.NombreCompleto,
-                pertenencia.OperadorId,
-                pertenencia.Rol
-            }
+            mensaje = "Los datos ingresados no son válidos.",
+            errores = ex.Errors.Select(e => e.ErrorMessage)
         });
     }
+
+    return resultado.Status switch
+    {
+        RegisterStatus.Exitoso when resultado.Response is not null
+            => Results.Created(
+                $"/api/comercios/{resultado.Response.ComercioId}",
+                resultado.Response),
+
+        RegisterStatus.EmailYaRegistrado
+            => Results.Conflict(new
+            {
+                mensaje = "El correo electrónico ya está registrado."
+            }),
+
+        RegisterStatus.RutYaRegistrado
+            => Results.Conflict(new
+            {
+                mensaje = "Ya existe un comercio con ese RUT."
+            }),
+
+        RegisterStatus.DatosInvalidos
+            => Results.BadRequest(new
+            {
+                mensaje = "No se pudo completar el registro.",
+                errores = resultado.Errores
+            }),
+
+        _ => Results.Problem(
+            "No se pudo procesar el registro.")
+    };
+}
+
 }

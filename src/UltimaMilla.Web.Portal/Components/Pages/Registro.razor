@@ -1,0 +1,89 @@
+
+@page "/registro"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using UltimaMilla.Web.Portal.Services
+@inject AuthApiClient AuthApi
+@inject NavigationManager Navigation
+
+<PageTitle>Registro de comercio</PageTitle>
+
+<h1>Registrar comercio</h1>
+
+<p>Completá los datos para crear tu comercio y tu usuario administrador.</p>
+
+<EditForm Model="modelo" OnValidSubmit="RegistrarAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label for="nombreCompleto">Nombre completo</label>
+        <InputText id="nombreCompleto"
+                   @bind-Value="modelo.NombreCompleto" />
+    </div>
+
+    <div>
+        <label for="nombreComercio">Nombre del comercio</label>
+        <InputText id="nombreComercio"
+                   @bind-Value="modelo.NombreComercio" />
+    </div>
+
+    <div>
+        <label for="rut">RUT</label>
+        <InputText id="rut"
+                   @bind-Value="modelo.Rut" />
+    </div>
+
+    <div>
+        <label for="email">Correo electrónico</label>
+        <InputText id="email"
+                   type="email"
+                   @bind-Value="modelo.Email" />
+    </div>
+
+    <div>
+        <label for="password">Contraseña</label>
+        <InputText id="password"
+                   type="password"
+                   @bind-Value="modelo.Password" />
+    </div>
+
+    <button type="submit" disabled="@registrando">
+        @(registrando ? "Registrando..." : "Crear cuenta")
+    </button>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <p class="@(exito ? "ok" : "error")">@mensaje</p>
+}
+
+@code {
+    private RegistroModel modelo = new();
+    private bool registrando;
+    private bool exito;
+    private string? mensaje;
+
+    private async Task RegistrarAsync()
+    {
+        registrando = true;
+        mensaje = null;
+
+        try
+        {
+            var resultado = await AuthApi.RegistrarAsync(modelo);
+
+            exito = resultado.Exito;
+            mensaje = resultado.Mensaje;
+
+            if (exito)
+            {
+                modelo = new RegistroModel();
+            }
+        }
+        finally
+        {
+            registrando = false;
+        }
+    }
+}

@@ -100,15 +100,42 @@ public sealed class AppDbContext
         // --------------------------------------------------
         // MULTITENANCY EXISTENTE
         // --------------------------------------------------
+// --------------------------------------------------
+// MULTITENANCY - OPERADORES Y COMERCIOS
+// --------------------------------------------------
 
-        modelBuilder.Entity<CuentaComercial>()
-            .HasQueryFilter(cuenta =>
-                _tenantContext.OperadorId.HasValue &&
-                cuenta.OperadorId == _tenantContext.OperadorId.Value);
+// Una cuenta comercial puede consultarse si:
+// 1. Pertenece al operador autenticado.
+// 2. Pertenece al comercio autenticado.
 
-        modelBuilder.Entity<Envio>()
-            .HasQueryFilter(envio =>
-                _tenantContext.OperadorId.HasValue &&
-                envio.OperadorId == _tenantContext.OperadorId.Value);
+modelBuilder.Entity<CuentaComercial>()
+    .HasQueryFilter(cuenta =>
+        (
+            _tenantContext.OperadorId != null &&
+            _tenantContext.ComercioId == null &&
+            cuenta.OperadorId == _tenantContext.OperadorId
+        )
+        ||
+        (
+            _tenantContext.ComercioId != null &&
+            _tenantContext.OperadorId == null &&
+            cuenta.ComercioId == _tenantContext.ComercioId
+        ));
+
+modelBuilder.Entity<Envio>()
+    .HasQueryFilter(envio =>
+        (
+            _tenantContext.OperadorId != null &&
+            _tenantContext.ComercioId == null &&
+            envio.OperadorId == _tenantContext.OperadorId
+        )
+        ||
+        (
+            _tenantContext.ComercioId != null &&
+            _tenantContext.OperadorId == null &&
+            CuentasComerciales.Any(cuenta =>
+                cuenta.Id == envio.CuentaComercialId &&
+                cuenta.ComercioId == _tenantContext.ComercioId)
+        ));
     }
 }

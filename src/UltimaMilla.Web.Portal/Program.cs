@@ -11,6 +11,9 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpClient<EnviosApiClient>(c =>
     c.BaseAddress = new Uri(builder.Configuration["Api:BaseUrl"] ?? "http://localhost:5080/"));
 
+builder.Services.AddHttpClient<AuthApiClient>(c =>
+    c.BaseAddress = new Uri(builder.Configuration["Api:BaseUrl"] ?? "http://localhost:5080/"));
+
 var app = builder.Build();
 
 app.UseAntiforgery();

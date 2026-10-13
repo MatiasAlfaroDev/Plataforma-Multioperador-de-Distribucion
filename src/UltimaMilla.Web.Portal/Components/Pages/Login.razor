@@ -1,0 +1,58 @@
+@page "/login"
+@rendermode InteractiveServer
+@using UltimaMilla.Web.Portal.Services
+@inject AuthApiClient AuthApi
+
+<PageTitle>Iniciar sesión</PageTitle>
+
+<h1>Iniciar sesión</h1>
+<p>Ingresá con tu cuenta de comercio.</p>
+
+<EditForm Model="modelo" OnValidSubmit="IniciarSesionAsync">
+    <DataAnnotationsValidator />
+
+    <div>
+        <label>Correo electrónico</label>
+        <InputText type="email" @bind-Value="modelo.Email" />
+    </div>
+
+    <div>
+        <label>Contraseña</label>
+        <InputText type="password" @bind-Value="modelo.Password" />
+    </div>
+
+    <button type="submit" disabled="@procesando">
+        @(procesando ? "Ingresando..." : "Iniciar sesión")
+    </button>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <p>@mensaje</p>
+}
+
+@code {
+    private LoginModel modelo = new();
+    private string? mensaje;
+    private bool procesando;
+
+   private async Task IniciarSesionAsync()
+{
+    mensaje = null;
+    procesando = true;
+
+    try
+    {
+        modelo.ComercioId = null;
+
+        var resultado = await AuthApi.LoginAsync(modelo);
+        mensaje = resultado.Mensaje;
+
+        // Próximo paso: crear la sesión autenticada.
+    }
+    finally
+    {
+        procesando = false;
+    }
+}
+}

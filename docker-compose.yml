@@ -31,7 +31,7 @@ services:
       POSTGRES_USER: ultimamilla
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ultimamilla_dev}
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -46,6 +46,9 @@ services:
       dockerfile: src/UltimaMilla.Api/Dockerfile
     environment:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
+      Jwt__Key: "${JWT_KEY:?Falta JWT_KEY en .env}"
+      Jwt__Issuer: "${JWT_ISSUER:?Falta JWT_ISSUER en .env}"
+      Jwt__Audience: "${JWT_AUDIENCE:?Falta JWT_AUDIENCE en .env}"
     depends_on:
       postgres:
         condition: service_healthy
