@@ -1,11 +1,41 @@
-body { font-family: system-ui, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; color: #222; }
-header { padding-bottom: .5rem; border-bottom: 1px solid #ddd; margin-bottom: 1rem; }
-fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 1rem 0; padding: .5rem 1rem 1rem; }
-legend { font-weight: 600; }
+/* Tokens compartidos por Portal y Backoffice: mismos nombres en los dos archivos. */
+:root {
+  color-scheme: light dark;
+  --fondo: #f6f7f9; --superficie: #ffffff; --texto: #1f2328; --texto-suave: #57606a;
+  --borde: #d0d7de; --acento: #0b6e4f; --acento-texto: #ffffff;
+  --peligro: #b3261e; --ok: #16692e; --radio: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #16181c; --superficie: #1f2228; --texto: #e6e8eb; --texto-suave: #a3aab3;
+    --borde: #3a3f47; --acento: #3fb68b; --acento-texto: #0d1512;
+    --peligro: #ff8a80; --ok: #6fd38f;
+  }
+}
+body { font-family: system-ui, sans-serif; background: var(--fondo); color: var(--texto); }
+header { padding-bottom: .5rem; border-bottom: 1px solid var(--borde); margin-bottom: 1rem; }
 label { display: block; margin: .7rem 0 .2rem; font-weight: 600; }
-input, select { width: 100%; padding: .5rem; box-sizing: border-box; }
+input, select { width: 100%; padding: .5rem; box-sizing: border-box; background: var(--superficie);
+  color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio); font: inherit; }
+button { padding: .55rem 1.1rem; border-radius: var(--radio); border: 1px solid var(--borde);
+  background: var(--superficie); color: var(--texto); font: inherit; cursor: pointer; }
+button:active { transform: translateY(1px); }
+button.primario { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); font-weight: 600; }
+button.peligro { color: var(--peligro); border-color: currentColor; background: transparent; }
+button:disabled { opacity: .6; cursor: progress; }
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.nota { color: var(--texto-suave); font-size: .9rem; }
+.aviso { padding: .6rem .8rem; border-radius: var(--radio); border: 1px solid currentColor; }
+.ok { color: var(--ok); }
+.error, .validation-message, .validation-errors { color: var(--peligro); }
+
+body { max-width: 680px; margin: 2rem auto; padding: 0 1rem; }
+fieldset { border: 1px solid var(--borde); border-radius: var(--radio); margin: 1rem 0; padding: .5rem 1rem 1rem; background: var(--superficie); }
+legend { font-weight: 600; }
 .fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; }
-button { margin-top: 1rem; padding: .6rem 1.2rem; }
-.nota { color: #666; font-size: .9rem; }
-.ok { color: #16692e; }
-.error, .validation-message, .validation-errors { color: #b3261e; }
+fieldset button { margin-top: 1rem; }
+.bulto + .bulto { border-top: 1px solid var(--borde); margin-top: 1rem; }
+.bulto h3 { font-size: 1rem; margin: 1rem 0 0; }
+.acciones { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.validation-message { font-size: .9rem; margin-top: .2rem; }
+.validation-errors { padding-left: 1.2rem; }

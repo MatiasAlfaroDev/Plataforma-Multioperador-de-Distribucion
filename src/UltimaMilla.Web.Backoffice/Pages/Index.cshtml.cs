@@ -26,7 +26,7 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         }
         catch (HttpRequestException)
         {
-            Error = "No se pudo conectar con la API.";
+            Error = "No se pudieron cargar los envíos. Probá de nuevo en unos minutos.";
         }
     }
 

@@ -5,6 +5,10 @@ namespace UltimaMilla.Web.Portal.Services;
 
 public sealed record CuentaComercialItem(Guid Id, Guid OperadorId, string OperadorNombre, Guid ComercioId, string ComercioNombre, bool Activa);
 
+/// <summary>Copia de lo que devuelve GET /api/zonas.</summary>
+public sealed record ZonaItem(Guid Id, string Nombre, string Departamento);
+
+/// <summary>Resultado de una operación de alta de envío.</summary>
 public sealed record ResultadoAlta(bool Exito, string Mensaje);
 
 /// <summary>Cliente HTTP tipado hacia la API. El Portal nunca toca la base de datos.</summary>
@@ -12,6 +16,12 @@ public sealed class EnviosApiClient(HttpClient http)
 {
     public async Task<IReadOnlyList<CuentaComercialItem>> ListarCuentasAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<CuentaComercialItem>>("api/cuentas-comerciales", ct) ?? [];
+
+    /// <summary>Zonas de cobertura del operador: el departamento del envío tiene que ser uno de ellos para que haya tarifa.</summary>
+    public async Task<IReadOnlyList<ZonaItem>> ListarZonasAsync(Guid operadorId, CancellationToken ct = default)
+    {
+        return await http.GetFromJsonAsync<List<ZonaItem>>($"api/zonas?operadorId={operadorId}", ct) ?? [];
+    }
 
     public async Task<ResultadoAlta> CrearAsync(NuevoEnvioModel m, CancellationToken ct = default)
     {
@@ -46,7 +56,7 @@ public sealed class EnviosApiClient(HttpClient http)
         }
         catch (HttpRequestException)
         {
-            return new(false, "No se pudo conectar con la API.");
+            return new(false, "No se pudo dar de alta el envío. Probá de nuevo en unos minutos.");
         }
     }
 

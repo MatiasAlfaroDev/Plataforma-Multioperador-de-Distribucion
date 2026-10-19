@@ -29,8 +29,8 @@ public sealed class NuevoEnvioModel
     [Required(ErrorMessage = "La localidad es obligatoria.")]
     public string Localidad { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "El departamento es obligatorio.")]
-    public string Departamento { get; set; } = "Montevideo";
+    [Required(ErrorMessage = "Elegí el departamento.")]
+    public string Departamento { get; set; } = string.Empty;
 
     public List<NuevoBultoModel> Bultos { get; set; } =
     [
