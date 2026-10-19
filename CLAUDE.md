@@ -20,9 +20,9 @@ docker compose down -v                             # borra también el volumen d
 ```
 
 Entrypoints detrás de Traefik: `portal.localhost:8000`, `backoffice.localhost:8000`,
-`api.localhost:8000`, `aspire.localhost:8000` (observabilidad) y `rabbit.localhost:8000`
-(panel de RabbitMQ). El panel de Traefik va en `localhost:8081`. Los navegadores resuelven
-`*.localhost` solos.
+`api.localhost:8000`, `grafana.localhost:8000` (Grafana: tablero técnico, trazas y logs)
+y `rabbit.localhost:8000` (panel de RabbitMQ). El panel de Traefik va en `localhost:8081`.
+Los navegadores resuelven `*.localhost` solos.
 
 ### App móvil (solución aparte)
 
@@ -83,6 +83,7 @@ externa. No agregues esas dependencias a esos dos proyectos.
   como parámetro (`Envio.Crear(..., ahora)`), que es lo que hace comprobables las pruebas.
 - **Auditoría:** `CreadoEn`/`ActualizadoEn` los completa `AuditableEntityInterceptor`; no se
   asignan en los Handlers.
+- **Eventos (outbox, RNF 6.8):** el Handler publica con `IPublicadorDeEventos` **antes** de `GuardarCambiosAsync`: MassTransit guarda el mensaje en la tabla `OutboxMessage` dentro de la misma transacción y lo entrega a RabbitMQ después. Los eventos son `record` en `<Area>/Eventos/`; el exchange se llama por namespace y tipo, así que moverlos rompe a quien los consuma. El bus no está en `/ready`: sin RabbitMQ la API sigue aceptando escrituras.
 - **Paquetes NuGet:** gestión central de versiones. La versión va en `Directory.Packages.props`
   de la raíz y el `.csproj` referencia el paquete **sin** `Version`. El TargetFramework
   (`net10.0`) viene de `Directory.Build.props` de la raíz.
@@ -116,17 +117,16 @@ responde a `Host(api.localhost)` **y** a `PathPrefix(/api)`, esto último para q
 móvil (emulador Android: `10.0.2.2:8000`, ver `Mobile/Data/Constants.cs`).
 
 Once contenedores: `traefik`, `postgres`, `redis`, `rabbitmq`, `otel-collector`,
-`aspire-dashboard`, `inicializador`, **dos réplicas de `api`**, `portal` y `backoffice`.
-`redis` y `rabbitmq` están declarados pero ningún código los usa todavía (caché 22/10,
-outbox 29/10). `api` e `inicializador` comparten `image: ultimamilla-api:local`, así que la
-imagen se construye una sola vez; `api` no lleva `container_name` a propósito, porque con uno
-fijo Docker no puede crear la segunda réplica. El Portal y el Backoffice salen por
+`lgtm`, `inicializador`, **dos réplicas de `api`**, `portal` y `backoffice`.
+`redis` está declarado pero ningún código lo usa todavía (caché 22/10); `rabbitmq` recibe los eventos del outbox de la API, y el Worker que los consume entra el 29/10. `api` e `inicializador` comparten `image: ultimamilla-api:local`, así que la imagen se construye una sola vez; `api` no lleva `container_name` a propósito, porque con uno fijo Docker no puede crear la segunda réplica. El Portal y el Backoffice salen por
 `Api__BaseUrl: http://traefik/` y no por `api:8080`, para usar el balanceador con health
 checks activos en lugar del round-robin del DNS de Docker.
 
 **Nunca** referenciar el csproj de Mobile desde el grafo de la API, el Portal o el Backoffice:
 los tres `docker build` fallarían con `NETSDK1147`, porque la imagen `sdk:10.0` no trae el
 workload de MAUI. La dependencia va siempre de Mobile hacia afuera.
+
+El router de la API responde a `PathPrefix(/api)`, así que todo router de otro host cuyo panel use `/api` (Grafana, RabbitMQ) necesita `priority=100`.
 
 ## Documentación
 

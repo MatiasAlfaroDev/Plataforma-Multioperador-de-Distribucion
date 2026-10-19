@@ -36,7 +36,7 @@ docker compose up --build
 | API | http://api.localhost:8000/api/envios |
 | Salud de la API | http://api.localhost:8000/health · `/ready` · `/live` |
 | Contrato OpenAPI | http://api.localhost:8000/openapi/v1.json |
-| Observabilidad (Aspire) | http://aspire.localhost:8000 |
+| Grafana: tablero técnico, trazas y logs | http://grafana.localhost:8000 |
 | Panel de RabbitMQ | http://rabbit.localhost:8000 |
 | Panel de Traefik | http://localhost:8081 |
 
@@ -46,12 +46,12 @@ Los navegadores resuelven `*.localhost` a la propia máquina, no hay que tocar e
 ### Qué levanta el compose
 
 Once contenedores: `traefik` (único proxy inverso, TLS, balanceo y rate limit), `postgres`,
-`redis`, `rabbitmq`, `otel-collector`, `aspire-dashboard`, `inicializador`, **dos réplicas de
-`api`**, `portal` y `backoffice`.
+`redis`, `rabbitmq`, `otel-collector`, `lgtm` (Grafana con Prometheus, Tempo y Loki), `inicializador`,
+**dos réplicas de `api`**, `portal` y `backoffice`.
 
-`redis` y `rabbitmq` todavía no los consume ningún código: están declarados para que el
-entorno coincida con `Docs/Modelado/stack-tecnologico.md` y para que el caché (22/10) y el
-outbox con el Worker (29/10) entren sin tocar infraestructura.
+`redis` todavía no lo consume ningún código: está declarado para que el caché (22/10) entre sin tocar
+infraestructura. `rabbitmq` recibe los eventos que la API publica por el outbox; el Worker que los
+consume entra el 29/10.
 
 El servicio **`inicializador`** crea el esquema y siembra los datos de demostración una sola
 vez y termina; las réplicas de la API arrancan recién cuando salió bien

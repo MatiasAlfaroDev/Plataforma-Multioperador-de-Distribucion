@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Resources;
 using UltimaMilla.Api.Errores;
 using UltimaMilla.Api.Salud;
 using UltimaMilla.Application;
@@ -19,9 +20,12 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Falta la cadena de conexión ConnectionStrings:Default.");
 
+var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
+    ?? throw new InvalidOperationException("Falta la cadena de conexión ConnectionStrings:RabbitMq.");
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddInfrastructure(connectionString, rabbitMq);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ManejadorDeErrores>();
@@ -34,14 +38,25 @@ builder.Services.AddHealthChecks()
 // los pone el compose: OTEL_EXPORTER_OTLP_ENDPOINT y OTEL_SERVICE_NAME.
 builder.Logging.AddOpenTelemetry(o => o.IncludeFormattedMessage = true);
 builder.Services.AddOpenTelemetry()
+    // Las réplicas comparten OTEL_SERVICE_NAME; sin un id de instancia propio (el hostname del contenedor)
+    // Prometheus suma sus series como si fueran una.
+    .ConfigureResource(r => r.AddAttributes([new("service.instance.id", Environment.MachineName)]))
     .WithTracing(t => t
         // Sin el filtro, el health check de Traefik cada 5s por réplica aporta dos spans
         // (/ready y su SELECT 1) y tapa las trazas de negocio en el dashboard.
         .AddAspNetCoreInstrumentation(o => o.Filter = ctx => !EsSonda(ctx.Request.Path))
         // Npgsql 10 trae su propio ActivitySource, así que cada consulta es una span sin
         // agregar paquetes; el de EF Core solo existe en beta.
-        .AddSource("Npgsql"))
-    .WithMetrics(m => m.AddAspNetCoreInstrumentation())
+        .AddSource("Npgsql")
+        // la traza del POST sigue hasta la publicación del outbox y la entrega a RabbitMQ
+        .AddSource("MassTransit"))
+    .WithMetrics(m =>
+    {
+        m.AddAspNetCoreInstrumentation();
+        m.AddMeter("MassTransit");
+        // .NET 10 emite las métricas de runtime (GC, hilos, memoria) en el medidor System.Runtime sin paquete extra.
+        m.AddMeter("System.Runtime");
+    })
     .UseOtlpExporter();
 
 var app = builder.Build();

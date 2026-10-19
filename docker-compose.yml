@@ -7,7 +7,7 @@
 #   API desde la app móvil:  http://10.0.2.2:8000/api/...  (emulador) o http://localhost:8000/api/... (Windows)
 #   Panel de Traefik:        http://localhost:8081
 #   Panel de RabbitMQ:       http://rabbit.localhost:8000
-#   Observabilidad:          http://aspire.localhost:8000
+#   Grafana (observabilidad): http://grafana.localhost:8000
 #
 # Monitoreos siguientes: worker, seguimiento y TLS con Let's Encrypt (solo en la nube).
 services:
@@ -51,8 +51,8 @@ services:
       timeout: 3s
       retries: 10
 
-  # Broker de mensajes (RNF 6.8). Todavía no lo consume ningún código: entra con el outbox
-  # y el Worker del 29/10. El panel de administración va por Traefik.
+  # Broker de mensajes (RNF 6.8). La API publica por el outbox; el Worker que consume entra el 29/10.
+  # El panel de administración va por Traefik.
   rabbitmq:
     image: rabbitmq:4-management-alpine
     environment:
@@ -67,32 +67,37 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.rabbitmq.rule=Host(`rabbit.localhost`)"
       - "traefik.http.routers.rabbitmq.entrypoints=web"
+      # Prioridad sobre el PathPrefix(/api) de la API, que si no se queda con /api/* de este host.
+      - "traefik.http.routers.rabbitmq.priority=100"
       - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
 
   # Única superficie de telemetría de las aplicaciones (RNF 6.12, stack-tecnologico.md §3).
-  # Al arrancar avisa tres veces que no alcanza el 18889 del dashboard: es la carrera de
-  # arranque, el cliente gRPC reintenta y conecta solo. El dashboard no tiene healthcheck
-  # porque su imagen no trae shell.
+  # Si al arrancar avisa que no alcanza lgtm:4317 es la carrera de arranque: reintenta y
+  # conecta solo.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.115.1
     command: --config=/etc/otelcol-contrib/config.yaml
     volumes:
       - ./docker/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     depends_on:
-      aspire-dashboard:
+      lgtm:
         condition: service_started
 
-  # Visualización en desarrollo: logs, métricas y trazas correlacionadas sin configurar nada.
-  # En la nube este lugar lo ocupan Prometheus, Tempo y Grafana.
-  aspire-dashboard:
-    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
-    environment:
-      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+  # Tablero técnico (RNF 6.12): Grafana con Prometheus, Tempo y Loki en un solo contenedor,
+  # el mismo stack que en la nube con un contenedor en lugar de tres. El tablero propio se
+  # provisiona desde docker/grafana/. Acceso anónimo como Admin: solo para desarrollo.
+  lgtm:
+    image: grafana/otel-lgtm:0.36.0
+    volumes:
+      - ./docker/grafana/tableros.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ultimamilla.yaml:ro
+      - ./docker/grafana/tablero-tecnico.json:/otel-lgtm/tablero-tecnico.json:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.aspire.rule=Host(`aspire.localhost`)"
-      - "traefik.http.routers.aspire.entrypoints=web"
-      - "traefik.http.services.aspire.loadbalancer.server.port=18888"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      # Prioridad sobre el PathPrefix(/api) de la API, que si no se queda con /api/* de este host.
+      - "traefik.http.routers.grafana.priority=100"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
   # Prepara el esquema y los datos de demostración una sola vez y termina. Las réplicas de la
   # API esperan a que haya salido bien, así ninguna siembra en paralelo. Comparte imagen con
@@ -104,6 +109,8 @@ services:
     image: ultimamilla-api:local
     environment:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
+      # No conecta (termina antes de arrancar el bus), pero Program exige la cadena.
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-ultimamilla}:${RABBITMQ_PASSWORD:-ultimamilla_dev}@rabbitmq:5672"
       Inicializacion__SoloInicializar: "true"
     depends_on:
       postgres:
@@ -121,12 +128,15 @@ services:
       replicas: 2
     environment:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-ultimamilla}:${RABBITMQ_PASSWORD:-ultimamilla_dev}@rabbitmq:5672"
       # Telemetría: el SDK lee estas dos variables solo (no hay endpoint en el código).
-      # Las dos réplicas comparten nombre de servicio; el dashboard las separa por instancia.
+      # Las dos réplicas comparten nombre de servicio; Program les agrega service.instance.id.
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_SERVICE_NAME: "api"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       inicializador:
         condition: service_completed_successfully

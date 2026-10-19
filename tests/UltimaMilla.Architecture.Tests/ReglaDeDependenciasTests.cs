@@ -18,6 +18,7 @@ public class ReglaDeDependenciasTests
             .HaveDependencyOnAny(
                 "Microsoft.EntityFrameworkCore",
                 "Microsoft.AspNetCore",
+                "MassTransit",
                 "UltimaMilla.Application",
                 "UltimaMilla.Infrastructure")
             .GetResult();
@@ -34,6 +35,7 @@ public class ReglaDeDependenciasTests
             .HaveDependencyOnAny(
                 "Microsoft.EntityFrameworkCore",
                 "Microsoft.AspNetCore",
+                "MassTransit",
                 "UltimaMilla.Infrastructure")
             .GetResult();
 

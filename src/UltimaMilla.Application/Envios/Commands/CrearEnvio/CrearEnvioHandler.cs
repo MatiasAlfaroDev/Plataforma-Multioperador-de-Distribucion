@@ -2,18 +2,21 @@ using FluentValidation;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Application.Envios.Eventos;
 
 namespace UltimaMilla.Application.Envios.Commands.CrearEnvio;
 
 /// <summary>
 /// Caso de uso "dar de alta un envío" (RF 7): valida, busca la cuenta comercial,
 /// controla duplicados, crea el Envio con las reglas del dominio y confirma con el Unit of Work.
+/// Publica el evento EnvioCreado (RNF 6.8).
 /// </summary>
 public sealed class CrearEnvioHandler(
     IEnvioRepository envios,
     ICuentaComercialRepository cuentas,
     IVersionTarifariaRepository tarifas,
     IUnitOfWork unitOfWork,
+    IPublicadorDeEventos eventos,
     IValidator<CrearEnvioCommand> validator,
     TimeProvider reloj)
 {
@@ -55,6 +58,10 @@ public sealed class CrearEnvioHandler(
             versionTarifaria.Id,
             tarifaCalculada);
         await envios.AgregarAsync(envio, ct);
+        
+        // va antes de guardar porque se confirma en la misma transacción que el envío (outbox, RNF 6.8)
+        await eventos.PublicarAsync(new EnvioCreado(envio.Id, envio.OperadorId, envio.CuentaComercialId, envio.ReferenciaExterna, envio.FechaAlta), ct);
+
         await unitOfWork.GuardarCambiosAsync(ct);
         return envio.Id;
     }

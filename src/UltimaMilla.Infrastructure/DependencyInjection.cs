@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using MassTransit;
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Infrastructure.Mensajeria;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Infrastructure.Persistence.Interceptors;
 using UltimaMilla.Infrastructure.Persistence.Seed;
@@ -11,8 +13,11 @@ namespace UltimaMilla.Infrastructure;
 
 public static class DependencyInjection
 {
-    /// <summary>Registra EF Core con PostgreSQL y las implementaciones de los contratos de Application.</summary>
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString)
+    /// <summary>
+    /// Registra EF Core con PostgreSQL, MassTransit con RabbitMQ y las implementaciones de los contratos de Application.
+    /// rabbitMq: cadena amqp://usuario:clave@host:5672
+    /// </summary>
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString, string rabbitMq)
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AuditableEntityInterceptor>();
@@ -26,6 +31,28 @@ public static class DependencyInjection
         services.AddScoped<IOperadorRepository, OperadorRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IZonaCoberturaRepository, ZonaCoberturaRepository>();
+        services.AddScoped<IPublicadorDeEventos, PublicadorDeEventos>();
+
+        // El outbox (RNF 6.8) guarda el mensaje en la misma transacción y un servicio en segundo plano
+        // de cada réplica lo entrega a RabbitMQ; UsePostgres hace que las dos réplicas no se pisen (bloqueo por fila).
+        services.AddMassTransit(x =>
+        {
+            x.AddEntityFrameworkOutbox<AppDbContext>(o =>
+            {
+                o.UsePostgres();
+                o.UseBusOutbox();
+            });
+            
+            // Sin RabbitMQ la API sigue sirviendo y acumula en el outbox, así que el bus no entra en /ready (Traefik la sacaría del pool); queda en /health.
+            x.ConfigureHealthCheckOptions(o => o.Tags.Remove("ready"));
+            
+            x.UsingRabbitMq((ctx, cfg) =>
+            {
+                cfg.Host(new Uri(rabbitMq));
+                cfg.ConfigureEndpoints(ctx);
+            });
+        });
+
         return services;
     }
 

@@ -1,0 +1,13 @@
+# Este archivo es parte del provisioning de dashboards de Grafana
+# Monta el tablero técnico definido en RNF 6.12 para el proyecto UTEC 2026
+
+apiVersion: 1
+
+providers:
+  - name: 'Última Milla'
+    folder: 'Última Milla'
+    type: file
+    disableDeletion: true
+    options:
+      path: /otel-lgtm/tablero-tecnico.json
+      foldersFromFilesStructure: false

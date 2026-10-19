@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Configuracion;
+using MassTransit;
 
 namespace UltimaMilla.Infrastructure.Persistence;
 
@@ -18,5 +19,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     {
         // Toma todas las clases IEntityTypeConfiguration de la carpeta Configurations.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        // tablas del outbox de MassTransit (RNF 6.8): el mensaje se guarda en la misma transacción que el cambio
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
     }
 }

@@ -1,6 +1,6 @@
 # Collector de OpenTelemetry (stack-tecnologico.md §3): las aplicaciones hablan OTLP solo
 # contra el Collector, y el backend de visualización es una decisión de compose, no de código.
-# En desarrollo exporta al Aspire dashboard; en la nube, a Prometheus y Tempo.
+# Exporta a grafana/otel-lgtm: Grafana con Prometheus (métricas), Tempo (trazas) y Loki (logs).
 receivers:
   otlp:
     protocols:
@@ -13,8 +13,8 @@ processors:
   batch: {}
 
 exporters:
-  otlp/aspire:
-    endpoint: aspire-dashboard:18889
+  otlp/lgtm:
+    endpoint: lgtm:4317
     tls:
       insecure: true
 
@@ -23,12 +23,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp/aspire]
+      exporters: [otlp/lgtm]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp/aspire]
+      exporters: [otlp/lgtm]
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp/aspire]
+      exporters: [otlp/lgtm]
