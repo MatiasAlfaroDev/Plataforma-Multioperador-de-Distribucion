@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Comercio> Comercios => Set<Comercio>();
     public DbSet<CuentaComercial> CuentasComerciales => Set<CuentaComercial>();
     public DbSet<Envio> Envios => Set<Envio>();
+    public DbSet<EventoMovil> EventosMovil => Set<EventoMovil>();
     public DbSet<ZonaCobertura> ZonasCobertura => Set<ZonaCobertura>();
     public DbSet<CuadroTarifario> CuadrosTarifarios => Set<CuadroTarifario>();
     public DbSet<VersionTarifaria> VersionesTarifarias => Set<VersionTarifaria>();

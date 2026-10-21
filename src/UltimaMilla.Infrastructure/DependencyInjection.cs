@@ -26,6 +26,7 @@ public static class DependencyInjection
             .AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));
 
         services.AddScoped<IEnvioRepository, EnvioRepository>();
+        services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
         services.AddScoped<IVersionTarifariaRepository, VersionTarifariaRepository>();
         services.AddScoped<IOperadorRepository, OperadorRepository>();

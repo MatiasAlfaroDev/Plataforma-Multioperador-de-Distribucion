@@ -6,6 +6,7 @@ namespace UltimaMilla.Application.Abstractions;
 public interface IEnvioRepository
 {
     Task AgregarAsync(Envio envio, CancellationToken ct);
+    Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct);
     Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct);
 
     /// <summary>Lista envíos con sus bultos; si viene operadorId, filtra por ese operador.</summary>

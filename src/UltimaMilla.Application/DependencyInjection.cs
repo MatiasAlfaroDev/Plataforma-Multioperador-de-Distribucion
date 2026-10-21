@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
+using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
 using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
@@ -19,6 +20,7 @@ public static class DependencyInjection
 
         services.AddScoped<CrearEnvioHandler>();
         services.AddScoped<ListarEnviosHandler>();
+        services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
         services.AddScoped<ListarOperadoresHandler>();
         services.AddScoped<ActualizarTarifaHandler>();
