@@ -8,6 +8,7 @@ using UltimaMilla.Api.Salud;
 using UltimaMilla.Application;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
+using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
 using UltimaMilla.Infrastructure;
@@ -98,6 +99,17 @@ api.MapPost("/envios", async (CrearEnvioCommand command, CrearEnvioHandler handl
 api.MapGet("/envios", async (Guid? operadorId, ListarEnviosHandler handler, CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ListarEnviosQuery(operadorId), ct)));
 
+// POST /api/envios/{id}/eventos-movil → sincronización de la app del repartidor (entregado / no entregado).
+// 201 = guardado; 409 = ya estaba (reintento, la app lo toma como éxito); 400 = conflicto o datos inválidos.
+api.MapPost("/envios/{envioId:guid}/eventos-movil",
+    async (Guid envioId, EventoMovilRequest request, RegistrarEventoMovilHandler handler, CancellationToken ct) =>
+    {
+        await handler.Handle(
+            new RegistrarEventoMovilCommand(envioId, request.IdEvento, request.Tipo, request.Motivo, request.Receptor, request.FechaHora),
+            ct);
+        return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
+    });
+
 api.MapPost("/tarifas", async (ActualizarTarifaCommand command, ActualizarTarifaHandler handler, CancellationToken ct) =>
 {
     var id = await handler.Handle(command, ct);
@@ -131,3 +143,6 @@ static bool EsSonda(PathString ruta) =>
 
 // Permite usar Program en las pruebas de integración más adelante.
 public partial class Program { }
+
+/// <summary>Cuerpo que manda la app del repartidor; el envío viaja en la URL.</summary>
+public sealed record EventoMovilRequest(Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora);

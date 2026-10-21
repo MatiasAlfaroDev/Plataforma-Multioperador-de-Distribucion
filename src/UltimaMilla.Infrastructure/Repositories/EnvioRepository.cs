@@ -10,6 +10,9 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
     public async Task AgregarAsync(Envio envio, CancellationToken ct) =>
         await db.Envios.AddAsync(envio, ct);
 
+    public Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct) =>
+        db.Envios.FirstOrDefaultAsync(e => e.Id == id, ct);
+
     public Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct) =>
         db.Envios.AnyAsync(e => e.CuentaComercialId == cuentaComercialId && e.ReferenciaExterna == referenciaExterna, ct);
 
