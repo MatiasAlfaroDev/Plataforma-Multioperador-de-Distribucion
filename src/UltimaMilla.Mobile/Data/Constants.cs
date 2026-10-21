@@ -1,9 +1,6 @@
 namespace UltimaMilla.Mobile.Data;
 
-/// <summary>
-/// Constantes de la app, como Constants.cs de la demo BeatScan.
-/// En el 15/10 se agrega acá la ruta de la base SQLite cifrada.
-/// </summary>
+/// <summary>Constantes de la app, como Constants.cs de la demo BeatScan.</summary>
 public static class Constants
 {
     /// <summary>
@@ -16,4 +13,16 @@ public static class Constants
         DeviceInfo.Platform == DevicePlatform.Android
             ? "http://10.0.2.2:8000/"
             : "http://localhost:8000/";
+
+    /// <summary>Archivo de la base local, en la carpeta privada de la app.</summary>
+    public const string DatabaseFilename = "repartidor.db3";
+
+    public static string DatabasePath => Path.Combine(FileSystem.AppDataDirectory, DatabaseFilename);
+
+    /// <summary>
+    /// Nombre con el que se guarda la clave de cifrado en SecureStorage
+    /// (Keystore en Android, Keychain en iOS, almacén protegido en Windows).
+    /// La clave nunca está escrita en el código.
+    /// </summary>
+    public const string ClaveBaseLocalKey = "clave_base_local";
 }

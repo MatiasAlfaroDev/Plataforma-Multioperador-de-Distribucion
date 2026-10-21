@@ -9,10 +9,13 @@
 
     <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="12">
 
-        <Label Text="Provisorio: desde el 15/10 el operador sale del inicio de sesión."
+        <Label Text="Provisorio: el operador saldrá del inicio de sesión."
                FontSize="13" TextColor="Gray" />
 
-        <Label Grid.Row="1" Text="{Binding Error}" TextColor="Red" IsVisible="{Binding HayError}" />
+        <VerticalStackLayout Grid.Row="1" Spacing="4">
+            <Label Text="{Binding Error}" TextColor="Red" IsVisible="{Binding HayError}" />
+            <Label Text="{Binding Aviso}" TextColor="#8A4B00" IsVisible="{Binding HayAviso}" />
+        </VerticalStackLayout>
 
         <RefreshView Grid.Row="2" Command="{Binding CargarCommand}" IsRefreshing="{Binding EstaCargando}">
             <CollectionView ItemsSource="{Binding Operadores}">
