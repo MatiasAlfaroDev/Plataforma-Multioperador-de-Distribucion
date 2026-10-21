@@ -48,22 +48,19 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
 
     /// <summary>
     /// Reemplaza la ruta guardada del operador por la recién descargada, SIN perder lo que
-    /// el repartidor registró y todavía no se sincronizó: esas filas se conservan y solo
-    /// se actualiza su estado del servidor.
+    /// el repartidor registró: el resultado local (Entregado / No entregado) se conserva,
+    /// esté o no sincronizado, y solo se actualizan los datos que vienen del servidor.
+    /// Se borran los envíos que ya no están en la ruta, salvo los que faltan sincronizar.
     /// </summary>
     public async Task GuardarRutaAsync(Guid operadorId, IEnumerable<EnvioItem> envios)
     {
         await using var conexion = await db.AbrirAsync();
         await using var tx = (SqliteTransaction)await conexion.BeginTransactionAsync();
 
-        var borrar = conexion.CreateCommand();
-        borrar.Transaction = tx;
-        borrar.CommandText = "DELETE FROM envios_ruta WHERE operador_id = $op AND pendiente = 0";
-        borrar.Parameters.AddWithValue("$op", operadorId.ToString());
-        await borrar.ExecuteNonQueryAsync();
-
+        var ids = new List<string>();
         foreach (var e in envios)
         {
+            ids.Add(e.Id.ToString());
             var upsert = conexion.CreateCommand();
             upsert.Transaction = tx;
             upsert.CommandText = """
@@ -90,6 +87,22 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
             await upsert.ExecuteNonQueryAsync();
         }
 
+        // Envíos que ya no vienen en la ruta (por ejemplo, reasignados a otro repartidor):
+        // se borran del teléfono, salvo los que tienen algo pendiente de mandar al servidor.
+        var borrar = conexion.CreateCommand();
+        borrar.Transaction = tx;
+        var parametros = new List<string>();
+        for (var i = 0; i < ids.Count; i++)
+        {
+            parametros.Add($"$id{i}");
+            borrar.Parameters.AddWithValue($"$id{i}", ids[i]);
+        }
+        borrar.CommandText = ids.Count == 0
+            ? "DELETE FROM envios_ruta WHERE operador_id = $op AND pendiente = 0"
+            : $"DELETE FROM envios_ruta WHERE operador_id = $op AND pendiente = 0 AND id NOT IN ({string.Join(", ", parametros)})";
+        borrar.Parameters.AddWithValue("$op", operadorId.ToString());
+        await borrar.ExecuteNonQueryAsync();
+
         await tx.CommitAsync();
     }
 
@@ -102,7 +115,7 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
                    estado_servidor, resultado_local, pendiente
             FROM envios_ruta
             WHERE operador_id = $op
-            ORDER BY referencia
+            ORDER BY (resultado_local IS NOT NULL), referencia  -- primero lo que falta entregar
             """;
         comando.Parameters.AddWithValue("$op", operadorId.ToString());
 
