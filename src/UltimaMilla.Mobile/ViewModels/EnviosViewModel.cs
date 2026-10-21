@@ -64,16 +64,50 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     private string? aviso;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EnLinea))]
     private bool sinConexion;
 
+    public bool EnLinea => !SinConexion;
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HayPendientes), nameof(TextoBotonSincronizar))]
+    [NotifyPropertyChangedFor(nameof(HayPendientes), nameof(TextoPendientes))]
     private int pendientes;
+
+    // Resumen del día para la cabecera de la pantalla.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Progreso), nameof(TextoProgreso))]
+    private int total;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Progreso), nameof(TextoProgreso))]
+    private int entregados;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Progreso), nameof(TextoProgreso))]
+    private int noEntregados;
+
+    [ObservableProperty]
+    private int porEntregar;
 
     public bool HayError => !string.IsNullOrEmpty(Error);
     public bool HayAviso => !string.IsNullOrEmpty(Aviso);
     public bool HayPendientes => Pendientes > 0;
-    public string TextoBotonSincronizar => $"Sincronizar ({Pendientes} pendiente{(Pendientes == 1 ? "" : "s")})";
+    public string TextoBotonSincronizar => "Enviar ahora";
+    public string TextoPendientes => Pendientes == 1
+        ? "1 registro guardado en el teléfono sin enviar"
+        : $"{Pendientes} registros guardados en el teléfono sin enviar";
+
+    /// <summary>De 0 a 1, para la barra de progreso: cuántos envíos ya tienen resultado.</summary>
+    public double Progreso => Total == 0 ? 0 : (double)(Entregados + NoEntregados) / Total;
+    public string TextoProgreso => $"{Entregados + NoEntregados} de {Total} resueltos";
+    public string FechaHoy
+    {
+        get
+        {
+            var texto = DateTime.Now.ToString("dddd d 'de' MMMM", new System.Globalization.CultureInfo("es-UY"));
+            return char.ToUpper(texto[0]) + texto[1..];   // "Miércoles 21 de octubre"
+        }
+    }
 
     /// <summary>Shell llama a este método con los parámetros de la navegación.</summary>
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -242,6 +276,11 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         Envios.Clear();
         foreach (var envio in lista)
             Envios.Add(envio);
+
+        Total = lista.Count;
+        Entregados = lista.Count(e => e.EsEntregado);
+        NoEntregados = lista.Count(e => e.EsNoEntregado);
+        PorEntregar = lista.Count(e => e.PuedeRegistrar);
 
         Pendientes = await _eventos.ContarAsync();
     }
