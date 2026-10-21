@@ -7,23 +7,31 @@
              x:DataType="vm:EnviosViewModel"
              Title="{Binding Operador.Nombre}">
 
-    <Grid RowDefinitions="Auto,*" Padding="16" RowSpacing="12">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="16" RowSpacing="10">
 
-        <Label Text="{Binding Error}" TextColor="Red" IsVisible="{Binding HayError}" />
+        <!-- Franja de estado de la conexión -->
+        <Border Grid.Row="0" Padding="10,6" StrokeShape="RoundRectangle 8"
+                BackgroundColor="#FFF3E0" Stroke="#F57C00" IsVisible="{Binding SinConexion}">
+            <Label Text="Sin conexión · trabajando con datos guardados" TextColor="#8A4B00" FontAttributes="Bold" />
+        </Border>
 
-        <RefreshView Grid.Row="1" Command="{Binding CargarCommand}" IsRefreshing="{Binding EstaCargando}">
+        <Label Grid.Row="1" Text="{Binding Aviso}" FontSize="13" TextColor="Gray" IsVisible="{Binding HayAviso}" />
+
+        <Label Grid.Row="2" Text="{Binding Error}" TextColor="Red" IsVisible="{Binding HayError}" />
+
+        <Button Grid.Row="3" Text="{Binding TextoBotonSincronizar}" Command="{Binding SincronizarCommand}"
+                IsVisible="{Binding HayPendientes}" />
+
+        <RefreshView Grid.Row="4" Command="{Binding CargarCommand}" IsRefreshing="{Binding EstaCargando}">
             <CollectionView ItemsSource="{Binding Envios}">
                 <CollectionView.EmptyView>
-                    <Label Text="No hay envíos para este operador." HorizontalOptions="Center" Margin="0,24" />
+                    <Label Text="No hay envíos en la ruta. Deslizá hacia abajo para descargar." HorizontalOptions="Center" Margin="0,24" />
                 </CollectionView.EmptyView>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="models:EnvioItem">
+                    <DataTemplate x:DataType="models:EnvioRuta">
                         <Border Margin="0,6" Padding="14" StrokeShape="RoundRectangle 10">
                             <VerticalStackLayout Spacing="4">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Text="{Binding ReferenciaExterna}" FontAttributes="Bold" FontSize="16" />
-                                    <Label Grid.Column="1" Text="{Binding Estado}" FontSize="13" TextColor="Gray" />
-                                </Grid>
+                                <Label Text="{Binding ReferenciaExterna}" FontAttributes="Bold" FontSize="16" />
                                 <Label Text="{Binding DestinatarioNombre}" />
                                 <Label Text="{Binding Direccion}" FontSize="13" />
                                 <Label FontSize="12" TextColor="Gray">
@@ -37,6 +45,17 @@
                                         </FormattedString>
                                     </Label.FormattedText>
                                 </Label>
+                                <Label Text="{Binding EstadoMostrado}" FontSize="13" FontAttributes="Bold" />
+
+                                <!-- Solo se ven si todavía no se registró el resultado -->
+                                <HorizontalStackLayout Spacing="8" Margin="0,6,0,0" IsVisible="{Binding PuedeRegistrar}">
+                                    <Button Text="Entregado"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=EntregarCommand}"
+                                            CommandParameter="{Binding .}" />
+                                    <Button Text="No entregado"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=NoEntregadoCommand}"
+                                            CommandParameter="{Binding .}" />
+                                </HorizontalStackLayout>
                             </VerticalStackLayout>
                         </Border>
                     </DataTemplate>

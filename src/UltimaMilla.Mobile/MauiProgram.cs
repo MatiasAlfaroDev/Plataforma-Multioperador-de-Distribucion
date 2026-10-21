@@ -10,6 +10,9 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        // Carga el motor SQLite con cifrado (SQLCipher) que trae el paquete SQLitePCLRaw.bundle_e_sqlcipher.
+        SQLitePCL.Batteries_V2.Init();
+
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
@@ -32,12 +35,26 @@ public static class MauiProgram
             c.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
         });
 
+        // Trabajo sin conexión: base local cifrada, repositorios y sincronización (una sola instancia para toda la app).
+        builder.Services.AddSingleton<BaseDeDatosLocal>();
+        builder.Services.AddSingleton<RutaRepository>();
+        builder.Services.AddSingleton<EventosPendientesRepository>();
+        builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
+        builder.Services.AddSingleton<SincronizacionService>();
+        builder.Services.AddSingleton<IDialogos, DialogosShell>();
+
         // MVVM: cada página recibe su ViewModel por constructor.
         builder.Services.AddTransient<SeleccionOperadorViewModel>();
         builder.Services.AddTransient<SeleccionOperadorPage>();
         builder.Services.AddTransient<EnviosViewModel>();
         builder.Services.AddTransient<EnviosPage>();
 
-        return builder.Build();
+        var app = builder.Build();
+
+        // Se crea al arrancar para que empiece a escuchar los cambios de conexión
+        // y sincronice solo, aunque el repartidor no esté en la pantalla de la ruta.
+        _ = app.Services.GetRequiredService<SincronizacionService>();
+
+        return app;
     }
 }
