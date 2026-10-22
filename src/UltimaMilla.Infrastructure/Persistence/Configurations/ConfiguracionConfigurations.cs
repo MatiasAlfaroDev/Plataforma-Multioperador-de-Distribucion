@@ -1,3 +1,4 @@
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using UltimaMilla.Domain.Configuracion;
@@ -28,6 +29,75 @@ public sealed class ZonaCoberturaConfiguration
 
         builder.HasIndex(z => new { z.OperadorId, z.Nombre })
             .IsUnique();
+
+        builder.HasMany(z => z.Localidades)
+            .WithOne()
+            .HasForeignKey(x => x.ZonaCoberturaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(z => z.Localidades)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(z => z.Franjas)
+            .WithOne()
+            .HasForeignKey(x => x.ZonaCoberturaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(z => z.Franjas)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+public sealed class LocalidadCubiertaConfiguration
+    : IEntityTypeConfiguration<LocalidadCubierta>
+{
+    public void Configure(EntityTypeBuilder<LocalidadCubierta> builder)
+    {
+        builder.ToTable("localidades_cubiertas");
+        builder.HasKey(x => x.Id);
+
+        builder.Property(x => x.Id)
+            .ValueGeneratedNever();
+
+        builder.Property(x => x.Nombre)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Property(x => x.Sector)
+            .HasMaxLength(150);
+
+        builder.HasIndex(x => new
+        {
+            x.ZonaCoberturaId,
+            x.Nombre,
+            x.Sector
+        });
+    }
+}
+
+public sealed class FranjaEntregaConfiguration
+    : IEntityTypeConfiguration<FranjaEntrega>
+{
+    public void Configure(EntityTypeBuilder<FranjaEntrega> builder)
+    {
+        builder.ToTable("franjas_entrega");
+        builder.HasKey(x => x.Id);
+
+        builder.Property(x => x.Id)
+            .ValueGeneratedNever();
+
+        builder.Property(x => x.HoraDesde)
+            .IsRequired();
+
+        builder.Property(x => x.HoraHasta)
+            .IsRequired();
+
+        builder.HasIndex(x => new
+        {
+            x.ZonaCoberturaId,
+            x.HoraDesde,
+            x.HoraHasta
+        });
     }
 }
 

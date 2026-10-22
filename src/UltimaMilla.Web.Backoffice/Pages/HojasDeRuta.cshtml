@@ -1,0 +1,316 @@
+
+@page
+@model UltimaMilla.Web.Backoffice.Pages.HojasDeRutaModel
+
+@{
+    ViewData["Title"] = "Hojas de ruta";
+}
+
+<h1>Hojas de ruta</h1>
+
+<p>
+    Seleccioná los envíos, el repartidor y el vehículo.
+    El sistema comprobará las restricciones y calculará
+    el orden de las paradas.
+</p>
+
+@if (TempData["Exito"] is string exito)
+{
+    <div class="alert alert-success">
+        @exito
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-danger">
+        @Model.Error
+    </div>
+}
+
+<!-- Selección del operador -->
+<form method="get" class="mb-4">
+    <label for="operadorId">Operador</label>
+
+    <select id="operadorId"
+            name="operadorId"
+            class="form-select"
+            onchange="this.form.submit()">
+
+        @foreach (var operador in Model.Operadores)
+        {
+            <option value="@operador.Id"
+                    selected="@(operador.Id == Model.Formulario.OperadorId)">
+                @operador.Nombre
+            </option>
+        }
+    </select>
+</form>
+
+@if (Model.Formulario.OperadorId != Guid.Empty)
+{
+    <h2>Crear hoja de ruta</h2>
+
+    <form method="post">
+
+        <div asp-validation-summary="All"
+             class="text-danger mb-3"></div>
+
+        <input type="hidden"
+               asp-for="Formulario.OperadorId" />
+
+        <!-- Fecha de reparto -->
+        <div class="mb-3">
+            <label asp-for="Formulario.Fecha">
+                Fecha de reparto
+            </label>
+
+            <input asp-for="Formulario.Fecha"
+                   type="date"
+                   class="form-control" />
+
+            <small class="text-muted">
+                Día en que se realizará el reparto.
+            </small>
+        </div>
+
+        <!-- Hora de salida -->
+        <div class="mb-3">
+            <label asp-for="Formulario.HoraSalida">
+                Hora de salida
+            </label>
+
+            <input asp-for="Formulario.HoraSalida"
+                   type="time"
+                   class="form-control" />
+
+            <small class="text-muted">
+                Hora prevista de salida del repartidor.
+            </small>
+        </div>
+
+        <!-- Franja horaria -->
+        <div class="mb-3">
+            <label asp-for="Formulario.FranjaSeleccionada">
+                Franja horaria de entrega
+            </label>
+
+            <select asp-for="Formulario.FranjaSeleccionada"
+                    class="form-select">
+
+                <option value="">
+                    Seleccionar franja
+                </option>
+
+                @foreach (var franja in Model.Franjas)
+                {
+                    var valor =
+                        $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
+
+                    <option value="@valor">
+                        @franja.HoraDesde.ToString("HH:mm")
+                        -
+                        @franja.HoraHasta.ToString("HH:mm")
+                    </option>
+                }
+            </select>
+
+            <span asp-validation-for="Formulario.FranjaSeleccionada"
+                  class="text-danger"></span>
+
+            <small class="text-muted">
+                Se utilizará para validar los horarios
+                de los envíos seleccionados.
+            </small>
+        </div>
+
+        <!-- Repartidor -->
+        <div class="mb-3">
+            <label asp-for="Formulario.RepartidorId">
+                Repartidor
+            </label>
+
+            <select asp-for="Formulario.RepartidorId"
+                    class="form-select">
+
+                <option value="">
+                    Seleccionar repartidor
+                </option>
+
+                @foreach (var repartidor in Model.Repartidores)
+                {
+                    <option value="@repartidor.Id">
+                        @repartidor.Nombre
+                    </option>
+                }
+            </select>
+        </div>
+
+        <!-- Vehículo -->
+        <div class="mb-3">
+            <label asp-for="Formulario.VehiculoId">
+                Vehículo
+            </label>
+
+            <select asp-for="Formulario.VehiculoId"
+                    class="form-select">
+
+                <option value="">
+                    Seleccionar vehículo
+                </option>
+
+                @foreach (var vehiculo in Model.Vehiculos)
+                {
+                    <option value="@vehiculo.Id">
+                        @vehiculo.Matricula —
+                        @vehiculo.CapacidadPesoKg kg,
+                        @vehiculo.CapacidadVolumenM3 m³
+                    </option>
+                }
+            </select>
+        </div>
+
+        <!-- Máximo de paradas -->
+        <div class="mb-3">
+            <label asp-for="Formulario.MaximoParadas">
+                Máximo de paradas
+            </label>
+
+            <input asp-for="Formulario.MaximoParadas"
+                   type="number"
+                   min="1"
+                   max="200"
+                   class="form-control" />
+
+            <span asp-validation-for="Formulario.MaximoParadas"
+                  class="text-danger"></span>
+        </div>
+
+        <!-- Selección de envíos -->
+        <h3>Envíos disponibles</h3>
+
+        <p class="text-muted">
+            Seleccioná los envíos que querés incluir
+            en esta hoja de ruta.
+        </p>
+
+        @if (Model.Envios.Count == 0)
+        {
+            <div class="alert alert-info">
+                No hay envíos en depósito para este operador.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Referencia</th>
+                            <th>Localidad</th>
+                            <th>Peso</th>
+                            <th>Compromiso actual</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var envio in Model.Envios)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox"
+                                           name="Formulario.EnviosIds"
+                                           value="@envio.Id"
+                                           checked="@(Model.Formulario.EnviosIds.Contains(envio.Id))" />
+                                </td>
+
+                                <td>
+                                    @envio.ReferenciaExterna
+                                </td>
+
+                                <td>
+                                    @envio.Localidad
+                                </td>
+
+                                <td>
+                                    @envio.PesoKg kg
+                                </td>
+
+                                <td>
+                                    @if (envio.TieneCompromiso)
+                                    {
+                                        <span>
+                                            @envio.FechaComprometida
+                                            |
+                                            @envio.HoraDesde–@envio.HoraHasta
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">
+                                            Se definirá al planificar
+                                        </span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <button type="submit"
+                class="btn btn-primary"
+                disabled="@(Model.Envios.Count == 0)">
+            Crear y asignar hoja de ruta
+        </button>
+    </form>
+
+    <hr class="my-4" />
+
+    <!-- Listado de hojas de ruta -->
+    <h2>Hojas de ruta creadas</h2>
+
+    @if (Model.Hojas.Count == 0)
+    {
+        <p>
+            Todavía no hay hojas de ruta para este operador.
+        </p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Salida</th>
+                        <th>Paradas</th>
+                        <th>Peso asignado</th>
+                        <th>Identificador</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var hoja in Model.Hojas)
+                    {
+                        <tr>
+                            <td>@hoja.Fecha</td>
+
+                            <td>
+                                @(hoja.HoraSalida?.ToString("HH:mm") ?? "Sin definir")
+                            </td>
+
+                            <td>@hoja.CantidadParadas</td>
+
+                            <td>@hoja.PesoAsignadoKg kg</td>
+
+                            <td>@hoja.Id</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}

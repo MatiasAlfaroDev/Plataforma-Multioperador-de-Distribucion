@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using UltimaMilla.Application.Common;
+using Microsoft.EntityFrameworkCore;
 
 namespace UltimaMilla.Api.Errores;
 
@@ -9,10 +10,27 @@ namespace UltimaMilla.Api.Errores;
 /// Traduce las excepciones de Application y Domain a respuestas HTTP con formato ProblemDetails,
 /// para que los endpoints no tengan try/catch.
 /// </summary>
-public sealed class ManejadorDeErrores : IExceptionHandler
+public sealed class ManejadorDeErrores(
+    ILogger<ManejadorDeErrores> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext http, Exception exception, CancellationToken ct)
     {
+        logger.LogError(
+            exception,
+            "Error procesando {Metodo} {Ruta}",
+            http.Request.Method,
+            http.Request.Path);
+        if (exception is DbUpdateConcurrencyException concurrencia)
+        {
+            foreach (var entrada in concurrencia.Entries)
+            {
+                logger.LogError(
+                    "Conflicto de concurrencia en entidad {Entidad}, estado EF: {Estado}",
+                    entrada.Metadata.ClrType.Name,
+                    entrada.State);
+            }
+        }
+
         ProblemDetails problema = exception switch
         {
             ValidationException ve => new ValidationProblemDetails(

@@ -15,6 +15,7 @@ public sealed class CrearEnvioHandler(
     IEnvioRepository envios,
     ICuentaComercialRepository cuentas,
     IVersionTarifariaRepository tarifas,
+    IVersionReglasOperativasRepository reglas,
     IUnitOfWork unitOfWork,
     IPublicadorDeEventos eventos,
     IValidator<CrearEnvioCommand> validator,
@@ -57,6 +58,15 @@ public sealed class CrearEnvioHandler(
         envio.AplicarTarifa(
             versionTarifaria.Id,
             tarifaCalculada);
+
+        var versionReglas = await reglas.ObtenerVigenteAsync(
+            cuenta.OperadorId,
+            ahora,
+            ct)
+            ?? throw new NoEncontradoException(
+                "No existe una versión de reglas operativas vigente para este operador.");
+
+        envio.AsignarReglasOperativas(versionReglas.Id);
         await envios.AgregarAsync(envio, ct);
         
         // va antes de guardar porque se confirma en la misma transacción que el envío (outbox, RNF 6.8)

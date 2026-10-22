@@ -22,6 +22,10 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
             .WithMany()
             .HasForeignKey(e => e.VersionTarifariaId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<VersionReglasOperativas>()
+            .WithMany()
+            .HasForeignKey(e => e.VersionReglasOperativasId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Ignore(e => e.PesoTotalKg);
         builder.Ignore(e => e.VolumenTotalMetrosCubicos);
         // Concurrencia optimista con la columna de sistema xmin de PostgreSQL (informe 6.1 y 6.4).
@@ -47,6 +51,24 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         // Bultos: tabla propia, se guardan y se borran junto con el envío.
         builder.HasMany(e => e.Bultos).WithOne().HasForeignKey("EnvioId").OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(e => e.Bultos).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Historial de transiciones del envío.
+        builder.HasMany(e => e.Eventos)
+            .WithOne()
+            .HasForeignKey(e => e.EnvioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(e => e.Eventos)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Intentos de entrega asociados al envío.
+        builder.HasMany(e => e.Intentos)
+            .WithOne()
+            .HasForeignKey(e => e.EnvioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(e => e.Intentos)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasOne<CuentaComercial>().WithMany().HasForeignKey(e => e.CuentaComercialId).OnDelete(DeleteBehavior.Restrict);
 

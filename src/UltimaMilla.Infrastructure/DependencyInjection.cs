@@ -29,9 +29,14 @@ public static class DependencyInjection
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
         services.AddScoped<IVersionTarifariaRepository, VersionTarifariaRepository>();
+        services.AddScoped<IVersionReglasOperativasRepository, VersionReglasOperativasRepository>();
+        services.AddScoped<IMotivoNoEntregaRepository, MotivoNoEntregaRepository>();
         services.AddScoped<IOperadorRepository, OperadorRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IZonaCoberturaRepository, ZonaCoberturaRepository>();
+        services.AddScoped<IRepartidorRepository, RepartidorRepository>();
+        services.AddScoped<IVehiculoRepository, VehiculoRepository>();
+        services.AddScoped<IHojaDeRutaRepository, HojaDeRutaRepository>();
         services.AddScoped<IPublicadorDeEventos, PublicadorDeEventos>();
 
         // El outbox (RNF 6.8) guarda el mensaje en la misma transacción y un servicio en segundo plano
@@ -69,7 +74,7 @@ public static class DependencyInjection
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        await db.Database.EnsureCreatedAsync(ct);
+        await db.Database.MigrateAsync(ct);
         await DbSeeder.SembrarAsync(db, ct);
     }
 }

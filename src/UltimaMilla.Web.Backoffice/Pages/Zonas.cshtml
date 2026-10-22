@@ -1,0 +1,171 @@
+
+@page
+@model UltimaMilla.Web.Backoffice.Pages.ZonasModel
+
+@{
+    ViewData["Title"] = "Zonas de cobertura";
+}
+
+<h1>Zonas de cobertura</h1>
+
+<p class="nota">
+    Configurá las áreas de reparto, las franjas disponibles
+    y los tiempos estimados de cada operador.
+</p>
+
+@if (TempData["Mensaje"] is string mensaje)
+{
+    <p class="aviso ok" role="status">@mensaje</p>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <p class="aviso error" role="alert">@Model.Error</p>
+}
+
+<section>
+    <h2>Seleccionar operador</h2>
+
+    <form method="get" class="filtro">
+        <div>
+            <label for="operador">Operador</label>
+
+            <select id="operador" name="operadorId" required>
+                <option value="">Seleccioná un operador</option>
+
+                @foreach (var operador in Model.Operadores)
+                {
+                    <option value="@operador.Id"
+                            selected="@(Model.OperadorId == operador.Id)">
+                        @operador.Nombre
+                    </option>
+                }
+            </select>
+        </div>
+
+        <button type="submit">Consultar</button>
+    </form>
+</section>
+
+@if (Model.OperadorId is Guid operadorId &&
+     operadorId != Guid.Empty)
+{
+    <section>
+        <h2>Zonas existentes</h2>
+
+        @if (Model.Zonas.Count == 0)
+        {
+            <p class="nota">
+                Este operador todavía no tiene zonas activas.
+            </p>
+        }
+        else
+        {
+            <div class="tabla">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Zona</th>
+                            <th>Departamento</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var zona in Model.Zonas)
+                        {
+                            <tr>
+                                <td>@zona.Nombre</td>
+                                <td>@zona.Departamento</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section>
+        <h2>Crear zona</h2>
+
+        <form method="post">
+            <input type="hidden"
+                   asp-for="Formulario.OperadorId"
+                   value="@operadorId" />
+
+            <div asp-validation-summary="All"
+                 class="error"></div>
+
+            <div class="campos">
+                <div>
+                    <label asp-for="Formulario.Nombre">
+                        Nombre de la zona
+                    </label>
+                    <input asp-for="Formulario.Nombre"
+                           placeholder="Ej.: San José de Mayo" />
+                </div>
+
+                <div>
+                    <label asp-for="Formulario.Departamento">
+                        Departamento
+                    </label>
+                    <input asp-for="Formulario.Departamento"
+                           placeholder="Ej.: San José" />
+                </div>
+
+                <div>
+                    <label asp-for="Formulario.MinutosTraslado">
+                        Tiempo estimado entre paradas (minutos)
+                    </label>
+                    <input asp-for="Formulario.MinutosTraslado"
+                        type="number"
+                        min="1" />
+                </div>
+            </div>
+
+            <label asp-for="Formulario.Coberturas">
+                Localidades y sectores cubiertos
+            </label>
+
+            <textarea asp-for="Formulario.Coberturas"
+                      rows="5"
+                      style="width:100%;box-sizing:border-box;
+                             background:var(--superficie);
+                             color:var(--texto);
+                             border:1px solid var(--borde);
+                             border-radius:var(--radio);
+                             padding:.6rem;font:inherit;"
+                      placeholder="San José de Mayo&#10;Otra localidad&#10;Montevideo | Cordón"></textarea>
+
+            <p class="nota">
+                Escribí una cobertura por línea.
+                Para cubrir toda una localidad, escribí su nombre.
+                Para un sector, utilizá: Localidad | Sector.
+            </p>
+
+            <label asp-for="Formulario.Franjas">
+                Franjas horarias disponibles
+            </label>
+
+            <textarea asp-for="Formulario.Franjas"
+                      rows="4"
+                      style="width:100%;box-sizing:border-box;
+                             background:var(--superficie);
+                             color:var(--texto);
+                             border:1px solid var(--borde);
+                             border-radius:var(--radio);
+                             padding:.6rem;font:inherit;"
+                      placeholder="09:00-12:00&#10;14:00-18:00"></textarea>
+
+            <p class="nota">
+                Una franja por línea, con formato HH:mm-HH:mm.
+                Las franjas no pueden superponerse.
+            </p>
+
+            <div class="acciones">
+                <button type="submit" class="primario">
+                    Crear zona
+                </button>
+            </div>
+        </form>
+    </section>
+}

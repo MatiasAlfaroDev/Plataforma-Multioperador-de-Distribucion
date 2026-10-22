@@ -9,12 +9,17 @@ using UltimaMilla.Application;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
+using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
 using UltimaMilla.Infrastructure;
 using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
+using UltimaMilla.Application.Configuracion.Commands.CrearZona;
+using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
+using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
+using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,7 +64,7 @@ builder.Services.AddOpenTelemetry()
         m.AddMeter("System.Runtime");
     })
     .UseOtlpExporter();
-
+builder.Services.AddScoped<CrearZonaHandler>();
 var app = builder.Build();
 
 // Un solo proceso prepara la base. El servicio `inicializador` del compose corre con esta
@@ -110,6 +115,23 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     });
 
+api.MapPost("/envios/{envioId:guid}/recepcion",
+    async (
+        Guid envioId,
+        RecibirEnDepositoRequest request,
+        RecibirEnDepositoHandler handler,
+        CancellationToken ct) =>
+    {
+        await handler.Handle(
+            new RecibirEnDepositoCommand(
+                envioId,
+                request.IdentificacionesEscaneadas,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    });
+
 api.MapPost("/tarifas", async (ActualizarTarifaCommand command, ActualizarTarifaHandler handler, CancellationToken ct) =>
 {
     var id = await handler.Handle(command, ct);
@@ -134,6 +156,71 @@ api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, Cancell
     return Results.Ok(zonas);
 });
 
+
+api.MapPost("/zonas", async (
+    CrearZonaCommand command,
+    CrearZonaHandler handler,
+    CancellationToken ct) =>
+{
+    var id = await handler.Handle(command, ct);
+
+    return Results.Ok(new { id });
+});
+
+api.MapPost("/hojas-de-ruta", async (
+    CrearHojaDeRutaCommand command,
+    CrearHojaDeRutaHandler handler,
+    CancellationToken ct) =>
+{
+    var id = await handler.Handle(command, ct);
+
+    return Results.Created(
+        $"/api/hojas-de-ruta/{id}",
+        new { id });
+});
+
+api.MapGet("/hojas-de-ruta/opciones", async (
+    Guid operadorId,
+    ConsultarHojasDeRutaHandler handler,
+    CancellationToken ct) =>
+{
+    var opciones = await handler.ObtenerOpcionesAsync(
+        operadorId, ct);
+
+    return Results.Ok(opciones);
+});
+
+api.MapGet("/hojas-de-ruta", async (
+    Guid operadorId,
+    ConsultarHojasDeRutaHandler handler,
+    CancellationToken ct) =>
+{
+    var hojas = await handler.ListarAsync(operadorId, ct);
+
+    return Results.Ok(hojas);
+});
+
+api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
+    async (
+        Guid hojaId,
+        Guid operadorId,
+        DespacharHojaDeRutaHandler handler,
+        CancellationToken ct) =>
+    {
+        var cantidad = await handler.Handle(
+            new DespacharHojaDeRutaCommand(
+                operadorId,
+                hojaId),
+            ct);
+
+        return Results.Ok(new
+        {
+            hojaDeRutaId = hojaId,
+            enviosActualizados = cantidad
+        });
+    });
+
+
 app.Run();
 
 // Las sondas de salud no se instrumentan: al descartarse la span del request, la consulta
@@ -146,3 +233,4 @@ public partial class Program { }
 
 /// <summary>Cuerpo que manda la app del repartidor; el envío viaja en la URL.</summary>
 public sealed record EventoMovilRequest(Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora);
+public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
