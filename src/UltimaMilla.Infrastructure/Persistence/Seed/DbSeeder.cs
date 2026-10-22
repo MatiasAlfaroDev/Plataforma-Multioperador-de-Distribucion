@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Configuracion;
+using Microsoft.EntityFrameworkCore;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Infrastructure.Persistence.Seed;
 
@@ -119,5 +121,67 @@ public static class DbSeeder
 
             await db.SaveChangesAsync(ct);
         }
+
+        if (!await db.VersionesReglasOperativas
+                .AnyAsync(v => v.OperadorId == RapiEnviosId, ct))
+        {
+            db.VersionesReglasOperativas.Add(
+                VersionReglasOperativas.Crear(
+                    operadorId: RapiEnviosId,
+                    maximoIntentosEntrega: 3,
+                    horasMinimasEntreIntentos: 24,
+                    requierePruebaEntrega: true,
+                    diasMaximosParaDevolucion: 7,
+                    vigenciaDesde: DateTimeOffset.Parse("2026-01-01T00:00:00Z")));
+        }
+
+        if (!await db.VersionesReglasOperativas
+                .AnyAsync(v => v.OperadorId == LogisticaSurId, ct))
+        {
+            db.VersionesReglasOperativas.Add(
+                VersionReglasOperativas.Crear(
+                    operadorId: LogisticaSurId,
+                    maximoIntentosEntrega: 2,
+                    horasMinimasEntreIntentos: 12,
+                    requierePruebaEntrega: true,
+                    diasMaximosParaDevolucion: 5,
+                    vigenciaDesde: DateTimeOffset.Parse("2026-01-01T00:00:00Z")));
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        // Datos iniciales para probar la planificación de rutas.
+        var operadores = await db.Operadores
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        foreach (var operador in operadores)
+        {
+            var tieneRepartidor = await db.Repartidores
+                .AnyAsync(r => r.OperadorId == operador.Id, ct);
+
+            if (!tieneRepartidor)
+            {
+                db.Repartidores.Add(Repartidor.Crear(
+                    operador.Id,
+                    "Repartidor de prueba",
+                    "099123456"));
+            }
+
+            var tieneVehiculo = await db.Vehiculos
+                .AnyAsync(v => v.OperadorId == operador.Id, ct);
+
+            if (!tieneVehiculo)
+            {
+                db.Vehiculos.Add(Vehiculo.Crear(
+                    operador.Id,
+                    "TEST1234",
+                    500m,
+                    3m));
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
     }
+    
 }

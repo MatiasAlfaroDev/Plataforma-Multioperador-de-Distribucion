@@ -29,4 +29,22 @@ public sealed class EnviosApiClient(HttpClient http)
         var url = operadorId is Guid id ? $"api/envios?operadorId={id}" : "api/envios";
         return await http.GetFromJsonAsync<List<EnvioItem>>(url, ct) ?? [];
     }
+
+    public async Task RecibirEnDepositoAsync(
+        Guid envioId,
+        IReadOnlyList<string> identificaciones,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        var respuesta = await http.PostAsJsonAsync(
+            $"api/envios/{envioId}/recepcion",
+            new
+            {
+                IdentificacionesEscaneadas = identificaciones,
+                Responsable = responsable
+            },
+            ct);
+
+        respuesta.EnsureSuccessStatusCode();
+    }
 }

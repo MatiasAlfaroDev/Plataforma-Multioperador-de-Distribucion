@@ -1,3 +1,6 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <!-- Domain no referencia ningún proyecto ni paquete: es el centro de Clean Architecture (ADR-001). -->
+<Project Sdk="Microsoft.NET.Sdk"><!-- Domain no referencia ningún proyecto ni paquete: es el centro de Clean Architecture (ADR-001). -->
+
+  <ItemGroup>
+    <PackageReference Include="Stateless" />
+  </ItemGroup>
 </Project>

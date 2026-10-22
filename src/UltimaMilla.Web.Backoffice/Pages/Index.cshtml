@@ -1,63 +1,446 @@
+
 @page
 @model IndexModel
 @using UltimaMilla.Web.Backoffice.Services
+
 @{
     ViewData["Title"] = "Envíos";
+
+    var hayRecepciones = Model.Envios.Any(
+        e => e.Estado == "Admitido");
 }
 
 <h1>Envíos</h1>
 
+<!-- Filtro por operador -->
 <form method="get" class="filtro">
     <div>
         <label for="operador">Operador</label>
+
         <select id="operador" name="operadorId">
             <option value="">Todos</option>
+
             @foreach (var o in Model.Operadores)
             {
-                <option value="@o.Id" selected="@(Model.OperadorId == o.Id)">@o.Nombre</option>
+                <option value="@o.Id"
+                        selected="@(Model.OperadorId == o.Id)">
+                    @o.Nombre
+                </option>
             }
         </select>
     </div>
+
     <button type="submit">Ver</button>
 </form>
 
 @if (Model.Error is not null)
 {
-    <p class="error" role="alert">@Model.Error</p>
+    <p class="error" role="alert">
+        @Model.Error
+    </p>
 }
-else if (Model.Envios.Count == 0)
+
+@if (Model.Envios.Count == 0)
 {
-    <p>No hay envíos. Da de alta uno desde el Portal del comercio.</p>
+    <p>
+        No hay envíos.
+        Da de alta uno desde el Portal del comercio.
+    </p>
 }
 else
 {
-    <p class="nota">@(Model.Envios.Count == 1 ? "1 envío" : $"{Model.Envios.Count} envíos")</p>
+    <p class="nota">
+        @(Model.Envios.Count == 1
+            ? "1 envío"
+            : $"{Model.Envios.Count} envíos")
+    </p>
+
     <div class="tabla">
         <table>
             <thead>
                 <tr>
-                    <th>Referencia</th><th>Operador</th><th>Comercio</th><th>Destinatario</th>
-                    <th>Dirección</th><th class="num">Bultos</th><th class="num">Peso (kg)</th><th>Modalidad</th><th>Estado</th><th class="num">Tarifa</th><th>Alta</th>
+                    <th>Referencia</th>
+                    <th>Operador</th>
+                    <th>Comercio</th>
+                    <th>Destinatario</th>
+                    <th>Dirección</th>
+                    <th class="num">Bultos</th>
+                    <th class="num">Peso (kg)</th>
+                    <th>Modalidad</th>
+                    <th>Estado</th>
+                    <th class="num">Tarifa</th>
+                    <th>Alta</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
+
             <tbody>
                 @foreach (var e in Model.Envios)
                 {
                     <tr>
                         <td>@e.ReferenciaExterna</td>
-                        <td><span class="operador" style="background:@Model.ColorDe(e.OperadorId)"></span>@e.OperadorNombre</td>
+
+                        <td>
+                            <span class="operador"
+                                  style="background:@Model.ColorDe(e.OperadorId)">
+                            </span>
+
+                            @e.OperadorNombre
+                        </td>
+
                         <td>@e.ComercioNombre</td>
+
                         <td>@e.DestinatarioNombre</td>
+
                         <td>@e.Direccion</td>
-                        <td class="num">@e.CantidadBultos</td>
-                        <td class="num">@Formato.Numero(e.PesoTotalKg)</td>
-                        <td>@Formato.Modalidad(e.Modalidad)</td>
-                        <td>@e.Estado</td>
-                        <td class="num">@(e.TarifaCalculada is decimal t ? Formato.Moneda(t) : "Sin tarifa")</td>
-                        <td>@Formato.Hora(e.FechaAlta)</td>
+
+                        <td class="num">
+                            @e.CantidadBultos
+                        </td>
+
+                        <td class="num">
+                            @Formato.Numero(e.PesoTotalKg)
+                        </td>
+
+                        <td>
+                            @Formato.Modalidad(e.Modalidad)
+                        </td>
+
+                        <td>
+                            @Formato.Estado(e.Estado)
+                        </td>
+
+                        <td class="num">
+                            @(e.TarifaCalculada is decimal tarifa
+                                ? Formato.Moneda(tarifa)
+                                : "Sin tarifa")
+                        </td>
+
+                        <td>
+                            @Formato.Hora(e.FechaAlta)
+                        </td>
+
+                        <!-- Acciones según el estado -->
+                        <td class="columna-acciones">
+                            @if (e.Estado == "Admitido")
+                            {
+                                <button type="button"
+                                        class="abrir-recepcion"
+                                        data-envio-id="@e.Id"
+                                        data-referencia="@e.ReferenciaExterna"
+                                        data-operador="@e.OperadorNombre"
+                                        data-bultos="@e.CantidadBultos">
+                                    Recibir en depósito
+                                </button>
+                            }
+                            else if (e.Estado == "EnDeposito")
+                            {
+                                <a asp-page="/HojasDeRuta"
+                                   asp-route-operadorId="@e.OperadorId"
+                                   asp-route-envioId="@e.Id"
+                                   class="accion-asignar">
+                                    Asignar a ruta
+                                </a>
+                            }
+                            else if (e.Estado == "AsignadoARuta")
+                            {
+                                <span class="accion-estado">
+                                    Asignado a ruta
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="accion-estado">
+                                    —
+                                </span>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
 }
+
+<!-- Modal de recepción -->
+@if (hayRecepciones)
+{
+    <dialog id="modalRecepcion"
+            class="modal-recepcion"
+            aria-labelledby="tituloRecepcion">
+
+        <form method="post"
+              asp-page-handler="Recibir"
+              id="formRecepcion">
+
+            @Html.AntiForgeryToken()
+
+            <input type="hidden"
+                   name="envioId"
+                   id="recepcionEnvioId" />
+
+            <input type="hidden"
+                   name="operadorId"
+                   value="@Model.OperadorId" />
+
+            <div class="modal-encabezado">
+                <h2 id="tituloRecepcion">
+                    Recibir en depósito
+                </h2>
+
+                <button type="button"
+                        class="cerrar-modal"
+                        id="cerrarRecepcion"
+                        aria-label="Cerrar">
+                    &times;
+                </button>
+            </div>
+
+            <div class="modal-info">
+                <p>
+                    <strong>Envío:</strong>
+                    <span id="recepcionReferencia"></span>
+                </p>
+
+                <p>
+                    <strong>Operador:</strong>
+                    <span id="recepcionOperador"></span>
+                </p>
+
+                <p>
+                    <strong>Bultos declarados:</strong>
+                    <span id="recepcionBultos"></span>
+                </p>
+            </div>
+
+            <div class="modal-campo">
+                <label for="identificaciones">
+                    Códigos de bultos escaneados
+                </label>
+
+                <textarea id="identificaciones"
+                          name="identificaciones"
+                          rows="4"
+                          placeholder="Ingresá un código por línea"
+                          required></textarea>
+
+                <small>
+                    Ingresá todos los códigos de los bultos recibidos.
+                </small>
+            </div>
+
+            <div class="modal-campo">
+                <label for="responsable">
+                    Responsable de recepción
+                </label>
+
+                <input type="text"
+                       id="responsable"
+                       name="responsable"
+                       placeholder="Nombre del operario"
+                       required />
+
+                <small>
+                    Provisorio hasta implementar
+                    la identificación de usuarios.
+                </small>
+            </div>
+
+            <div class="modal-acciones">
+                <button type="button"
+                        id="cancelarRecepcion"
+                        class="boton-cancelar">
+                    Cancelar
+                </button>
+
+                <button type="submit">
+                    Confirmar recepción
+                </button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>
+        const modalRecepcion =
+            document.getElementById("modalRecepcion");
+
+        const formularioRecepcion =
+            document.getElementById("formRecepcion");
+
+        document.querySelectorAll(".abrir-recepcion")
+            .forEach(boton => {
+                boton.addEventListener("click", () => {
+                    formularioRecepcion.reset();
+
+                    document.getElementById(
+                        "recepcionEnvioId"
+                    ).value = boton.dataset.envioId;
+
+                    document.getElementById(
+                        "recepcionReferencia"
+                    ).textContent = boton.dataset.referencia;
+
+                    document.getElementById(
+                        "recepcionOperador"
+                    ).textContent = boton.dataset.operador;
+
+                    document.getElementById(
+                        "recepcionBultos"
+                    ).textContent = boton.dataset.bultos;
+
+                    modalRecepcion.showModal();
+                });
+            });
+
+        document.getElementById("cerrarRecepcion")
+            .addEventListener("click", () => {
+                modalRecepcion.close();
+            });
+
+        document.getElementById("cancelarRecepcion")
+            .addEventListener("click", () => {
+                modalRecepcion.close();
+            });
+    </script>
+}
+
+<style>
+    /* Acciones del listado */
+
+    .columna-acciones {
+        min-width: 155px;
+        white-space: nowrap;
+    }
+
+    .accion-asignar {
+        display: inline-block;
+        padding: 9px 13px;
+        border-radius: 7px;
+        background: #2563eb;
+        color: #ffffff;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 0.2s ease;
+    }
+
+    .accion-asignar:hover,
+    .accion-asignar:focus {
+        background: #1d4ed8;
+        color: #ffffff;
+        text-decoration: none;
+    }
+
+    .accion-estado {
+        color: #94a3b8;
+        font-size: 0.875rem;
+    }
+
+    /* Modal de recepción existente */
+
+    .modal-recepcion {
+        box-sizing: border-box;
+        width: min(480px, calc(100% - 32px));
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 24px;
+        border: 1px solid #475569;
+        border-radius: 12px;
+        background: #1e293b;
+        color: #f8fafc;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+    }
+
+    .modal-recepcion::backdrop {
+        background: rgba(0, 0, 0, .65);
+    }
+
+    .modal-encabezado {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .modal-encabezado h2 {
+        margin: 0;
+        color: #f8fafc;
+        font-size: 1.3rem;
+    }
+
+    .cerrar-modal {
+        border: none;
+        background: transparent;
+        color: #cbd5e1;
+        font-size: 1.8rem;
+        cursor: pointer;
+    }
+
+    .modal-info {
+        padding: 14px;
+        margin-bottom: 20px;
+        border: 1px solid #475569;
+        border-radius: 8px;
+        background: #334155;
+    }
+
+    .modal-info p {
+        margin: 6px 0;
+        color: #f8fafc;
+    }
+
+    .modal-campo {
+        margin-bottom: 18px;
+    }
+
+    .modal-campo label {
+        display: block;
+        margin-bottom: 8px;
+        color: #f8fafc;
+        font-weight: 600;
+    }
+
+    .modal-campo input,
+    .modal-campo textarea {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 11px;
+        border: 1px solid #64748b;
+        border-radius: 7px;
+        background: #0f172a;
+        color: #f8fafc;
+        font: inherit;
+    }
+
+    .modal-campo input::placeholder,
+    .modal-campo textarea::placeholder {
+        color: #94a3b8;
+    }
+
+    .modal-campo input:focus,
+    .modal-campo textarea:focus {
+        outline: 2px solid #60a5fa;
+        outline-offset: 1px;
+    }
+
+    .modal-campo small {
+        display: block;
+        margin-top: 6px;
+        color: #cbd5e1;
+    }
+
+    .modal-acciones {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 24px;
+    }
+
+    .modal-acciones .boton-cancelar {
+        border: 1px solid #64748b;
+        background: transparent;
+        color: #f8fafc;
+    }
+</style>

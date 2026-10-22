@@ -32,4 +32,19 @@ public static class Formato
     /// Convierte la modalidad "Estandar" a "Estándar".
     /// </summary>
     public static string Modalidad(string modalidad) => modalidad == "Estandar" ? "Estándar" : modalidad;
+
+    public static string Estado(string estado) => estado switch
+    {
+        "Admitido" => "Admitido",
+        "EnDeposito" => "En depósito",
+        "AsignadoARuta" => "Asignado a ruta",
+        "EnTransito" => "En tránsito",
+        "Entregado" => "Entregado",
+        "NoEntregado" => "No entregado",
+        "Reprogramado" => "Reprogramado",
+        "EnDevolucion" => "En devolución",
+        "Devuelto" => "Devuelto",
+        "Extraviado" => "Extraviado",
+        _ => estado
+    };
 }

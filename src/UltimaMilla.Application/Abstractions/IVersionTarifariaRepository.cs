@@ -23,4 +23,5 @@ public interface IVersionTarifariaRepository
     Task AgregarAsync(
         VersionTarifaria version,
         CancellationToken ct);
+        
 }
