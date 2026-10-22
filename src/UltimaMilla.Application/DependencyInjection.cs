@@ -11,6 +11,7 @@ using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
+using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 
 namespace UltimaMilla.Application;
 
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ListarZonasHandler>();
         services.AddScoped<CrearHojaDeRutaHandler>();
         services.AddScoped<ConsultarHojasDeRutaHandler>();
+        services.AddScoped<DespacharHojaDeRutaHandler>();
         return services;
     }
 }

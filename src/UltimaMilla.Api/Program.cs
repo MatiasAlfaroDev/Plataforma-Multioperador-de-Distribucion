@@ -19,6 +19,7 @@ using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.CrearZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
+using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -198,6 +199,26 @@ api.MapGet("/hojas-de-ruta", async (
 
     return Results.Ok(hojas);
 });
+
+api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
+    async (
+        Guid hojaId,
+        Guid operadorId,
+        DespacharHojaDeRutaHandler handler,
+        CancellationToken ct) =>
+    {
+        var cantidad = await handler.Handle(
+            new DespacharHojaDeRutaCommand(
+                operadorId,
+                hojaId),
+            ct);
+
+        return Results.Ok(new
+        {
+            hojaDeRutaId = hojaId,
+            enviosActualizados = cantidad
+        });
+    });
 
 
 app.Run();
