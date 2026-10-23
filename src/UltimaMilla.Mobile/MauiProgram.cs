@@ -35,6 +35,13 @@ public static class MauiProgram
             c.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
         });
 
+        // HttpClient para el inicio de sesión (misma dirección de la API).
+        builder.Services.AddHttpClient<IAuthApi, AuthApi>(c =>
+        {
+            c.BaseAddress = new Uri(Constants.BaseApiUrl);
+            c.Timeout = TimeSpan.FromSeconds(20);
+        });
+
         // Trabajo sin conexión: base local cifrada, repositorios y sincronización (una sola instancia para toda la app).
         builder.Services.AddSingleton<BaseDeDatosLocal>();
         builder.Services.AddSingleton<RutaRepository>();
@@ -48,6 +55,8 @@ public static class MauiProgram
         builder.Services.AddTransient<SeleccionOperadorPage>();
         builder.Services.AddTransient<EnviosViewModel>();
         builder.Services.AddTransient<EnviosPage>();
+        builder.Services.AddTransient<LoginViewModel>();
+        builder.Services.AddTransient<LoginPage>();
 
         var app = builder.Build();
 

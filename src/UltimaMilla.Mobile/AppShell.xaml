@@ -6,6 +6,10 @@
        Title="Repartidor"
        Shell.FlyoutBehavior="Disabled">
 
+    <ShellContent Title="Iniciar sesión"
+                  Route="login"
+                  ContentTemplate="{DataTemplate pages:LoginPage}" />
+
     <ShellContent Title="Operador"
                   Route="operador"
                   ContentTemplate="{DataTemplate pages:SeleccionOperadorPage}" />
