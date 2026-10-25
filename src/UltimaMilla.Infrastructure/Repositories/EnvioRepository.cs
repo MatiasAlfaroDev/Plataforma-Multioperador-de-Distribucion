@@ -21,13 +21,24 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
     public Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct) =>
         db.Envios.AnyAsync(e => e.CuentaComercialId == cuentaComercialId && e.ReferenciaExterna == referenciaExterna, ct);
 
-    public async Task<IReadOnlyList<Envio>> ListarAsync(Guid? operadorId, CancellationToken ct)
+    public async Task<IReadOnlyList<Envio>> ListarAsync(
+    Guid operadorId,
+    Guid? cuentaComercialId,
+    CancellationToken ct)
+{
+    var consulta = db.Envios
+        .AsNoTracking()
+        .Include(e => e.Bultos)
+        .Where(e => e.OperadorId == operadorId);
+
+    if (cuentaComercialId.HasValue)
     {
-        var consulta = db.Envios.AsNoTracking().Include(e => e.Bultos).AsQueryable();
-
-        if (operadorId is Guid id)
-            consulta = consulta.Where(e => e.OperadorId == id);
-
-        return await consulta.OrderByDescending(e => e.FechaAlta).ToListAsync(ct);
+        consulta = consulta.Where(
+            e => e.CuentaComercialId == cuentaComercialId.Value);
     }
+
+    return await consulta
+        .OrderByDescending(e => e.FechaAlta)
+        .ToListAsync(ct);
+}
 }

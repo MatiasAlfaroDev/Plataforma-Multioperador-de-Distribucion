@@ -9,6 +9,12 @@ public interface IEnvioRepository
     Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct);
     Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct);
 
-    /// <summary>Lista envíos con sus bultos; si viene operadorId, filtra por ese operador.</summary>
-    Task<IReadOnlyList<Envio>> ListarAsync(Guid? operadorId, CancellationToken ct);
+    /// <summary>
+    /// Lista los envíos de un operador y, opcionalmente,
+    /// de una cuenta comercial específica.
+    /// </summary>
+    Task<IReadOnlyList<Envio>> ListarAsync(
+        Guid operadorId,
+        Guid? cuentaComercialId,
+        CancellationToken ct);
 }

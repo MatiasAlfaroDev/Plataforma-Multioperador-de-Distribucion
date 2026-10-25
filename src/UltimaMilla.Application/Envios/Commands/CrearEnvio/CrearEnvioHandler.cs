@@ -3,6 +3,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Application.Envios.Eventos;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Application.Envios.Commands.CrearEnvio;
 
@@ -19,14 +20,51 @@ public sealed class CrearEnvioHandler(
     IUnitOfWork unitOfWork,
     IPublicadorDeEventos eventos,
     IValidator<CrearEnvioCommand> validator,
+    ITenantContext tenantContext,
     TimeProvider reloj)
 {
-    public async Task<Guid> Handle(CrearEnvioCommand command, CancellationToken ct)
+    public async Task<Guid> Handle(
+    CrearEnvioCommand command,
+    CancellationToken ct)
+{
+    if (!tenantContext.EstaAutenticado ||
+        !tenantContext.OperadorId.HasValue ||
+        !tenantContext.UsuarioId.HasValue)
     {
-        await validator.ValidateAndThrowAsync(command, ct);
+        throw new UnauthorizedAccessException(
+            "Debe iniciar sesión y seleccionar un operador.");
+    }
 
-        var cuenta = await cuentas.ObtenerAsync(command.CuentaComercialId, ct)
-            ?? throw new NoEncontradoException("La cuenta comercial no existe.");
+    await validator.ValidateAndThrowAsync(command, ct);
+
+    var cuenta = await cuentas.ObtenerAsync(
+        command.CuentaComercialId, ct)
+        ?? throw new NoEncontradoException(
+            "La cuenta comercial no existe.");
+
+    if (cuenta.OperadorId != tenantContext.OperadorId.Value)
+    {
+        throw new UnauthorizedAccessException(
+            "La cuenta comercial no pertenece al operador seleccionado.");
+    }
+
+    if (tenantContext.Perfil is not (
+    Perfiles.AdministradorOperador or
+    Perfiles.Operador or
+    Perfiles.Comercio))
+{
+    throw new UnauthorizedAccessException(
+        "Su perfil no tiene permisos para crear envíos.");
+}
+
+if (tenantContext.Perfil == Perfiles.Comercio &&
+    tenantContext.ComercioId != cuenta.Id)
+{
+    throw new UnauthorizedAccessException(
+        "No tiene permisos para crear envíos con esta cuenta comercial.");
+}
+
+    // El resto del método continúa igual.
 
         var referencia = command.ReferenciaExterna.Trim();
         if (await envios.ExisteReferenciaAsync(cuenta.Id, referencia, ct))

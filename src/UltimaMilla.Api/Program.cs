@@ -26,6 +26,10 @@ using UltimaMilla.Infrastructure.Identidad;
 using UltimaMilla.Api.Endpoints;
 using Microsoft.AspNetCore.DataProtection;
 using StackExchange.Redis;
+using Microsoft.EntityFrameworkCore;
+using UltimaMilla.Api.Seguridad;
+using UltimaMilla.Infrastructure.Persistence;
+using UltimaMilla.Application.Seguridad;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -117,6 +121,10 @@ if (!soloInicializar)
             redis,
             "UltimaMilla:DataProtection:Keys");
 }
+
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 var app = builder.Build();
 
 // Un solo proceso prepara la base. El servicio `inicializador` del compose corre con esta
@@ -151,15 +159,38 @@ api.MapGet("/cuentas-comerciales", async (ListarCuentasComercialesHandler handle
     Results.Ok(await handler.Handle(new ListarCuentasComercialesQuery(), ct)));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
-api.MapPost("/envios", async (CrearEnvioCommand command, CrearEnvioHandler handler, CancellationToken ct) =>
+api.MapPost("/envios", async (
+    CrearEnvioCommand command,
+    CrearEnvioHandler handler,
+    CancellationToken ct) =>
 {
     var id = await handler.Handle(command, ct);
-    return Results.Created($"/api/envios/{id}", new { id });
-});
+
+    return Results.Created(
+        $"/api/envios/{id}",
+        new { id });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
 
 // GET /api/envios?operadorId=... → listado para el Backoffice.
-api.MapGet("/envios", async (Guid? operadorId, ListarEnviosHandler handler, CancellationToken ct) =>
-    Results.Ok(await handler.Handle(new ListarEnviosQuery(operadorId), ct)));
+// GET /api/envios → listado según el operador y perfil autenticado.
+api.MapGet("/envios", async (
+    ListarEnviosHandler handler,
+    CancellationToken ct) =>
+{
+    var resultado = await handler.Handle(
+        new ListarEnviosQuery(null),
+        ct);
+
+    return Results.Ok(resultado);
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
 
 // POST /api/envios/{id}/eventos-movil → sincronización de la app del repartidor (entregado / no entregado).
 // 201 = guardado; 409 = ya estaba (reintento, la app lo toma como éxito); 400 = conflicto o datos inválidos.
