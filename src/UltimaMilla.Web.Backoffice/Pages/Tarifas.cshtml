@@ -5,8 +5,10 @@
     ViewData["Title"] = "Configuración de tarifas";
 }
 
-<h1>Configuración de tarifas</h1>
-<p class="nota">Elegí un operador y una zona para ver o cambiar su tarifa vigente.</p>
+<p class="nota">
+    Seleccioná una zona de tu operador para consultar
+    o modificar su tarifa vigente.
+</p>
 
 @if (TempData["Mensaje"] is string mensaje)
 {
@@ -23,31 +25,10 @@
     <p class="aviso error" role="alert">@Model.Error</p>
 }
 
-<form method="get" class="filtro">
-    <div>
-        <label for="operadorId">Operador</label>
-        <select id="operadorId"
-                name="operadorId"
-                onchange="this.form.submit()">
-            <option value="">Elegí un operador</option>
 
-            @foreach (var operador in Model.Operadores)
-            {
-                <option value="@operador.Id"
-                        selected="@(Model.OperadorId == operador.Id)">
-                    @operador.Nombre
-                </option>
-            }
-        </select>
-    </div>
-
-    <button type="submit">Ver zonas</button>
-</form>
-
-@if (Model.OperadorId.HasValue)
+@if (Model.OperadorIdSesion != Guid.Empty)
 {
     <form method="get" class="filtro">
-        <input type="hidden" name="operadorId" value="@Model.OperadorId" />
         <div>
             <label for="zonaCoberturaId">Zona</label>
             <select id="zonaCoberturaId"
@@ -69,8 +50,10 @@
     </form>
 }
 
-@if (Model.OperadorId.HasValue && Model.ZonaCoberturaId.HasValue && Model.Error is null)
-{
+@if (Model.OperadorIdSesion != Guid.Empty &&
+     Model.ZonaCoberturaId.HasValue &&
+     Model.Error is null)
+     {
     <h2>Tarifa vigente</h2>
 
     @if (!Model.TarifaEncontrada)
@@ -85,7 +68,6 @@
         }
 
         <form method="post">
-            <input type="hidden" asp-for="OperadorId" />
             <input type="hidden" asp-for="ZonaCoberturaId" />
             <input type="hidden" asp-for="CuadroTarifarioId" />
 

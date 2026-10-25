@@ -186,13 +186,15 @@ services:
       context: .
       dockerfile: src/UltimaMilla.Web.Backoffice/Dockerfile
     environment:
-      # Por Traefik y no por `api:8080`: el DNS de Docker hace round-robin sin chequeo de
-      # salud, Traefik saca del pool la réplica que falla /ready antes de enrutarle tráfico.
       Api__BaseUrl: "http://traefik/"
+      ConnectionStrings__Redis: "redis:6379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_SERVICE_NAME: "backoffice"
     depends_on:
-      - api
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.backoffice.rule=Host(`backoffice.localhost`)"

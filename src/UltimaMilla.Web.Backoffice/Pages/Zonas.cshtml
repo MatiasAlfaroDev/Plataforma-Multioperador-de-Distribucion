@@ -23,32 +23,7 @@
     <p class="aviso error" role="alert">@Model.Error</p>
 }
 
-<section>
-    <h2>Seleccionar operador</h2>
-
-    <form method="get" class="filtro">
-        <div>
-            <label for="operador">Operador</label>
-
-            <select id="operador" name="operadorId" required>
-                <option value="">Seleccioná un operador</option>
-
-                @foreach (var operador in Model.Operadores)
-                {
-                    <option value="@operador.Id"
-                            selected="@(Model.OperadorId == operador.Id)">
-                        @operador.Nombre
-                    </option>
-                }
-            </select>
-        </div>
-
-        <button type="submit">Consultar</button>
-    </form>
-</section>
-
-@if (Model.OperadorId is Guid operadorId &&
-     operadorId != Guid.Empty)
+@if (Model.OperadorIdSesion != Guid.Empty)
 {
     <section>
         <h2>Zonas existentes</h2>
@@ -88,10 +63,11 @@
         <h2>Crear zona</h2>
 
         <form method="post">
-            <input type="hidden"
-                   asp-for="Formulario.OperadorId"
-                   value="@operadorId" />
-
+            <p class="nota">
+                Configurá las áreas de reparto, franjas disponibles
+                y tiempos estimados de tu operador.
+            </p>
+                
             <div asp-validation-summary="All"
                  class="error"></div>
 
