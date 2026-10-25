@@ -43,8 +43,12 @@ services:
 
   # Caché distribuido y coordinación (RNF 6.7). Todavía no lo consume ningún código:
   # entra con el caché del 22/10 y como backplane de SignalR y Data Protection.
+        # Caché distribuido y Data Protection
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -112,6 +116,8 @@ services:
       # No conecta (termina antes de arrancar el bus), pero Program exige la cadena.
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-ultimamilla}:${RABBITMQ_PASSWORD:-ultimamilla_dev}@rabbitmq:5672"
       Inicializacion__SoloInicializar: "true"
+      Inicializacion__UsuariosDemo: "true"
+      Inicializacion__PasswordDemo: "${DEMO_PASSWORD:?Debes definir DEMO_PASSWORD}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,31 +128,33 @@ services:
       context: .
       dockerfile: src/UltimaMilla.Api/Dockerfile
     image: ultimamilla-api:local
-    # Dos instancias balanceadas por Traefik (RNF 6.13). No hay container_name a propósito:
-    # con uno fijo Docker no puede crear la segunda réplica.
+
+    # Dos réplicas balanceadas por Traefik
     deploy:
       replicas: 2
+
     environment:
+      ConnectionStrings__Redis: "redis:6379"
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-ultimamilla}:${RABBITMQ_PASSWORD:-ultimamilla_dev}@rabbitmq:5672"
-      # Telemetría: el SDK lee estas dos variables solo (no hay endpoint en el código).
-      # Las dos réplicas comparten nombre de servicio; Program les agrega service.instance.id.
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_SERVICE_NAME: "api"
+
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       inicializador:
         condition: service_completed_successfully
+
     labels:
       - "traefik.enable=true"
-      # Host para el navegador; PathPrefix para la app móvil (el emulador Android entra por 10.0.2.2:8000)
       - "traefik.http.routers.api.rule=Host(`api.localhost`) || PathPrefix(`/api`)"
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.services.api.loadbalancer.server.port=8080"
-      # Health check activo: Traefik saca del pool a la instancia que falla /ready (informe 2.2)
       - "traefik.http.services.api.loadbalancer.healthcheck.path=/ready"
       - "traefik.http.services.api.loadbalancer.healthcheck.interval=5s"
 
@@ -188,3 +196,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
