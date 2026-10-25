@@ -1,4 +1,4 @@
-
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using UltimaMilla.Web.Backoffice.Services;
@@ -7,18 +7,13 @@ namespace UltimaMilla.Web.Backoffice.Pages;
 
 public sealed class IndexModel(EnviosApiClient api) : PageModel
 {
-    /// <summary>
-    /// Provisorio hasta implementar la autenticación:
-    /// el operador se selecciona desde el Backoffice.
-    /// </summary>
-    [BindProperty(SupportsGet = true)]
-    public Guid? OperadorId { get; set; }
-
-    public IReadOnlyList<OperadorItem> Operadores { get; private set; } = [];
-
     public IReadOnlyList<EnvioItem> Envios { get; private set; } = [];
 
     public string? Error { get; private set; }
+
+    public string OperadorNombre =>
+        Envios.FirstOrDefault()?.OperadorNombre
+        ?? "Operador seleccionado";
 
     public async Task OnGetAsync(CancellationToken ct)
     {
@@ -29,25 +24,18 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
     {
         try
         {
-            Operadores = await api.ListarOperadoresAsync(ct);
-
-            Envios = await api.ListarEnviosAsync(
-                OperadorId,
-                ct);
+            Envios = await api.ListarEnviosAsync(ct);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
-            Error =
-                "No se pudieron cargar los envíos. " +
-                "Probá de nuevo en unos minutos.";
+            Error = ex.StatusCode is not null
+                ? $"No se pudieron cargar los envíos (HTTP {(int)ex.StatusCode})."
+                : "No se pudo conectar con la API.";
         }
-    }
-
-    public string ColorDe(Guid operadorId)
-    {
-        return Operadores
-            .FirstOrDefault(o => o.Id == operadorId)?
-            .ColorPrimario ?? "#999";
+        catch (UnauthorizedAccessException)
+        {
+            Error = "La sesión no está disponible. Iniciá sesión nuevamente.";
+        }
     }
 
     public async Task<IActionResult> OnPostRecibirAsync(
@@ -70,8 +58,7 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
                 responsable ?? string.Empty,
                 ct);
 
-            return RedirectToPage(
-                new { operadorId = OperadorId });
+            return RedirectToPage();
         }
         catch (HttpRequestException ex)
         {

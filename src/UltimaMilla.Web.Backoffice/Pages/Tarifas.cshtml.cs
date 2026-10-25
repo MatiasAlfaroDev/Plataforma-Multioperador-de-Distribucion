@@ -5,12 +5,8 @@ using UltimaMilla.Web.Backoffice.Services;
 namespace UltimaMilla.Web.Backoffice.Pages;
 
 public class TarifasModel(
-    TarifasApiClient tarifasApi,
-    EnviosApiClient enviosApi) : PageModel
+    TarifasApiClient tarifasApi) : PageModel
 {
-    [BindProperty(SupportsGet = true)]
-    public Guid? OperadorId { get; set; }
-
     [BindProperty(SupportsGet = true)]
     public Guid? ZonaCoberturaId { get; set; }
 
@@ -38,17 +34,26 @@ public class TarifasModel(
 
     public string? Error { get; private set; }
 
-    public IReadOnlyList<OperadorItem> Operadores { get; private set; } = [];
+    public Guid OperadorIdSesion =>
+    Guid.TryParse(
+        User.FindFirst("operador_id")?.Value,
+        out var id)
+        ? id
+        : Guid.Empty;
+
     public IReadOnlyList<ZonaItem> Zonas { get; private set; } = [];
 
     public async Task OnGetAsync(CancellationToken ct)
     {
         try
         {
-            Operadores = await enviosApi.ListarOperadoresAsync(ct);
+            var operadorId = OperadorIdSesion;
 
-            if (OperadorId is not Guid operadorId)
+            if (operadorId == Guid.Empty)
+            {
+                Error = "No hay un operador seleccionado en la sesión.";
                 return;
+            }
 
             Zonas = await tarifasApi.ListarZonasAsync(operadorId, ct);
 
@@ -85,15 +90,20 @@ public class TarifasModel(
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken ct)
-    {
-        if (OperadorId is not Guid operadorId ||
-            ZonaCoberturaId is not Guid zonaId)
-        {
+    {var operadorId = OperadorIdSesion;
+
+        if (operadorId == Guid.Empty)
+            return Forbid();
+
+        if (ZonaCoberturaId is not Guid zonaId)
             return RedirectToPage();
-        }
 
         try
         {
+            var zonas = await tarifasApi.ListarZonasAsync(operadorId, ct);
+
+            if (!zonas.Any(z => z.Id == zonaId))
+                return Forbid();
             await tarifasApi.ActualizarAsync(
                 new ActualizarTarifaRequest(
                     operadorId,
@@ -110,7 +120,6 @@ public class TarifasModel(
 
             return RedirectToPage(new
             {
-                operadorId,
                 zonaCoberturaId = zonaId
             });
         }
@@ -119,7 +128,6 @@ public class TarifasModel(
             TempData["Error"] = "No se pudo guardar la tarifa. Revisá los valores y probá de nuevo.";
             return RedirectToPage(new
             {
-                operadorId,
                 zonaCoberturaId = zonaId
             });
         }

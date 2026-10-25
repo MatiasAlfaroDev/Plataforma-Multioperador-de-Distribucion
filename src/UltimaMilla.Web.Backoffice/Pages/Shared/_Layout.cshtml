@@ -53,12 +53,17 @@
 <body>
     <header>
         <strong>Backoffice del operador</strong> · Plataforma de última milla
-        <nav>
-            <a asp-page="/Index">Envíos</a>
-            <a asp-page="/Tarifas">Tarifas</a>
-            <a asp-page="/Zonas">Zonas de cobertura</a>
-            <a asp-page="/HojasDeRuta">Hojas de ruta</a>
-        </nav>
+        @if (User.IsInRole("AdministradorOperador") ||
+     User.IsInRole("Operador"))
+      {
+          <nav>
+              <a asp-page="/Index">Envíos</a>
+              <a asp-page="/Tarifas">Tarifas</a>
+              <a asp-page="/Zonas">Zonas de cobertura</a>
+              <a asp-page="/HojasDeRuta">Hojas de ruta</a>
+              <a asp-page="/SeleccionarOperador">Cambiar operador</a>
+          </nav>
+      }
     </header>
     <main>@RenderBody()</main>
 </body>

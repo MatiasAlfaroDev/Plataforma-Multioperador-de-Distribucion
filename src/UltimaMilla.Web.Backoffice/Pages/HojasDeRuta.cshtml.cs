@@ -10,7 +10,12 @@ namespace UltimaMilla.Web.Backoffice.Pages;
 public sealed class HojasDeRutaModel(
     HojasDeRutaApiClient api) : PageModel
 {
-    public List<OperadorRutaApiDto> Operadores { get; private set; } = [];
+    public Guid OperadorIdSesion =>
+    Guid.TryParse(
+        User.FindFirst("operador_id")?.Value,
+        out var id)
+        ? id
+        : Guid.Empty;
 
     public List<RepartidorRutaApiDto> Repartidores { get; private set; } = [];
 
@@ -27,29 +32,21 @@ public sealed class HojasDeRutaModel(
     [BindProperty]
     public FormularioHojaRuta Formulario { get; set; } = new();
 
-    public async Task OnGetAsync(
-        Guid? operadorId,
-        Guid? envioId,
-        CancellationToken ct)
+ public async Task OnGetAsync(
+    Guid? envioId,
+    CancellationToken ct)
+{
+    await CargarAsync(ct);
+
+    if (envioId.HasValue &&
+        Envios.Any(x => x.Id == envioId.Value))
     {
-        await CargarAsync(operadorId, ct);
-
-        if (envioId.HasValue &&
-            Envios.Any(x => x.Id == envioId.Value))
-        {
-            Formulario.EnviosIds = [envioId.Value];
-        }
+        Formulario.EnviosIds = [envioId.Value];
     }
-
+}
     public async Task<IActionResult> OnPostAsync(
         CancellationToken ct)
     {
-        if (Formulario.OperadorId == Guid.Empty)
-        {
-            ModelState.AddModelError(
-                "",
-                "Seleccioná un operador.");
-        }
 
         if (Formulario.RepartidorId == Guid.Empty)
         {
@@ -87,14 +84,14 @@ public sealed class HojasDeRutaModel(
 
         if (!ModelState.IsValid)
         {
-            await CargarAsync(Formulario.OperadorId, ct);
+            await CargarAsync(ct);
             return Page();
         }
 
         try
         {
             var solicitud = new CrearHojaRutaApiRequest(
-                Formulario.OperadorId,
+                OperadorIdSesion,
                 Formulario.RepartidorId,
                 Formulario.VehiculoId,
                 Formulario.Fecha,
@@ -110,9 +107,7 @@ public sealed class HojasDeRutaModel(
             TempData["Exito"] =
                 $"Hoja de ruta creada correctamente. ID: {hojaId}";
 
-            return RedirectToPage(
-                "/HojasDeRuta",
-                new { operadorId = Formulario.OperadorId });
+            return RedirectToPage("/HojasDeRuta");
         }
         catch (Exception ex) when (
             ex is HttpRequestException ||
@@ -120,53 +115,43 @@ public sealed class HojasDeRutaModel(
         {
             Error = ex.Message;
 
-            await CargarAsync(
-                Formulario.OperadorId, ct);
+            await CargarAsync(ct);
 
             return Page();
         }
     }
 
-    private async Task CargarAsync(
-        Guid? operadorId,
-        CancellationToken ct)
+   private async Task CargarAsync(CancellationToken ct)
+{
+    try
     {
-        try
+        var operadorId = OperadorIdSesion;
+
+        if (operadorId == Guid.Empty)
         {
-            Operadores = await api.ListarOperadoresAsync(ct);
-
-            var seleccionado = operadorId.GetValueOrDefault();
-
-            if (seleccionado == Guid.Empty &&
-                Operadores.Count > 0)
-            {
-                seleccionado = Operadores[0].Id;
-            }
-
-            Formulario.OperadorId = seleccionado;
-
-            if (seleccionado == Guid.Empty)
-                return;
-
-            var opciones = await api.ObtenerOpcionesAsync(
-                seleccionado, ct);
-
-            Repartidores = opciones.Repartidores;
-            Vehiculos = opciones.Vehiculos;
-            Envios = opciones.Envios;
-            Franjas = opciones.Franjas;
-
-            Hojas = await api.ListarAsync(
-                seleccionado, ct);
+            Error = "No hay un operador seleccionado en la sesión.";
+            return;
         }
-        catch (Exception ex) when (
-            ex is HttpRequestException ||
-            ex is InvalidOperationException)
-        {
-            Error ??=
-                $"No se pudieron cargar las hojas de ruta: {ex.Message}";
-        }
+
+        var opciones = await api.ObtenerOpcionesAsync(
+            operadorId, ct);
+
+        Repartidores = opciones.Repartidores;
+        Vehiculos = opciones.Vehiculos;
+        Envios = opciones.Envios;
+        Franjas = opciones.Franjas;
+
+        Hojas = await api.ListarAsync(operadorId, ct);
     }
+    catch (Exception ex) when (
+        ex is HttpRequestException ||
+        ex is InvalidOperationException ||
+        ex is UnauthorizedAccessException)
+    {
+        Error ??=
+            $"No se pudieron cargar las hojas de ruta: {ex.Message}";
+    }
+}
 
     private static bool IntentarObtenerFranja(
         string? valor,
@@ -209,7 +194,6 @@ public sealed class HojasDeRutaModel(
 
     public sealed class FormularioHojaRuta
     {
-        public Guid OperadorId { get; set; }
 
         public Guid RepartidorId { get; set; }
 

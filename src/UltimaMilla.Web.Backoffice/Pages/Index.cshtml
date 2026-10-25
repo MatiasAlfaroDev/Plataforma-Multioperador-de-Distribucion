@@ -11,27 +11,9 @@
 }
 
 <h1>Envíos</h1>
-
-<!-- Filtro por operador -->
-<form method="get" class="filtro">
-    <div>
-        <label for="operador">Operador</label>
-
-        <select id="operador" name="operadorId">
-            <option value="">Todos</option>
-
-            @foreach (var o in Model.Operadores)
-            {
-                <option value="@o.Id"
-                        selected="@(Model.OperadorId == o.Id)">
-                    @o.Nombre
-                </option>
-            }
-        </select>
-    </div>
-
-    <button type="submit">Ver</button>
-</form>
+<p class="nota">
+    Operador: <strong>@Model.OperadorNombre</strong>
+</p>
 
 @if (Model.Error is not null)
 {
@@ -60,7 +42,6 @@ else
             <thead>
                 <tr>
                     <th>Referencia</th>
-                    <th>Operador</th>
                     <th>Comercio</th>
                     <th>Destinatario</th>
                     <th>Dirección</th>
@@ -80,13 +61,6 @@ else
                     <tr>
                         <td>@e.ReferenciaExterna</td>
 
-                        <td>
-                            <span class="operador"
-                                  style="background:@Model.ColorDe(e.OperadorId)">
-                            </span>
-
-                            @e.OperadorNombre
-                        </td>
 
                         <td>@e.ComercioNombre</td>
 
@@ -135,10 +109,9 @@ else
                             }
                             else if (e.Estado == "EnDeposito")
                             {
-                                <a asp-page="/HojasDeRuta"
-                                   asp-route-operadorId="@e.OperadorId"
-                                   asp-route-envioId="@e.Id"
-                                   class="accion-asignar">
+                               <a asp-page="/HojasDeRuta"
+                                asp-route-envioId="@e.Id"
+                                class="accion-asignar">
                                     Asignar a ruta
                                 </a>
                             }
@@ -179,9 +152,6 @@ else
                    name="envioId"
                    id="recepcionEnvioId" />
 
-            <input type="hidden"
-                   name="operadorId"
-                   value="@Model.OperadorId" />
 
             <div class="modal-encabezado">
                 <h2 id="tituloRecepcion">
