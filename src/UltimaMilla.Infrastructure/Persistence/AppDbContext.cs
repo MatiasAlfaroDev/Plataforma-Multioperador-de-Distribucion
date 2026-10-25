@@ -4,10 +4,15 @@ using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Rutas;
 using MassTransit;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using UltimaMilla.Infrastructure.Identidad;
 
 namespace UltimaMilla.Infrastructure.Persistence;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(
+    DbContextOptions<AppDbContext> options)
+    : IdentityDbContext<Usuario, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Operador> Operadores => Set<Operador>();
     public DbSet<Comercio> Comercios => Set<Comercio>();
@@ -25,12 +30,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<CuadroTarifario> CuadrosTarifarios => Set<CuadroTarifario>();
     public DbSet<VersionTarifaria> VersionesTarifarias => Set<VersionTarifaria>();
     public DbSet<VersionReglasOperativas> VersionesReglasOperativas => Set<VersionReglasOperativas>();
+    public DbSet<MembresiaUsuario> MembresiasUsuarios=> Set<MembresiaUsuario>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Toma todas las clases IEntityTypeConfiguration de la carpeta Configurations.
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        // Configuración de las tablas de ASP.NET Core Identity.
+        base.OnModelCreating(modelBuilder);
 
-        // tablas del outbox de MassTransit (RNF 6.8): el mensaje se guarda en la misma transacción que el cambio
+        // Configuraciones existentes de las entidades de negocio.
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(AppDbContext).Assembly);
+
+        // Tablas del outbox de MassTransit.
         modelBuilder.AddInboxStateEntity();
         modelBuilder.AddOutboxMessageEntity();
         modelBuilder.AddOutboxStateEntity();

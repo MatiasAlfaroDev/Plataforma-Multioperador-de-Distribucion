@@ -20,6 +20,12 @@ using UltimaMilla.Application.Configuracion.Commands.CrearZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using UltimaMilla.Infrastructure.Identidad;
+using UltimaMilla.Api.Endpoints;
+using Microsoft.AspNetCore.DataProtection;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +38,30 @@ var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, rabbitMq);
+
+builder.Services
+    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddCookie(IdentityConstants.ApplicationScheme, options =>
+    {
+        options.Cookie.Name = "UltimaMilla.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ManejadorDeErrores>();
@@ -65,6 +95,28 @@ builder.Services.AddOpenTelemetry()
     })
     .UseOtlpExporter();
 builder.Services.AddScoped<CrearZonaHandler>();
+var soloInicializar = builder.Configuration.GetValue<bool>(
+    "Inicializacion:SoloInicializar");
+
+if (!soloInicializar)
+{
+    var redisConnectionString =
+        builder.Configuration.GetConnectionString("Redis")
+        ?? throw new InvalidOperationException(
+            "No se configuró ConnectionStrings:Redis.");
+
+    var redis = await ConnectionMultiplexer.ConnectAsync(
+        redisConnectionString);
+
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+
+    builder.Services
+        .AddDataProtection()
+        .SetApplicationName("UltimaMilla")
+        .PersistKeysToStackExchangeRedis(
+            redis,
+            "UltimaMilla:DataProtection:Keys");
+}
 var app = builder.Build();
 
 // Un solo proceso prepara la base. El servicio `inicializador` del compose corre con esta
@@ -77,12 +129,17 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
 }
 
 app.UseExceptionHandler();
-app.MapOpenApi();   // contrato en /openapi/v1.json (Scalar se agrega con la API pública)
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapOpenApi();  // contrato en /openapi/v1.json (Scalar se agrega con la API pública)
 
 // Salud (RNF 6.13): /live = el proceso responde; /ready = además llega a la base; /health = todo.
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapAutenticacionEndpoints();
 
 var api = app.MapGroup("/api");
 
