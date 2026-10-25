@@ -1,0 +1,113 @@
+
+@page "/seleccionar-operador"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize]
+@inject IJSRuntime JS
+@inject NavigationManager Navegacion
+
+<PageTitle>Seleccionar operador - Última Milla</PageTitle>
+
+<h1>Seleccionar operador</h1>
+
+<p>Elegí con qué operador querés trabajar.</p>
+
+@if (cargando)
+{
+    <p>Cargando operadores...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <p role="alert" style="color: red;">@error</p>
+}
+else if (membresias.Count == 0)
+{
+    <p>No tenés membresías activas.</p>
+}
+else
+{
+    @foreach (var membresia in membresias)
+    {
+        <div style="border: 1px solid #ccc; padding: 16px; margin-bottom: 12px;">
+            <h3>@ObtenerNombreOperador(membresia.OperadorId)</h3>
+            <p>Perfil: @membresia.Perfil</p>
+
+            <button disabled="@seleccionando"
+                    @onclick="() => Seleccionar(membresia.Id)">
+                Seleccionar
+            </button>
+        </div>
+    }
+}
+
+@code {
+    private List<MembresiaDto> membresias = new();
+    private bool cargando = true;
+    private bool seleccionando;
+    private string? error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            var resultado = await JS.InvokeAsync<List<MembresiaDto>>(
+                "autenticacionPortal.obtenerMembresias");
+
+            membresias = resultado ?? new();
+        }
+        catch (JSException)
+        {
+            error = "No se pudieron cargar los operadores.";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Seleccionar(Guid membresiaId)
+    {
+        if (seleccionando)
+            return;
+
+        seleccionando = true;
+        error = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "autenticacionPortal.seleccionarOperador",
+                membresiaId);
+
+            // Recargar para reconocer la cookie con el operador seleccionado.
+            Navegacion.NavigateTo("/", forceLoad: true);
+        }
+        catch (JSException)
+        {
+            error = "No se pudo seleccionar el operador.";
+            seleccionando = false;
+        }
+    }
+
+    private static string ObtenerNombreOperador(Guid operadorId)
+    {
+        return operadorId.ToString() switch
+        {
+            "11111111-0000-0000-0000-000000000001" => "RapiEnvíos",
+            "11111111-0000-0000-0000-000000000002" => "Logística Sur",
+            _ => $"Operador {operadorId}"
+        };
+    }
+
+    private sealed class MembresiaDto
+    {
+        public Guid Id { get; set; }
+        public Guid OperadorId { get; set; }
+        public Guid? CuentaComercialId { get; set; }
+        public string Perfil { get; set; } = "";
+    }
+}

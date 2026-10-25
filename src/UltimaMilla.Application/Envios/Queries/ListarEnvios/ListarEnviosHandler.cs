@@ -48,9 +48,11 @@ public sealed class ListarEnviosHandler(
             cuentaComercialId,
             ct);
 
-        var cuentasPorId = (await cuentas.ListarResumenAsync(ct))
+        var cuentasPorId = (await cuentas.ListarResumenAsync(
+            operadorId,
+            cuentaComercialId,
+            ct))
             .ToDictionary(c => c.Id);
-
         return lista
             .Select(e =>
             {

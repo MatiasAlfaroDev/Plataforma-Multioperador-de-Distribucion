@@ -42,7 +42,8 @@ public static class DependencyInjection
             options.User.RequireUniqueEmail = true;
         })
         .AddRoles<IdentityRole<Guid>>()
-        .AddEntityFrameworkStores<AppDbContext>();
+        .AddEntityFrameworkStores<AppDbContext>()
+        .AddDefaultTokenProviders();
         services.AddScoped<IEnvioRepository, EnvioRepository>();
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();

@@ -30,6 +30,7 @@ using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Api.Seguridad;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Application.Seguridad;
+using Microsoft.AspNetCore.Antiforgery;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,6 +67,11 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+});
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ManejadorDeErrores>();
@@ -140,6 +146,7 @@ app.UseExceptionHandler();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 app.MapOpenApi();  // contrato en /openapi/v1.json (Scalar se agrega con la API pública)
 
@@ -149,21 +156,54 @@ app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.C
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapAutenticacionEndpoints();
 
+app.MapGet("/api/antiforgery/token", (
+    HttpContext context,
+    IAntiforgery antiforgery) =>
+{
+    var tokens = antiforgery.GetAndStoreTokens(context);
+
+    context.Response.Headers.CacheControl = "no-store";
+
+    return Results.Ok(new
+    {
+        token = tokens.RequestToken
+    });
+})
+.RequireAuthorization();
+
 var api = app.MapGroup("/api");
 
 api.MapGet("/operadores", async (ListarOperadoresHandler handler, CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ListarOperadoresQuery(), ct)));
 
 // Provisorio hasta el login del 15/10: el Portal elige con qué cuenta comercial operar.
-api.MapGet("/cuentas-comerciales", async (ListarCuentasComercialesHandler handler, CancellationToken ct) =>
-    Results.Ok(await handler.Handle(new ListarCuentasComercialesQuery(), ct)));
+api.MapGet("/cuentas-comerciales", async (
+    ListarCuentasComercialesHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(
+        new ListarCuentasComercialesQuery(), ct)))
+    .RequireAuthorization(policy =>
+        policy.RequireRole(
+            "Comercio",
+            "AdministradorOperador",
+            "Operador"));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
 api.MapPost("/envios", async (
+    HttpContext context,
+    IAntiforgery antiforgery,
     CrearEnvioCommand command,
     CrearEnvioHandler handler,
     CancellationToken ct) =>
 {
+    if (!await antiforgery.IsRequestValidAsync(context))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Token de seguridad inválido",
+            detail: "La solicitud no contiene un token antifalsificación válido.");
+    }
+
     var id = await handler.Handle(command, ct);
 
     return Results.Created(
@@ -174,7 +214,6 @@ api.MapPost("/envios", async (
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
     Perfiles.Comercio));
-
 // GET /api/envios?operadorId=... → listado para el Backoffice.
 // GET /api/envios → listado según el operador y perfil autenticado.
 api.MapGet("/envios", async (
