@@ -24,9 +24,12 @@ public static class DependencyInjection
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AuditableEntityInterceptor>();
+        services.AddSingleton<TenantSaveChangesInterceptor>();
         services.AddDbContext<AppDbContext>((sp, options) => options
             .UseNpgsql(connectionString)
-            .AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));
+            .AddInterceptors(
+                sp.GetRequiredService<AuditableEntityInterceptor>(),
+                sp.GetRequiredService<TenantSaveChangesInterceptor>()));
 
         services.AddIdentityCore<Usuario>(options =>
         {
@@ -39,7 +42,8 @@ public static class DependencyInjection
             options.User.RequireUniqueEmail = true;
         })
         .AddRoles<IdentityRole<Guid>>()
-        .AddEntityFrameworkStores<AppDbContext>();
+        .AddEntityFrameworkStores<AppDbContext>()
+        .AddDefaultTokenProviders();
         services.AddScoped<IEnvioRepository, EnvioRepository>();
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
@@ -88,9 +92,11 @@ public static class DependencyInjection
 {
     using var scope = services.CreateScope();
 
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    await db.Database.MigrateAsync(ct);
+        db.HabilitarAccesoInicializacion();
+
+        await db.Database.MigrateAsync(ct);
 
     // Datos iniciales del negocio.
     await DbSeeder.SembrarAsync(db, ct);

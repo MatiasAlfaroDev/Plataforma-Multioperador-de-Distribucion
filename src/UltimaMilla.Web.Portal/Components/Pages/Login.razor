@@ -1,0 +1,79 @@
+
+@page "/login"
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject NavigationManager Navegacion
+
+<PageTitle>Iniciar sesión - Última Milla</PageTitle>
+
+<div class="login-container">
+    <h1>Portal del comercio</h1>
+    <h2>Iniciar sesión</h2>
+
+    <p>Ingresá tus credenciales para acceder a la plataforma.</p>
+
+    <form @onsubmit="IniciarSesion" @onsubmit:preventDefault>
+        <div>
+            <label for="email">Correo electrónico</label>
+            <input id="email"
+                   type="email"
+                   autocomplete="username"
+                   @bind="email"
+                   required />
+        </div>
+
+        <div>
+            <label for="password">Contraseña</label>
+            <input id="password"
+                   type="password"
+                   autocomplete="current-password"
+                   @bind="password"
+                   required />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <p role="alert" style="color: red;">@error</p>
+        }
+
+        <button type="submit" disabled="@procesando">
+            @(procesando ? "Ingresando..." : "Ingresar")
+        </button>
+    </form>
+</div>
+
+@code {
+    private string email = "";
+    private string password = "";
+    private string? error;
+    private bool procesando;
+
+    private async Task IniciarSesion()
+    {
+        if (procesando)
+            return;
+
+        procesando = true;
+        error = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "autenticacionPortal.login",
+                email,
+                password);
+
+            // Recarga completa para que Blazor reconozca la cookie.
+            Navegacion.NavigateTo("/seleccionar-operador", forceLoad: true);
+        }
+        catch (JSException)
+        {
+            error = "No se pudo iniciar sesión. Verificá tus credenciales.";
+        }
+        finally
+        {
+            password = "";
+            procesando = false;
+        }
+    }
+}

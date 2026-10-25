@@ -100,6 +100,18 @@ public static class IdentitySeeder
                 };
 
                 Verificar(await userManager.CreateAsync(usuario, password));
+            }else if (
+                bool.TryParse(
+                    configuration["Inicializacion:RestablecerPasswordDemo"],
+                    out var restablecerPassword)
+                && restablecerPassword)
+            {
+                var token = await userManager.GeneratePasswordResetTokenAsync(usuario);
+
+                Verificar(await userManager.ResetPasswordAsync(
+                    usuario,
+                    token,
+                    password));
             }
 
             if (!await userManager.IsInRoleAsync(usuario, perfil))

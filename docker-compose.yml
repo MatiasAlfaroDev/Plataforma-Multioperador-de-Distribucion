@@ -118,6 +118,7 @@ services:
       Inicializacion__SoloInicializar: "true"
       Inicializacion__UsuariosDemo: "true"
       Inicializacion__PasswordDemo: "${DEMO_PASSWORD:?Debes definir DEMO_PASSWORD}"
+      Inicializacion__RestablecerPasswordDemo: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -168,8 +169,12 @@ services:
       Api__BaseUrl: "http://traefik/"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_SERVICE_NAME: "portal"
+      ConnectionStrings__Redis: "redis:6379"
     depends_on:
-      - api
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.portal.rule=Host(`portal.localhost`)"

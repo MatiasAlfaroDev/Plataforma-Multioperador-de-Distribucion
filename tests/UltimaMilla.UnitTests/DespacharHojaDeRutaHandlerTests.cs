@@ -202,12 +202,15 @@ public class DespacharHojaDeRutaHandlerTests
                 e.ReferenciaExterna == referenciaExterna));
 
         public Task<IReadOnlyList<Envio>> ListarAsync(
-            Guid? operadorId,
-            CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<Envio>>(
-                lista.Where(e =>
-                    operadorId is null || e.OperadorId == operadorId)
-                .ToList());
+    Guid operadorId,
+    Guid? cuentaComercialId,
+    CancellationToken ct) =>
+    Task.FromResult<IReadOnlyList<Envio>>(
+        lista.Where(e =>
+            e.OperadorId == operadorId &&
+            (!cuentaComercialId.HasValue ||
+             e.CuentaComercialId == cuentaComercialId.Value))
+        .ToList());
     }
 
     private sealed class HojasEnMemoria : IHojaDeRutaRepository

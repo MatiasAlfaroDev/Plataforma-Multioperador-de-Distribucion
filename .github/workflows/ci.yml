@@ -31,4 +31,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Construir imágenes con docker compose
+        env:
+          DEMO_PASSWORD: "ci-build-placeholder-not-a-real-password"
         run: docker compose build

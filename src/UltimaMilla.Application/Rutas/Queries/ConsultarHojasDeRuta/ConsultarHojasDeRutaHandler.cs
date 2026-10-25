@@ -67,7 +67,9 @@ public sealed class ConsultarHojasDeRutaHandler(
             operadorId, ct);
 
         var listaEnvios = await envios.ListarAsync(
-            operadorId, ct);
+            operadorId,
+            null,
+            ct);
 
         var zonasOperador = await zonas.ListarPorOperadorAsync(
             operadorId, ct);
