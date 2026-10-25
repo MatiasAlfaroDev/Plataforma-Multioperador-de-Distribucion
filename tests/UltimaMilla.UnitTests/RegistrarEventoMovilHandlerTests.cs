@@ -85,8 +85,16 @@ public class RegistrarEventoMovilHandlerTests
         public Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct) => Task.FromResult(Lista.FirstOrDefault(e => e.Id == id));
         public Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct) =>
             Task.FromResult(Lista.Any(e => e.CuentaComercialId == cuentaComercialId && e.ReferenciaExterna == referenciaExterna));
-        public Task<IReadOnlyList<Envio>> ListarAsync(Guid? operadorId, CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<Envio>>(Lista);
+        public Task<IReadOnlyList<Envio>> ListarAsync(
+    Guid operadorId,
+    Guid? cuentaComercialId,
+    CancellationToken ct) =>
+    Task.FromResult<IReadOnlyList<Envio>>(
+        Lista.Where(e =>
+            e.OperadorId == operadorId &&
+            (!cuentaComercialId.HasValue ||
+             e.CuentaComercialId == cuentaComercialId.Value))
+        .ToList());
     }
 
     private sealed class EventosEnMemoria : IEventoMovilRepository
