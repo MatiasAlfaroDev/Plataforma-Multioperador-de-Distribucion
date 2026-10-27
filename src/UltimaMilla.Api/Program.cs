@@ -236,9 +236,20 @@ api.MapGet("/envios", async (
 api.MapPost("/envios/{envioId:guid}/eventos-movil",
     async (Guid envioId, EventoMovilRequest request, RegistrarEventoMovilHandler handler, CancellationToken ct) =>
     {
-        await handler.Handle(
-            new RegistrarEventoMovilCommand(envioId, request.IdEvento, request.Tipo, request.Motivo, request.Receptor, request.FechaHora),
-            ct);
+        await handler.Handle(          
+            new RegistrarEventoMovilCommand(
+                envioId,
+                request.IdEvento,
+                request.Tipo,
+                request.Motivo,
+                request.Receptor,
+                request.FechaHora,
+                request.DocumentoReceptor,
+                request.ReferenciaFirma,
+                request.ReferenciaFotografia,
+                request.Latitud,
+                request.Longitud,
+                request.EvidenciaFallo),ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     });
 
@@ -359,5 +370,6 @@ static bool EsSonda(PathString ruta) =>
 public partial class Program { }
 
 /// <summary>Cuerpo que manda la app del repartidor; el envío viaja en la URL.</summary>
-public sealed record EventoMovilRequest(Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora);
+
+public sealed record EventoMovilRequest( Guid IdEvento,  string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null);
 public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);

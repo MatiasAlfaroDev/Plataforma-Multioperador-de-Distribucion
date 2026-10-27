@@ -10,7 +10,8 @@ public sealed class PruebaEntregaConfiguration : IEntityTypeConfiguration<Prueba
     {
         builder.ToTable("pruebas_entrega");
         builder.HasKey(p => p.Id);
-
+        builder.Property(p => p.Id)
+            .ValueGeneratedNever();
         builder.Property(p => p.NombreReceptor)
             .HasMaxLength(200).IsRequired();
 
