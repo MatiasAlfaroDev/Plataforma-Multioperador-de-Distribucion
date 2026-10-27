@@ -115,4 +115,28 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         comando.Parameters.AddWithValue("$id", evento.Id.ToString());
         await comando.ExecuteNonQueryAsync();
     }
+
+    /// <summary>
+    /// El repartidor acepta lo que dice el servidor: se borra lo registrado para ese envío
+    /// y el envío vuelve a "Por entregar" en el teléfono. Es la última palabra del ADR de conflictos.
+    /// </summary>
+    public async Task DescartarAsync(Guid envioId)
+    {
+        await using var conexion = await db.AbrirAsync();
+        await using var tx = (SqliteTransaction)await conexion.BeginTransactionAsync();
+
+        var borrar = conexion.CreateCommand();
+        borrar.Transaction = tx;
+        borrar.CommandText = "DELETE FROM eventos_pendientes WHERE envio_id = $envio";
+        borrar.Parameters.AddWithValue("$envio", envioId.ToString());
+        await borrar.ExecuteNonQueryAsync();
+
+        var reiniciar = conexion.CreateCommand();
+        reiniciar.Transaction = tx;
+        reiniciar.CommandText = "UPDATE envios_ruta SET resultado_local = NULL, pendiente = 0 WHERE id = $envio";
+        reiniciar.Parameters.AddWithValue("$envio", envioId.ToString());
+        await reiniciar.ExecuteNonQueryAsync();
+
+        await tx.CommitAsync();
+    }
 }

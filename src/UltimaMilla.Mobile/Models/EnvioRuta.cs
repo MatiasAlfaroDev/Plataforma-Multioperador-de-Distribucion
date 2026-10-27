@@ -65,13 +65,21 @@ public sealed class EnvioRuta
     /// <summary>La línea de sincronización se muestra solo si ya se registró algo.</summary>
     public bool MostrarSincronizacion => ResultadoLocal is not null;
 
-    public string TextoSincronizacion => PendienteDeSincronizar
-        ? "⏳ Guardado en el teléfono · falta enviarlo"
+    public string TextoSincronizacion =>
+        Rechazado ? $"⚠ Rechazado por el servidor: {UltimoError}"
+        : PendienteDeSincronizar ? "⏳ Guardado en el teléfono · falta enviarlo"
         : "✓ Enviado al servidor";
 
-    public Color ColorSincronizacion => PendienteDeSincronizar
-        ? Color.FromArgb("#B05A00")
+    public Color ColorSincronizacion =>
+        Rechazado ? Color.FromArgb("#C5221F")
+        : PendienteDeSincronizar ? Color.FromArgb("#B05A00")
         : Color.FromArgb("#1E8E3E");
+
+    /// <summary>Por qué el servidor rechazó lo registrado (null si nunca lo rechazó).</summary>
+    public string? UltimoError { get; set; }
+
+    /// <summary>Conflicto: falta sincronizar y el servidor ya dijo que no.</summary>
+    public bool Rechazado => PendienteDeSincronizar && UltimoError is not null;
 
     public string DetalleBultos => $"{CantidadBultos} {(CantidadBultos == 1 ? "bulto" : "bultos")} · {Modalidad}";
 }

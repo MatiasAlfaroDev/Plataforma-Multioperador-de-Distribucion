@@ -248,6 +248,24 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         }
     }
 
+    /// <summary>El servidor rechazó lo registrado: el repartidor lo descarta y puede volver a registrarlo.</summary>
+    [RelayCommand]
+    private async Task DescartarAsync(EnvioRuta envio)
+    {
+        if (!envio.Rechazado)
+            return;
+
+        var opcion = await _dialogos.ElegirAsync(
+            $"{envio.ReferenciaExterna}: {envio.UltimoError}",
+            ["Descartar y volver a registrar"]);
+        if (opcion is null)
+            return;
+
+        await _eventos.DescartarAsync(envio.Id);
+        Aviso = $"{envio.ReferenciaExterna}: descartado. Quedó como \"Por entregar\".";
+        await RefrescarDesdeBaseLocalAsync();
+    }
+
     /// <summary>Siempre se guarda primero en el teléfono; si hay señal, se intenta mandar enseguida.</summary>
     private async Task RegistrarAsync(EventoPendiente evento)
     {

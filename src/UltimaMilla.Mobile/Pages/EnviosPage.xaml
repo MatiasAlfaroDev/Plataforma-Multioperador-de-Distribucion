@@ -144,6 +144,12 @@
                                 <!-- ¿Ya llegó al servidor? -->
                                 <Label Text="{Binding TextoSincronizacion}" TextColor="{Binding ColorSincronizacion}"
                                        FontSize="12" FontFamily="OpenSansSemibold" IsVisible="{Binding MostrarSincronizacion}" />
+                                <!-- Conflicto: el servidor rechazó lo registrado -->
+                                <Button Text="Descartar" Style="{StaticResource BotonPeligro}"
+                                        HorizontalOptions="Start" Padding="16,6"
+                                        IsVisible="{Binding Rechazado}"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=DescartarCommand}"
+                                        CommandParameter="{Binding .}" />
 
                                 <!-- Botones: solo si todavía no se registró el resultado -->
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,6,0,0"
