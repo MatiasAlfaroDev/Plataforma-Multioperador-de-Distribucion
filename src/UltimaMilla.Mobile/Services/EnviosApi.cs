@@ -28,13 +28,19 @@ public class EnviosApi : IEnviosApi
     /// </summary>
     public async Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarEventoAsync(EventoPendiente evento, CancellationToken ct = default)
     {
+        var esEntrega = evento.Tipo == "Entregado";
         var cuerpo = new
         {
             idEvento = evento.Id,
             tipo = evento.Tipo,
             motivo = evento.Motivo,
             receptor = evento.Receptor,
-            fechaHora = evento.FechaHora
+            fechaHora = evento.FechaHora,
+            latitud = evento.Latitud,
+            longitud = evento.Longitud,
+            // La misma foto es prueba de entrega o evidencia del intento fallido, según el tipo.
+            referenciaFotografia = esEntrega ? evento.ReferenciaFoto : null,
+            evidenciaFallo = esEntrega ? null : evento.ReferenciaFoto
         };
 
         try
@@ -45,8 +51,7 @@ public class EnviosApi : IEnviosApi
             if (respuesta.IsSuccessStatusCode || respuesta.StatusCode == HttpStatusCode.Conflict)
                 return (ResultadoEnvio.Aceptado, null);
 
-            var detalle = await respuesta.Content.ReadAsStringAsync(ct);
-            return (ResultadoEnvio.Rechazado, $"{(int)respuesta.StatusCode}: {Recortar(detalle)}");
+            return (ResultadoEnvio.Rechazado, await LeerMotivoAsync(respuesta, ct));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
@@ -54,5 +59,27 @@ public class EnviosApi : IEnviosApi
         }
     }
 
+    /// <summary>
+    /// La API explica el rechazo en un ProblemDetails: { "title": "El envío debe estar en tránsito..." }.
+    /// Se guarda solo ese texto, que es el que ve el repartidor.
+    /// </summary>
+    private static async Task<string> LeerMotivoAsync(HttpResponseMessage respuesta, CancellationToken ct)
+    {
+        if (respuesta.StatusCode == HttpStatusCode.Unauthorized)
+            return "Sesión vencida: iniciá sesión de nuevo.";
+
+        var texto = await respuesta.Content.ReadAsStringAsync(ct);
+        try
+        {
+            using var json = JsonDocument.Parse(texto);
+            if (json.RootElement.TryGetProperty("title", out var titulo) && titulo.GetString() is { Length: > 0 } motivo)
+                return motivo;
+        }
+        catch (JsonException)
+        {
+            // No era JSON: se guarda el texto tal cual.
+        }
+        return $"Error {(int)respuesta.StatusCode}: {Recortar(texto)}";
+    }
     private static string Recortar(string texto) => texto.Length <= 200 ? texto : texto[..200];
 }

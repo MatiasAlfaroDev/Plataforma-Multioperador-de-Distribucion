@@ -112,7 +112,10 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
         var comando = conexion.CreateCommand();
         comando.CommandText = """
             SELECT id, operador_id, referencia, destinatario, direccion, comercio, modalidad, bultos,
-                   estado_servidor, resultado_local, pendiente
+                   estado_servidor, resultado_local, pendiente,
+                   (SELECT p.ultimo_error FROM eventos_pendientes p
+                    WHERE p.envio_id = envios_ruta.id AND p.ultimo_error IS NOT NULL
+                    ORDER BY p.fecha_hora DESC LIMIT 1) AS ultimo_error
             FROM envios_ruta
             WHERE operador_id = $op
             ORDER BY (resultado_local IS NOT NULL), referencia  -- primero lo que falta entregar
@@ -135,7 +138,8 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
                 CantidadBultos = lector.GetInt32(7),
                 EstadoServidor = lector.GetString(8),
                 ResultadoLocal = lector.IsDBNull(9) ? null : lector.GetString(9),
-                PendienteDeSincronizar = lector.GetInt32(10) == 1
+                PendienteDeSincronizar = lector.GetInt32(10) == 1,
+                UltimoError = lector.IsDBNull(11) ? null : lector.GetString(11)
             });
         }
         return lista;

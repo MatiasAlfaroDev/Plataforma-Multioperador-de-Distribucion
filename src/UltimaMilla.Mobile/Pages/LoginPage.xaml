@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:UltimaMilla.Mobile.ViewModels"
+             x:Class="UltimaMilla.Mobile.Pages.LoginPage"
+             x:DataType="vm:LoginViewModel"
+             Title="Iniciar sesión">
+
+    <VerticalStackLayout Padding="24,48" Spacing="16">
+        <Label Text="🚚" FontSize="48" HorizontalOptions="Center" />
+        <Label Text="Repartidor" Style="{StaticResource Titulo}" HorizontalOptions="Center" />
+
+        <Entry Placeholder="Email" Keyboard="Email" Text="{Binding Email}" />
+        <Entry Placeholder="Contraseña" IsPassword="True" Text="{Binding Password}" />
+
+        <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" IsVisible="{Binding HayError}" />
+
+        <Button Text="Entrar" Command="{Binding IniciarSesionCommand}" />
+        <ActivityIndicator IsRunning="{Binding EstaCargando}" IsVisible="{Binding EstaCargando}" />
+
+        <Button Text="Trabajar sin conexión"
+                Command="{Binding TrabajarSinConexionCommand}"
+                BackgroundColor="Transparent"
+                TextColor="{StaticResource Primary}" />
+    </VerticalStackLayout>
+</ContentPage>

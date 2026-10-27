@@ -28,6 +28,13 @@ public sealed class EventoPendiente
     /// <summary>Momento real en que ocurrió en la calle, no el momento en que se sincronizó.</summary>
     public DateTimeOffset FechaHora { get; set; }
 
+    /// <summary>Posición del dispositivo al registrar (obligatoria para Entregado).</summary>
+    public decimal? Latitud { get; set; }
+    public decimal? Longitud { get; set; }
+
+    /// <summary>Referencia de la foto: prueba de entrega (Entregado) o evidencia (NoEntregado).</summary>
+    public string? ReferenciaFoto { get; set; }
+
     public int Intentos { get; set; }
     public string? UltimoError { get; set; }
 }
