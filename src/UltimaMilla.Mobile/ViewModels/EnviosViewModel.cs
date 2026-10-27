@@ -30,6 +30,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     private readonly SincronizacionService _sincronizacion;
     private readonly IConnectivity _conectividad;
     private readonly IDialogos _dialogos;
+    private readonly ICaptura _captura;
 
     public EnviosViewModel(
         IEnviosApi api,
@@ -37,7 +38,8 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         EventosPendientesRepository eventos,
         SincronizacionService sincronizacion,
         IConnectivity conectividad,
-        IDialogos dialogos)
+        IDialogos dialogos,
+        ICaptura captura)
     {
         _api = api;
         _ruta = ruta;
@@ -45,6 +47,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         _sincronizacion = sincronizacion;
         _conectividad = conectividad;
         _dialogos = dialogos;
+        _captura = captura;
     }
 
     public ObservableCollection<EnvioRuta> Envios { get; } = new();
@@ -161,8 +164,10 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
                 {
                     // Primero se intenta subir lo pendiente, así la ruta descargada ya lo refleja.
                     await _sincronizacion.SincronizarAsync();
+                    // La API devuelve los envíos del operador de la SESIÓN (cookie). Se guardan
+                    // solo los que coinciden con el operador de la pantalla: la app nunca mezcla operadores.
                     var descargados = await _api.ListarEnviosAsync(Operador.Id);
-                    await _ruta.GuardarRutaAsync(Operador.Id, descargados);
+                    await _ruta.GuardarRutaAsync(Operador.Id, descargados.Where(e => e.OperadorId == Operador.Id));
                     Aviso = $"Ruta descargada a las {DateTime.Now:HH:mm}.";
                 }
                 catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
@@ -196,13 +201,32 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         if (receptor is null)
             return;
 
+        // Prueba de entrega (RF 20): foto + posición y hora del dispositivo.
+        var id = Guid.NewGuid();
+        var foto = await _captura.SacarFotoAsync(id);
+        if (foto is null)
+        {
+            await _dialogos.AvisarAsync("Entrega", "La entrega necesita una foto como prueba.");
+            return;
+        }
+
+        var ubicacion = await _captura.ObtenerUbicacionAsync();
+        if (ubicacion is null)
+        {
+            await _dialogos.AvisarAsync("Entrega", "No se pudo obtener la ubicación. Activá la ubicación del dispositivo y probá de nuevo.");
+            return;
+        }
+
         await RegistrarAsync(new EventoPendiente
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             EnvioId = envio.Id,
             Tipo = "Entregado",
             Receptor = receptor,
-            FechaHora = DateTimeOffset.UtcNow
+            FechaHora = DateTimeOffset.UtcNow,
+            Latitud = ubicacion.Value.Latitud,
+            Longitud = ubicacion.Value.Longitud,
+            ReferenciaFoto = foto
         });
     }
 
@@ -216,13 +240,27 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         if (motivo is null)
             return;
 
+        // Evidencia del intento (RF 21): una foto, por ejemplo de la puerta.
+        var id = Guid.NewGuid();
+        var foto = await _captura.SacarFotoAsync(id);
+        if (foto is null)
+        {
+            await _dialogos.AvisarAsync("No entregado", "El intento fallido necesita una foto como evidencia.");
+            return;
+        }
+
+        var ubicacion = await _captura.ObtenerUbicacionAsync();
+
         await RegistrarAsync(new EventoPendiente
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             EnvioId = envio.Id,
             Tipo = "NoEntregado",
             Motivo = motivo,
-            FechaHora = DateTimeOffset.UtcNow
+            FechaHora = DateTimeOffset.UtcNow,
+            Latitud = ubicacion?.Latitud,
+            Longitud = ubicacion?.Longitud,
+            ReferenciaFoto = foto
         });
     }
 

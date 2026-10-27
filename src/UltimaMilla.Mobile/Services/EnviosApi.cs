@@ -28,13 +28,19 @@ public class EnviosApi : IEnviosApi
     /// </summary>
     public async Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarEventoAsync(EventoPendiente evento, CancellationToken ct = default)
     {
+        var esEntrega = evento.Tipo == "Entregado";
         var cuerpo = new
         {
             idEvento = evento.Id,
             tipo = evento.Tipo,
             motivo = evento.Motivo,
             receptor = evento.Receptor,
-            fechaHora = evento.FechaHora
+            fechaHora = evento.FechaHora,
+            latitud = evento.Latitud,
+            longitud = evento.Longitud,
+            // La misma foto es prueba de entrega o evidencia del intento fallido, según el tipo.
+            referenciaFotografia = esEntrega ? evento.ReferenciaFoto : null,
+            evidenciaFallo = esEntrega ? null : evento.ReferenciaFoto
         };
 
         try

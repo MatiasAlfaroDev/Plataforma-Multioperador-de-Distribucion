@@ -61,6 +61,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
         builder.Services.AddSingleton<SincronizacionService>();
         builder.Services.AddSingleton<IDialogos, DialogosShell>();
+        builder.Services.AddSingleton<ICaptura, Captura>();
 
         // MVVM: cada página recibe su ViewModel por constructor.
         builder.Services.AddTransient<LoginViewModel>();
