@@ -17,5 +17,10 @@
 
         <Button Text="Entrar" Command="{Binding IniciarSesionCommand}" />
         <ActivityIndicator IsRunning="{Binding EstaCargando}" IsVisible="{Binding EstaCargando}" />
+
+        <Button Text="Trabajar sin conexión"
+                Command="{Binding TrabajarSinConexionCommand}"
+                BackgroundColor="Transparent"
+                TextColor="{StaticResource Primary}" />
     </VerticalStackLayout>
 </ContentPage>
