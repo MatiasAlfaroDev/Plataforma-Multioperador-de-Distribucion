@@ -9,9 +9,6 @@ namespace UltimaMilla.Web.Backoffice.Pages;
 
 public sealed class CrearZonaFormulario
 {
-    [Required(ErrorMessage = "Seleccioná un operador.")]
-    public Guid OperadorId { get; set; }
-
     [Required(ErrorMessage = "Ingresá el nombre de la zona.")]
     [StringLength(150)]
     public string Nombre { get; set; } = string.Empty;
@@ -31,35 +28,30 @@ public sealed class CrearZonaFormulario
 }
 
 public class ZonasModel(
-    ZonasApiClient zonasApi,
-    EnviosApiClient enviosApi) : PageModel
+    ZonasApiClient zonasApi) : PageModel
 {
-    [BindProperty(SupportsGet = true)]
-    public Guid? OperadorId { get; set; }
 
     [BindProperty]
     public CrearZonaFormulario Formulario { get; set; } = new();
-
-    public IReadOnlyList<OperadorItem> Operadores { get; private set; } = [];
-
+    public Guid OperadorIdSesion =>
+    Guid.TryParse(
+        User.FindFirst("operador_id")?.Value,
+        out var id)
+        ? id
+        : Guid.Empty;
     public IReadOnlyList<ZonaListadoItem> Zonas { get; private set; } = [];
 
     public string? Error { get; private set; }
 
-    public async Task OnGetAsync(CancellationToken ct)
-    {
-        Formulario.OperadorId = OperadorId ?? Guid.Empty;
-        await CargarDatosAsync(ct);
-    }
+  public async Task OnGetAsync(CancellationToken ct)
+{
+    await CargarDatosAsync(ct);
+}
 
     public async Task<IActionResult> OnPostAsync(CancellationToken ct)
     {
-        OperadorId = Formulario.OperadorId;
-
-        if (Formulario.OperadorId == Guid.Empty)
-            ModelState.AddModelError(
-                "Formulario.OperadorId",
-                "Seleccioná un operador.");
+       if (OperadorIdSesion == Guid.Empty)
+        return Forbid();
 
         var coberturas = ParsearCoberturas(Formulario.Coberturas);
         var franjas = ParsearFranjas(Formulario.Franjas);
@@ -73,7 +65,7 @@ public class ZonasModel(
         try
         {
             var solicitud = new CrearZonaRequest(
-                Formulario.OperadorId,
+                OperadorIdSesion,
                 Formulario.Nombre.Trim(),
                 Formulario.Departamento.Trim(),
                 Formulario.MinutosTraslado,
@@ -84,8 +76,7 @@ public class ZonasModel(
 
             TempData["Mensaje"] = "Zona creada correctamente.";
 
-            return RedirectToPage(
-                new { operadorId = Formulario.OperadorId });
+            return RedirectToPage();
         }
         catch (InvalidOperationException ex)
         {
@@ -101,19 +92,22 @@ public class ZonasModel(
     }
 
     private async Task CargarDatosAsync(CancellationToken ct)
+{
+    try
     {
-        try
+        if (OperadorIdSesion == Guid.Empty)
         {
-            Operadores = await enviosApi.ListarOperadoresAsync(ct);
+            Error = "No hay un operador seleccionado en la sesión.";
+            return;
+        }
 
-            if (OperadorId is Guid id && id != Guid.Empty)
-                Zonas = await zonasApi.ListarAsync(id, ct);
-        }
-        catch (HttpRequestException)
-        {
-            Error ??= "No se pudieron cargar los datos del operador.";
-        }
+        Zonas = await zonasApi.ListarAsync(OperadorIdSesion, ct);
     }
+    catch (HttpRequestException ex)
+    {
+        Error ??= $"No se pudieron cargar las zonas: {ex.Message}";
+    }
+} 
 
     private List<CoberturaZonaRequest> ParsearCoberturas(string? texto)
     {

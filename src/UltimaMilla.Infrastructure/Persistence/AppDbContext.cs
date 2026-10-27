@@ -4,11 +4,30 @@ using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Rutas;
 using MassTransit;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using UltimaMilla.Infrastructure.Identidad;
+using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Domain.Common;
 
 namespace UltimaMilla.Infrastructure.Persistence;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(
+    DbContextOptions<AppDbContext> options,
+    ITenantContext? tenantContext = null)
+    : IdentityDbContext<Usuario, IdentityRole<Guid>, Guid>(options)
 {
+    private readonly ITenantContext? _tenantContext = tenantContext;
+
+    public Guid? OperadorActualId => _tenantContext?.OperadorId;
+
+    public bool AccesoInicializacion { get; private set; }
+
+    public void HabilitarAccesoInicializacion()
+    {
+        AccesoInicializacion = true;
+    }
+
     public DbSet<Operador> Operadores => Set<Operador>();
     public DbSet<Comercio> Comercios => Set<Comercio>();
     public DbSet<CuentaComercial> CuentasComerciales => Set<CuentaComercial>();
@@ -25,12 +44,71 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<CuadroTarifario> CuadrosTarifarios => Set<CuadroTarifario>();
     public DbSet<VersionTarifaria> VersionesTarifarias => Set<VersionTarifaria>();
     public DbSet<VersionReglasOperativas> VersionesReglasOperativas => Set<VersionReglasOperativas>();
+    public DbSet<MembresiaUsuario> MembresiasUsuarios=> Set<MembresiaUsuario>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Toma todas las clases IEntityTypeConfiguration de la carpeta Configurations.
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        // Configuración de las tablas de ASP.NET Core Identity.
+        base.OnModelCreating(modelBuilder);
 
-        // tablas del outbox de MassTransit (RNF 6.8): el mensaje se guarda en la misma transacción que el cambio
+        // Configuraciones existentes de las entidades de negocio.
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(AppDbContext).Assembly);
+
+        modelBuilder.Entity<CuentaComercial>()
+        .HasQueryFilter(c =>
+        AccesoInicializacion ||
+        c.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<Envio>()
+        .HasQueryFilter(e =>
+        AccesoInicializacion ||
+        e.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<CuadroTarifario>()
+    .HasQueryFilter(x =>
+        AccesoInicializacion ||
+        x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<Repartidor>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<Vehiculo>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<VersionReglasOperativas>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<VersionTarifaria>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<ZonaCobertura>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+               x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<EventoMovil>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<HojaDeRuta>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<MotivoNoEntrega>()
+        .HasQueryFilter(x =>
+        AccesoInicializacion ||
+        x.OperadorId == OperadorActualId);
+        // Tablas del outbox de MassTransit.
         modelBuilder.AddInboxStateEntity();
         modelBuilder.AddOutboxMessageEntity();
         modelBuilder.AddOutboxStateEntity();

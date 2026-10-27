@@ -1,0 +1,101 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.SeleccionarOperadorModel
+
+@{
+    ViewData["Title"] = "Seleccionar operador";
+}
+
+<section style="max-width: 600px; margin: 3rem auto;">
+    <h1>Seleccionar operador</h1>
+
+    <p class="nota">
+        Seleccioná la membresía con la que querés trabajar.
+    </p>
+
+    <div id="listaOperadores"></div>
+
+    <p id="mensajeError" class="error" role="alert"></p>
+</section>
+
+<script>
+    const lista = document.getElementById("listaOperadores");
+    const error = document.getElementById("mensajeError");
+
+    async function cargarOperadores() {
+        try {
+            const respuesta = await fetch("/api/auth/membresias", {
+                credentials: "same-origin"
+            });
+
+            if (respuesta.status === 401) {
+                window.location.assign("/Login");
+                return;
+            }
+
+            if (!respuesta.ok) {
+                throw new Error("No se pudieron cargar las membresías.");
+            }
+
+            const membresias = await respuesta.json();
+
+            const operadores = membresias.filter(m =>
+                m.perfil === "AdministradorOperador" ||
+                m.perfil === "Operador"
+            );
+
+            if (operadores.length === 0) {
+                error.textContent =
+                    "Tu usuario no tiene permisos para acceder al Backoffice.";
+                return;
+            }
+
+            operadores.forEach(m => {
+                const boton = document.createElement("button");
+                boton.type = "button";
+                boton.className = "primario";
+                boton.style.display = "block";
+                boton.style.marginBottom = "1rem";
+                boton.textContent =
+                    `${m.perfil} - Operador ${m.operadorId}`;
+
+                boton.addEventListener("click", async () => {
+                    boton.disabled = true;
+                    error.textContent = "";
+
+                    try {
+                        const respuestaSeleccion = await fetch(
+                            "/api/auth/seleccionar-operador",
+                            {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json"
+                                },
+                                credentials: "same-origin",
+                                body: JSON.stringify({
+                                    membresiaId: m.id
+                                })
+                            }
+                        );
+
+                        if (!respuestaSeleccion.ok) {
+                            throw new Error(
+                                "No se pudo seleccionar el operador."
+                            );
+                        }
+
+                        window.location.assign("/");
+                    } catch (ex) {
+                        error.textContent = ex.message;
+                        boton.disabled = false;
+                    }
+                });
+
+                lista.appendChild(boton);
+            });
+        } catch (ex) {
+            error.textContent = ex.message;
+        }
+    }
+
+    cargarOperadores();
+</script>

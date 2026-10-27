@@ -28,27 +28,11 @@
     </div>
 }
 
-<!-- Selección del operador -->
-<form method="get" class="mb-4">
-    <label for="operadorId">Operador</label>
+<p class="text-muted">
+    Los datos corresponden al operador de tu sesión.
+</p>
 
-    <select id="operadorId"
-            name="operadorId"
-            class="form-select"
-            onchange="this.form.submit()">
-
-        @foreach (var operador in Model.Operadores)
-        {
-            <option value="@operador.Id"
-                    selected="@(operador.Id == Model.Formulario.OperadorId)">
-                @operador.Nombre
-            </option>
-        }
-    </select>
-</form>
-
-@if (Model.Formulario.OperadorId != Guid.Empty)
-{
+@if (Model.OperadorIdSesion != Guid.Empty){
     <h2>Crear hoja de ruta</h2>
 
     <form method="post">
@@ -56,8 +40,6 @@
         <div asp-validation-summary="All"
              class="text-danger mb-3"></div>
 
-        <input type="hidden"
-               asp-for="Formulario.OperadorId" />
 
         <!-- Fecha de reparto -->
         <div class="mb-3">

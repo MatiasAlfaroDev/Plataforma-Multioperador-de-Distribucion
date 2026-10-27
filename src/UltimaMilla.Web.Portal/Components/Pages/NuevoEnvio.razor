@@ -1,6 +1,9 @@
 @page "/"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize]
 @inject EnviosApiClient Api
-
+@inject IJSRuntime JS
 <PageTitle>Nuevo envío</PageTitle>
 
 <h1>Nuevo envío</h1>
@@ -151,35 +154,92 @@ else
     private IReadOnlyList<string>? departamentos;
     private EditForm? formulario;
 
-    protected override async Task OnInitializedAsync()
+   protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (!firstRender)
+        return;
+
+    try
     {
-        try
+        cuentas = (await JS.InvokeAsync<List<CuentaComercialItem>>(
+            "autenticacionPortal.obtenerCuentasComerciales"))
+            .Where(c => c.Activa)
+            .ToList();
+
+        // La API ya devuelve únicamente las cuentas autorizadas.
+        if (cuentas.Count == 1)
         {
-            cuentas = (await Api.ListarCuentasAsync()).Where(c => c.Activa).ToList();
-        }
-        catch (HttpRequestException)
-        {
-            errorDeCarga = "No se pudieron cargar las cuentas comerciales. Probá de nuevo en unos minutos.";
+            modelo.CuentaComercialId = cuentas[0].Id.ToString();
+            await CambiarCuentaAsync();
+
         }
     }
-
-    private async Task GuardarAsync()
+    catch (JSException)
     {
-        guardando = true;
-        mensaje = null;
+        errorDeCarga = "No se pudieron cargar las cuentas comerciales.";
+    }
+    finally
+    {
+        StateHasChanged();
+    }
+}
 
-        var resultado = await Api.CrearAsync(modelo);
+   private async Task GuardarAsync()
+{
+    if (guardando)
+        return;
+
+    guardando = true;
+    mensaje = null;
+
+    try
+    {
+        var datos = new
+        {
+            cuentaComercialId = Guid.Parse(modelo.CuentaComercialId),
+            referenciaExterna = modelo.ReferenciaExterna,
+            modalidad = modelo.Modalidad,
+            destinatarioNombre = modelo.DestinatarioNombre,
+            destinatarioTelefono = modelo.DestinatarioTelefono,
+            calle = modelo.Calle,
+            numero = modelo.Numero,
+            localidad = modelo.Localidad,
+            departamento = modelo.Departamento,
+            bultos = modelo.Bultos.Select(b => new
+            {
+                pesoKg = b.PesoKg,
+                altoCm = b.AltoCm,
+                anchoCm = b.AnchoCm,
+                profundidadCm = b.ProfundidadCm
+            }).ToArray()
+        };
+
+        var resultado = await JS.InvokeAsync<ResultadoAlta>(
+            "autenticacionPortal.crearEnvio",
+            datos);
+
         exito = resultado.Exito;
         mensaje = resultado.Mensaje;
 
         if (exito)
         {
-            // Se conserva la cuenta elegida para cargar varios envíos seguidos.
-            modelo = new NuevoEnvioModel { CuentaComercialId = modelo.CuentaComercialId, Departamento = modelo.Departamento };
+            modelo = new NuevoEnvioModel
+            {
+                CuentaComercialId = modelo.CuentaComercialId,
+                Departamento = modelo.Departamento
+            };
         }
-
+    }
+    catch (JSException)
+    {
+        exito = false;
+        mensaje = "No se pudo conectar con la API para crear el envío.";
+    }
+    finally
+    {
         guardando = false;
     }
+}
     
     private void AgregarBulto()
     {
@@ -194,25 +254,38 @@ else
 
     // El departamento sale de las zonas del operador de la cuenta: escrito a mano, un error de
     // tipeo terminaba en "no existe tarifa vigente".
-    private async Task CambiarCuentaAsync()
+   private async Task CambiarCuentaAsync()
+{
+    modelo.Departamento = string.Empty;
+    departamentos = null;
+
+    var cuenta = cuentas?.FirstOrDefault(
+        c => c.Id.ToString() == modelo.CuentaComercialId);
+
+    if (cuenta is null)
+        return;
+
+    try
     {
-        modelo.Departamento = string.Empty;
-        departamentos = null;
-        var cuenta = cuentas?.FirstOrDefault(c => c.Id.ToString() == modelo.CuentaComercialId);
-        if (cuenta is null)
-            return;
-        try
-        {
-            var zonas = await Api.ListarZonasAsync(cuenta.OperadorId);
-            departamentos = zonas.Select(z => z.Departamento).Distinct().Order().ToList();
-            if (departamentos.Count == 1)
-                modelo.Departamento = departamentos[0];
-            // Revalida el departamento: asignado por código, el aviso "Elegí el departamento" quedaba colgado.
-            formulario?.EditContext?.NotifyFieldChanged(FieldIdentifier.Create(() => modelo.Departamento));
-        }
-        catch (HttpRequestException)
-        {
-            errorDeCarga = "No se pudieron cargar las zonas del operador. Probá de nuevo en unos minutos.";
-        }
+        var zonas = await JS.InvokeAsync<List<ZonaItem>>(
+            "autenticacionPortal.obtenerZonas",
+            cuenta.OperadorId);
+
+        departamentos = zonas
+            .Select(z => z.Departamento)
+            .Distinct()
+            .Order()
+            .ToList();
+
+        if (departamentos.Count == 1)
+            modelo.Departamento = departamentos[0];
+
+        formulario?.EditContext?.NotifyFieldChanged(
+            FieldIdentifier.Create(() => modelo.Departamento));
     }
+    catch (JSException)
+    {
+        errorDeCarga = "No se pudieron cargar las zonas del operador.";
+    }
+}
 }

@@ -1,3 +1,4 @@
+
 using FluentValidation;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
@@ -6,58 +7,135 @@ using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 
-/// <summary>
-/// Caso de uso "sincronizar un evento de la app del repartidor" (RF 18, 21 y 24).
-/// Reglas de la sincronización diferida (ADR de resolución de conflictos):
-/// 1. Idempotencia: si el IdEvento ya llegó, responde 409 sin aplicarlo de nuevo; la app lo toma como éxito.
-/// 2. El servidor manda: si el envío ya figura como entregado por otro evento, el nuevo se rechaza (400)
-///    y la app lo conserva en su cola con el motivo, sin perderlo.
-/// 3. Se guarda la hora real del teléfono (OcurridoEn) y la de llegada (RecibidoEn).
-/// </summary>
-/// <remarks>
-/// Cuando exista la máquina de estados, acá se agrega la transición del envío
-/// (envio.Entregar(...) / envio.RegistrarIntentoFallido(...)) antes de guardar.
-/// </remarks>
 public sealed class RegistrarEventoMovilHandler(
     IEnvioRepository envios,
     IEventoMovilRepository eventosMovil,
+    IVersionReglasOperativasRepository versionesReglas,
+    IMotivoNoEntregaRepository motivos,
     IUnitOfWork unitOfWork,
     IPublicadorDeEventos eventos,
     IValidator<RegistrarEventoMovilCommand> validator,
     TimeProvider reloj)
 {
-    public async Task Handle(RegistrarEventoMovilCommand command, CancellationToken ct)
+    public async Task Handle(
+        RegistrarEventoMovilCommand command,
+        CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(command, ct);
 
-        // 1. Idempotencia: un reintento del mismo evento no se aplica dos veces.
+        // Idempotencia de la sincronización.
         if (await eventosMovil.ExisteAsync(command.IdEvento, ct))
             throw new ConflictoException("El evento ya fue registrado.");
 
         var envio = await envios.ObtenerAsync(command.EnvioId, ct)
             ?? throw new NoEncontradoException("El envío no existe.");
 
-        // 2. Conflicto: otro evento ya dejó el envío como entregado. Gana lo que está en el servidor.
-        var entregaPrevia = await eventosMovil.ObtenerEntregaAsync(envio.Id, ct);
+        var entregaPrevia =
+            await eventosMovil.ObtenerEntregaAsync(envio.Id, ct);
+
         if (entregaPrevia is not null)
             throw new InvalidOperationException(
-                $"Conflicto: el envío ya figura como entregado a {entregaPrevia.Receptor} " +
+                $"Conflicto: el envío ya figura como entregado a " +
+                $"{entregaPrevia.Receptor} " +
                 $"({entregaPrevia.OcurridoEn:dd/MM/yyyy HH:mm} UTC).");
+
+        if (envio.Estado != EstadoEnvio.EnTransito)
+            throw new InvalidOperationException(
+                "El envío debe estar en tránsito para registrar una entrega o intento fallido.");
+     
+        if (envio.VersionReglasOperativasId is not Guid versionReglasId)
+            throw new InvalidOperationException(
+                "El envío no tiene una versión de reglas operativas asignada.");
+
+        var reglas = await versionesReglas.ObtenerPorIdAsync(
+            envio.OperadorId,
+            versionReglasId,
+            ct)
+            ?? throw new NoEncontradoException(
+                "No se encontró la versión de reglas operativas del envío.");
+
+        // Validamos el evento antes de modificar el estado.
+        var tipo = Enum.Parse<TipoEventoMovil>(
+            command.Tipo,
+            ignoreCase: true);
 
         var evento = EventoMovil.Registrar(
             command.IdEvento,
             envio,
-            Enum.Parse<TipoEventoMovil>(command.Tipo, ignoreCase: true),
+            tipo,
             command.Motivo,
             command.Receptor,
             command.FechaHora,
             reloj.GetUtcNow());
 
+        var ocurridoEn = evento.OcurridoEn;
+
+        if (tipo == TipoEventoMovil.Entregado)
+        {
+            if (!command.Latitud.HasValue ||
+                !command.Longitud.HasValue)
+                throw new ArgumentException(
+                    "La entrega debe incluir las coordenadas del dispositivo.");
+
+            var prueba = PruebaEntrega.Crear(
+                command.Receptor!,
+                command.DocumentoReceptor,
+                command.ReferenciaFirma,
+                command.ReferenciaFotografia,
+                ocurridoEn,
+                command.Latitud.Value,
+                command.Longitud.Value);
+
+            envio.Aplicar(
+                DisparadorEnvio.Entregar,
+                reglas,
+                ocurridoEn,
+                "Mobile",
+                "Mobile",
+                pruebaEntrega: prueba,
+                latitud: command.Latitud,
+                longitud: command.Longitud);
+        }
+        else if (tipo == TipoEventoMovil.NoEntregado)
+        {
+            if (string.IsNullOrWhiteSpace(command.EvidenciaFallo))
+                throw new ArgumentException(
+                    "El intento fallido debe incluir evidencia.");
+
+            var motivo = await motivos.ObtenerPorDescripcionAsync(
+                envio.OperadorId,
+                versionReglasId,
+                command.Motivo!,
+                ct)
+                ?? throw new NoEncontradoException(
+                    "El motivo de no entrega no existe en el catálogo del operador.");
+
+            envio.Aplicar(
+                DisparadorEnvio.RegistrarIntentoFallido,
+                reglas,
+                ocurridoEn,
+                "Mobile",
+                "Mobile",
+                motivoNoEntrega: motivo,
+                evidenciaFallo: command.EvidenciaFallo,
+                latitud: command.Latitud,
+                longitud: command.Longitud);
+        }
+        else
+        {
+            throw new ArgumentException(
+                "El tipo de evento móvil no es válido.");
+        }
+
         await eventosMovil.AgregarAsync(evento, ct);
 
-        // va antes de guardar porque se confirma en la misma transacción que el evento (outbox, RNF 6.8)
         await eventos.PublicarAsync(
-            new EventoMovilRegistrado(evento.Id, evento.EnvioId, evento.OperadorId, evento.Tipo.ToString(), evento.OcurridoEn),
+            new EventoMovilRegistrado(
+                evento.Id,
+                evento.EnvioId,
+                evento.OperadorId,
+                evento.Tipo.ToString(),
+                evento.OcurridoEn),
             ct);
 
         await unitOfWork.GuardarCambiosAsync(ct);

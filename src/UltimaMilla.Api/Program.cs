@@ -20,6 +20,17 @@ using UltimaMilla.Application.Configuracion.Commands.CrearZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using UltimaMilla.Infrastructure.Identidad;
+using UltimaMilla.Api.Endpoints;
+using Microsoft.AspNetCore.DataProtection;
+using StackExchange.Redis;
+using Microsoft.EntityFrameworkCore;
+using UltimaMilla.Api.Seguridad;
+using UltimaMilla.Infrastructure.Persistence;
+using UltimaMilla.Application.Seguridad;
+using Microsoft.AspNetCore.Antiforgery;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +43,35 @@ var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, rabbitMq);
+
+builder.Services
+    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddCookie(IdentityConstants.ApplicationScheme, options =>
+    {
+        options.Cookie.Name = "UltimaMilla.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+});
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ManejadorDeErrores>();
@@ -65,6 +105,32 @@ builder.Services.AddOpenTelemetry()
     })
     .UseOtlpExporter();
 builder.Services.AddScoped<CrearZonaHandler>();
+var soloInicializar = builder.Configuration.GetValue<bool>(
+    "Inicializacion:SoloInicializar");
+
+if (!soloInicializar)
+{
+    var redisConnectionString =
+        builder.Configuration.GetConnectionString("Redis")
+        ?? throw new InvalidOperationException(
+            "No se configuró ConnectionStrings:Redis.");
+
+    var redis = await ConnectionMultiplexer.ConnectAsync(
+        redisConnectionString);
+
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+
+    builder.Services
+        .AddDataProtection()
+        .SetApplicationName("UltimaMilla")
+        .PersistKeysToStackExchangeRedis(
+            redis,
+            "UltimaMilla:DataProtection:Keys");
+}
+
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 var app = builder.Build();
 
 // Un solo proceso prepara la base. El servicio `inicializador` del compose corre con esta
@@ -77,12 +143,33 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
 }
 
 app.UseExceptionHandler();
-app.MapOpenApi();   // contrato en /openapi/v1.json (Scalar se agrega con la API pública)
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
+
+app.MapOpenApi();  // contrato en /openapi/v1.json (Scalar se agrega con la API pública)
 
 // Salud (RNF 6.13): /live = el proceso responde; /ready = además llega a la base; /health = todo.
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapAutenticacionEndpoints();
+
+app.MapGet("/api/antiforgery/token", (
+    HttpContext context,
+    IAntiforgery antiforgery) =>
+{
+    var tokens = antiforgery.GetAndStoreTokens(context);
+
+    context.Response.Headers.CacheControl = "no-store";
+
+    return Results.Ok(new
+    {
+        token = tokens.RequestToken
+    });
+})
+.RequireAuthorization();
 
 var api = app.MapGroup("/api");
 
@@ -90,28 +177,79 @@ api.MapGet("/operadores", async (ListarOperadoresHandler handler, CancellationTo
     Results.Ok(await handler.Handle(new ListarOperadoresQuery(), ct)));
 
 // Provisorio hasta el login del 15/10: el Portal elige con qué cuenta comercial operar.
-api.MapGet("/cuentas-comerciales", async (ListarCuentasComercialesHandler handler, CancellationToken ct) =>
-    Results.Ok(await handler.Handle(new ListarCuentasComercialesQuery(), ct)));
+api.MapGet("/cuentas-comerciales", async (
+    ListarCuentasComercialesHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(
+        new ListarCuentasComercialesQuery(), ct)))
+    .RequireAuthorization(policy =>
+        policy.RequireRole(
+            "Comercio",
+            "AdministradorOperador",
+            "Operador"));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
-api.MapPost("/envios", async (CrearEnvioCommand command, CrearEnvioHandler handler, CancellationToken ct) =>
+api.MapPost("/envios", async (
+    HttpContext context,
+    IAntiforgery antiforgery,
+    CrearEnvioCommand command,
+    CrearEnvioHandler handler,
+    CancellationToken ct) =>
 {
-    var id = await handler.Handle(command, ct);
-    return Results.Created($"/api/envios/{id}", new { id });
-});
+    if (!await antiforgery.IsRequestValidAsync(context))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Token de seguridad inválido",
+            detail: "La solicitud no contiene un token antifalsificación válido.");
+    }
 
+    var id = await handler.Handle(command, ct);
+
+    return Results.Created(
+        $"/api/envios/{id}",
+        new { id });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
 // GET /api/envios?operadorId=... → listado para el Backoffice.
-api.MapGet("/envios", async (Guid? operadorId, ListarEnviosHandler handler, CancellationToken ct) =>
-    Results.Ok(await handler.Handle(new ListarEnviosQuery(operadorId), ct)));
+// GET /api/envios → listado según el operador y perfil autenticado.
+api.MapGet("/envios", async (
+    ListarEnviosHandler handler,
+    CancellationToken ct) =>
+{
+    var resultado = await handler.Handle(
+        new ListarEnviosQuery(null),
+        ct);
+
+    return Results.Ok(resultado);
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
 
 // POST /api/envios/{id}/eventos-movil → sincronización de la app del repartidor (entregado / no entregado).
 // 201 = guardado; 409 = ya estaba (reintento, la app lo toma como éxito); 400 = conflicto o datos inválidos.
 api.MapPost("/envios/{envioId:guid}/eventos-movil",
     async (Guid envioId, EventoMovilRequest request, RegistrarEventoMovilHandler handler, CancellationToken ct) =>
     {
-        await handler.Handle(
-            new RegistrarEventoMovilCommand(envioId, request.IdEvento, request.Tipo, request.Motivo, request.Receptor, request.FechaHora),
-            ct);
+        await handler.Handle(          
+            new RegistrarEventoMovilCommand(
+                envioId,
+                request.IdEvento,
+                request.Tipo,
+                request.Motivo,
+                request.Receptor,
+                request.FechaHora,
+                request.DocumentoReceptor,
+                request.ReferenciaFirma,
+                request.ReferenciaFotografia,
+                request.Latitud,
+                request.Longitud,
+                request.EvidenciaFallo),ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     });
 
@@ -232,5 +370,6 @@ static bool EsSonda(PathString ruta) =>
 public partial class Program { }
 
 /// <summary>Cuerpo que manda la app del repartidor; el envío viaja en la URL.</summary>
-public sealed record EventoMovilRequest(Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora);
+
+public sealed record EventoMovilRequest( Guid IdEvento,  string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null);
 public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);

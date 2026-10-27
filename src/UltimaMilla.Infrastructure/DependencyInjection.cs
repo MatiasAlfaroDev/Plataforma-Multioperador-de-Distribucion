@@ -8,6 +8,9 @@ using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Infrastructure.Persistence.Interceptors;
 using UltimaMilla.Infrastructure.Persistence.Seed;
 using UltimaMilla.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Identity;
+using UltimaMilla.Infrastructure.Identidad;
+using Microsoft.Extensions.Configuration;
 
 namespace UltimaMilla.Infrastructure;
 
@@ -21,10 +24,26 @@ public static class DependencyInjection
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AuditableEntityInterceptor>();
+        services.AddSingleton<TenantSaveChangesInterceptor>();
         services.AddDbContext<AppDbContext>((sp, options) => options
             .UseNpgsql(connectionString)
-            .AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));
+            .AddInterceptors(
+                sp.GetRequiredService<AuditableEntityInterceptor>(),
+                sp.GetRequiredService<TenantSaveChangesInterceptor>()));
 
+        services.AddIdentityCore<Usuario>(options =>
+        {
+            options.Password.RequiredLength = 8;
+            options.Password.RequireDigit = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+
+            options.User.RequireUniqueEmail = true;
+        })
+        .AddRoles<IdentityRole<Guid>>()
+        .AddEntityFrameworkStores<AppDbContext>()
+        .AddDefaultTokenProviders();
         services.AddScoped<IEnvioRepository, EnvioRepository>();
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
@@ -63,18 +82,31 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Crea la base y carga los datos iniciales. La corre un solo proceso: el servicio
-    /// `inicializador` del compose, que arranca con `depends_on: postgres service_healthy`
-    /// y termina. Las réplicas de la API no la llaman.
-    /// PROVISORIO para el 8/10: antes del 15/10 se reemplaza EnsureCreated por migraciones
-    /// con dotnet-ef (informe 6.6, RNF 6.4). Ver README, "Pendientes".
+    /// Aplica las migraciones pendientes y carga los datos iniciales.
+    /// Se ejecuta únicamente desde el servicio inicializador de Docker,
+    /// evitando que las réplicas de la API modifiquen el esquema en paralelo.
     /// </summary>
-    public static async Task InicializarBaseDeDatosAsync(this IServiceProvider services, CancellationToken ct = default)
-    {
-        using var scope = services.CreateScope();
+    public static async Task InicializarBaseDeDatosAsync(
+    this IServiceProvider services,
+    CancellationToken ct = default)
+{
+    using var scope = services.CreateScope();
+
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        db.HabilitarAccesoInicializacion();
+
         await db.Database.MigrateAsync(ct);
-        await DbSeeder.SembrarAsync(db, ct);
-    }
+
+    // Datos iniciales del negocio.
+    await DbSeeder.SembrarAsync(db, ct);
+
+    // Usuarios, roles y membresías.
+    await IdentitySeeder.SembrarAsync(
+        scope.ServiceProvider.GetRequiredService<UserManager<Usuario>>(),
+        scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>(),
+        db,
+        scope.ServiceProvider.GetRequiredService<IConfiguration>(),
+        ct);
+}
 }

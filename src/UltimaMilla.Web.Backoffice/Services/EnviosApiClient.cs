@@ -24,11 +24,13 @@ public sealed class EnviosApiClient(HttpClient http)
     public async Task<IReadOnlyList<OperadorItem>> ListarOperadoresAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<OperadorItem>>("api/operadores", ct) ?? [];
 
-    public async Task<IReadOnlyList<EnvioItem>> ListarEnviosAsync(Guid? operadorId, CancellationToken ct = default)
-    {
-        var url = operadorId is Guid id ? $"api/envios?operadorId={id}" : "api/envios";
-        return await http.GetFromJsonAsync<List<EnvioItem>>(url, ct) ?? [];
-    }
+   public async Task<IReadOnlyList<EnvioItem>> ListarEnviosAsync(
+    CancellationToken ct = default)
+{
+    return await http.GetFromJsonAsync<List<EnvioItem>>(
+        "api/envios",
+        ct) ?? [];
+}
 
     public async Task RecibirEnDepositoAsync(
         Guid envioId,
@@ -45,6 +47,16 @@ public sealed class EnviosApiClient(HttpClient http)
             },
             ct);
 
-        respuesta.EnsureSuccessStatusCode();
-    }
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var detalle = await respuesta.Content.ReadAsStringAsync(ct);
+
+            throw new HttpRequestException(
+                string.IsNullOrWhiteSpace(detalle)
+                    ? $"La API rechazó la recepción (HTTP {(int)respuesta.StatusCode})."
+                    : $"La API respondió: {detalle}",
+                null,
+                respuesta.StatusCode);
+        }
+            }
 }
