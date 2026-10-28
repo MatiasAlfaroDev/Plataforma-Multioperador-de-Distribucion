@@ -18,6 +18,8 @@
     <!-- Se fija la 8.x porque v9 cambia de licencia (v8 es Apache-2.0) y es el outbox transaccional de stack-tecnologico.md -->
     <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.5.11" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.11" />
+    <!-- Notificaciones push (6.11 y opcional 7.3): SDK oficial de Firebase para el servidor -->
+    <PackageVersion Include="FirebaseAdmin" Version="3.7.0" />
     <!-- API -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
     <!-- Observabilidad (RNF 6.12). Las consultas a PostgreSQL no llevan paquete: Npgsql 10

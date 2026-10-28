@@ -35,6 +35,8 @@ using UltimaMilla.Application.Seguridad;
 using Microsoft.AspNetCore.Antiforgery;
 using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Infrastructure.Caching;
+using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
+using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -402,6 +404,25 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
         });
     });
 
+// POST /api/dispositivos → la app registra el token de Firebase del teléfono al iniciar sesión.
+// El usuario y el operador salen de la cookie; si el token ya estaba, se renueva (no se duplica).
+api.MapPost("/dispositivos", async (
+    RegistrarDispositivoCommand command,
+    RegistrarDispositivoHandler handler,
+    CancellationToken ct) =>
+{
+    await handler.Handle(command, ct);
+    return Results.NoContent();
+})
+.RequireAuthorization();
+
+// POST /api/notificaciones/prueba → aviso a los teléfonos del usuario logueado (probar push con la app cerrada).
+api.MapPost("/notificaciones/prueba", async (
+    EnviarNotificacionDePruebaCommand command,
+    EnviarNotificacionDePruebaHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(command, ct)))
+.RequireAuthorization();
 
 app.Run();
 

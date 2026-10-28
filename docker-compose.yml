@@ -140,6 +140,12 @@ services:
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-ultimamilla}:${RABBITMQ_PASSWORD:-ultimamilla_dev}@rabbitmq:5672"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_SERVICE_NAME: "api"
+      # Push (6.11): cuenta de servicio de Firebase. Es secreta y no está en el repo; ver docker/secretos/LEEME.md.
+      # Si el archivo no está, la API arranca igual y solo el push queda desactivado.
+      Firebase__CredencialesRuta: "/run/secretos/firebase-cuenta-servicio.json"
+
+    volumes:
+      - ./docker/secretos:/run/secretos:ro
 
     depends_on:
       postgres:
