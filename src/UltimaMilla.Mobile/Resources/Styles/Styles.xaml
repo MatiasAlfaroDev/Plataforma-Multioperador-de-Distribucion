@@ -434,27 +434,77 @@
 
     <!-- ===== Estilos propios de la app del repartidor (se usan con Style="{StaticResource ...}") ===== -->
 
-    <!-- Tarjeta blanca con bordes redondeados -->
+    <!-- Ancho máximo del contenido: en tablet o Windows la pantalla no se estira de borde a borde -->
+    <x:Double x:Key="AnchoContenido">680</x:Double>
+
+    <!-- Tarjeta blanca con bordes redondeados y sombra suave -->
     <Style TargetType="Border" x:Key="Tarjeta">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FondoTarjeta}, Dark={StaticResource FondoTarjetaOscuro}}" />
-        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource FondoTarjetaOscuro}}" />
+        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Borde}, Dark={StaticResource BordeOscuro}}" />
         <Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 16" />
         <Setter Property="Padding" Value="16" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#0F2A4A" Opacity="0.06" Radius="14" Offset="0,4" />
+        </Setter>
+    </Style>
+
+    <!-- Tarjeta principal con degradado azul (resumen del día, progreso de la carga) -->
+    <Style TargetType="Border" x:Key="Hero">
+        <Setter Property="Background" Value="{StaticResource FondoHero}" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 22" />
+        <Setter Property="Padding" Value="20" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#123D73" Opacity="0.25" Radius="18" Offset="0,8" />
+        </Setter>
+    </Style>
+
+    <!-- Recuadro translúcido dentro del Hero (los contadores) -->
+    <Style TargetType="Border" x:Key="Contador">
+        <Setter Property="BackgroundColor" Value="#26FFFFFF" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="Padding" Value="8,12" />
     </Style>
 
     <!-- Etiqueta chica con fondo de color (el estado del envío) -->
     <Style TargetType="Border" x:Key="Chip">
         <Setter Property="StrokeThickness" Value="0" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
-        <Setter Property="Padding" Value="10,3" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 20" />
+        <Setter Property="Padding" Value="10,4" />
         <Setter Property="VerticalOptions" Value="Center" />
+    </Style>
+
+    <!-- Caja de un campo de texto: la Entry va adentro, sin la línea de abajo de Android -->
+    <Style TargetType="Border" x:Key="Campo">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FondoPagina}, Dark={StaticResource FondoPaginaOscuro}}" />
+        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Borde}, Dark={StaticResource BordeOscuro}}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+        <Setter Property="Padding" Value="12,2" />
+    </Style>
+
+    <Style TargetType="Label" x:Key="EtiquetaCampo">
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource White}}" />
     </Style>
 
     <Style TargetType="Label" x:Key="Titulo">
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="22" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray950}, Dark={StaticResource White}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource White}}" />
+    </Style>
+
+    <!-- Título de sección ("Envíos", "Bultos de la hoja") -->
+    <Style TargetType="Label" x:Key="Seccion">
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CharacterSpacing" Value="1" />
+        <Setter Property="TextTransform" Value="Uppercase" />
+        <Setter Property="Margin" Value="4,8,0,0" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextoSecundario}, Dark={StaticResource TextoSecundarioOscuro}}" />
     </Style>
 
     <Style TargetType="Label" x:Key="Secundario">
@@ -463,27 +513,93 @@
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextoSecundario}, Dark={StaticResource TextoSecundarioOscuro}}" />
     </Style>
 
+    <!-- Botón principal grande (Entrar, Despachar) -->
+    <Style TargetType="Button" x:Key="BotonPrimario">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="TextColor" Value="{StaticResource White}" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="16,14" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
+                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray300}}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- Botón con borde azul (acciones secundarias: Cargar vehículo, Enviar ahora) -->
+    <Style TargetType="Button" x:Key="BotonSecundario">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AzulClaro}, Dark={StaticResource FondoTarjetaOscuro}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="MinimumHeightRequest" Value="44" />
+    </Style>
+
+    <!-- Botón blanco sobre el Hero azul -->
+    <Style TargetType="Button" x:Key="BotonSobreHero">
+        <Setter Property="BackgroundColor" Value="{StaticResource White}" />
+        <Setter Property="TextColor" Value="{StaticResource Tertiary}" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="MinimumHeightRequest" Value="44" />
+    </Style>
+
+    <!-- Botón que parece un link (Trabajar sin conexión) -->
+    <Style TargetType="Button" x:Key="BotonTexto">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BorderWidth" Value="0" />
+    </Style>
+
     <!-- Botón verde (Entregado) y botón con borde rojo (No entregado) -->
     <Style TargetType="Button" x:Key="BotonExito">
         <Setter Property="BackgroundColor" Value="{StaticResource Exito}" />
         <Setter Property="TextColor" Value="{StaticResource White}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="14" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="12,10" />
-        <Setter Property="MinimumHeightRequest" Value="44" />
+        <Setter Property="MinimumHeightRequest" Value="46" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
     </Style>
 
     <Style TargetType="Button" x:Key="BotonPeligro">
-        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource PeligroSuave}, Dark={StaticResource FondoTarjetaOscuro}}" />
         <Setter Property="TextColor" Value="{StaticResource Peligro}" />
-        <Setter Property="BorderColor" Value="{StaticResource Peligro}" />
-        <Setter Property="BorderWidth" Value="1.5" />
+        <Setter Property="BorderWidth" Value="0" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="14" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="12,10" />
-        <Setter Property="MinimumHeightRequest" Value="44" />
+        <Setter Property="MinimumHeightRequest" Value="46" />
     </Style>
 
 </ResourceDictionary>

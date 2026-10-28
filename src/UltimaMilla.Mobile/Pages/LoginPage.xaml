@@ -4,23 +4,74 @@
              xmlns:vm="clr-namespace:UltimaMilla.Mobile.ViewModels"
              x:Class="UltimaMilla.Mobile.Pages.LoginPage"
              x:DataType="vm:LoginViewModel"
+             Shell.NavBarIsVisible="False"
              Title="Iniciar sesión">
 
-    <VerticalStackLayout Padding="24,48" Spacing="16">
-        <Label Text="🚚" FontSize="48" HorizontalOptions="Center" />
-        <Label Text="Repartidor" Style="{StaticResource Titulo}" HorizontalOptions="Center" />
+    <!-- Fondo: franja azul arriba y la tarjeta del formulario encima, centrada.
+         En el celular ocupa todo el ancho; en tablet o Windows queda centrada con 440 de ancho. -->
+    <Grid RowDefinitions="260,*">
 
-        <Entry Placeholder="Email" Keyboard="Email" Text="{Binding Email}" />
-        <Entry Placeholder="Contraseña" IsPassword="True" Text="{Binding Password}" />
+        <Border Background="{StaticResource FondoHero}" StrokeThickness="0" />
 
-        <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" IsVisible="{Binding HayError}" />
+        <ScrollView Grid.RowSpan="2">
+            <VerticalStackLayout Padding="20,48,20,24" Spacing="20"
+                                 WidthRequest="{OnIdiom Phone=-1, Default=440}"
+                                 HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
 
-        <Button Text="Entrar" Command="{Binding IniciarSesionCommand}" />
-        <ActivityIndicator IsRunning="{Binding EstaCargando}" IsVisible="{Binding EstaCargando}" />
+                <!-- Marca -->
+                <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Border StrokeThickness="0" StrokeShape="RoundRectangle 22" BackgroundColor="#26FFFFFF"
+                            WidthRequest="72" HeightRequest="72" HorizontalOptions="Center">
+                        <Label Text="🚚" FontSize="36" HorizontalOptions="Center" VerticalOptions="Center" />
+                    </Border>
+                    <Label Text="Última Milla" TextColor="White" FontFamily="OpenSansSemibold" FontSize="26"
+                           HorizontalOptions="Center" />
+                    <Label Text="App del repartidor" TextColor="#CFE0F5" FontSize="14" HorizontalOptions="Center" />
+                </VerticalStackLayout>
 
-        <Button Text="Trabajar sin conexión"
-                Command="{Binding TrabajarSinConexionCommand}"
-                BackgroundColor="Transparent"
-                TextColor="{StaticResource Primary}" />
-    </VerticalStackLayout>
+                <!-- Formulario -->
+                <Border Style="{StaticResource Tarjeta}" Padding="22">
+                    <VerticalStackLayout Spacing="14">
+                        <Label Text="Iniciá sesión" Style="{StaticResource Titulo}" FontSize="20" />
+
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Email" Style="{StaticResource EtiquetaCampo}" />
+                            <Border Style="{StaticResource Campo}">
+                                <Entry Placeholder="nombre@empresa.com" Keyboard="Email" Text="{Binding Email}" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Contraseña" Style="{StaticResource EtiquetaCampo}" />
+                            <Border Style="{StaticResource Campo}">
+                                <Entry Placeholder="••••••••" IsPassword="True" Text="{Binding Password}"
+                                       ReturnType="Go" ReturnCommand="{Binding IniciarSesionCommand}" />
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <!-- Error -->
+                        <Border Style="{StaticResource Chip}" BackgroundColor="{StaticResource PeligroSuave}"
+                                Padding="12,8" HorizontalOptions="Fill" IsVisible="{Binding HayError}">
+                            <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" FontSize="13" />
+                        </Border>
+
+                        <Grid>
+                            <Button Text="Entrar" Style="{StaticResource BotonPrimario}"
+                                    Command="{Binding IniciarSesionCommand}" />
+                            <ActivityIndicator IsRunning="{Binding EstaCargando}" IsVisible="{Binding EstaCargando}"
+                                               Color="White" HorizontalOptions="End" Margin="0,0,16,0"
+                                               HeightRequest="22" WidthRequest="22" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Sin señal -->
+                <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                    <Label Text="¿Sin señal?" Style="{StaticResource Secundario}" HorizontalOptions="Center" />
+                    <Button Text="Trabajar con la ruta guardada" Style="{StaticResource BotonTexto}"
+                            Command="{Binding TrabajarSinConexionCommand}" />
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
 </ContentPage>

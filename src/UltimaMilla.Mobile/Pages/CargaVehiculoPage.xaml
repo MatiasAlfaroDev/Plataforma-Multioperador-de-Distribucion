@@ -10,86 +10,105 @@
     <!-- Fila 0: la lista (con su cabecera). Fila 1: el botón Despachar, siempre visible abajo. -->
     <Grid RowDefinitions="*,Auto">
 
-        <CollectionView ItemsSource="{Binding Bultos}" Margin="16,0">
+        <!-- En el celular ocupa todo el ancho; en tablet o Windows queda centrada -->
+        <CollectionView ItemsSource="{Binding Bultos}" Margin="16,0"
+                        WidthRequest="{OnIdiom Phone=-1, Default=680}"
+                        HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
 
             <!-- ===== CABECERA: hoja, progreso, escaneo y sobrantes ===== -->
             <CollectionView.Header>
-                <VerticalStackLayout Spacing="12" Padding="0,16,0,4">
+                <VerticalStackLayout Spacing="14" Padding="0,16,0,4">
 
-                    <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}"
-                           IsVisible="{Binding HayError}" />
+                    <Border Style="{StaticResource Chip}" BackgroundColor="{StaticResource PeligroSuave}"
+                            Padding="12,8" HorizontalOptions="Fill" IsVisible="{Binding HayError}">
+                        <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" FontSize="13" />
+                    </Border>
 
                     <!-- 1. Elegir la hoja de ruta de hoy -->
-                    <Label Text="Tus hojas de ruta de hoy" Style="{StaticResource Titulo}" FontSize="18" />
-                    <VerticalStackLayout Spacing="8" BindableLayout.ItemsSource="{Binding Hojas}">
+                    <Label Text="Tus hojas de ruta de hoy" Style="{StaticResource Seccion}" />
+                    <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding Hojas}">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="models:HojaDeRutaItem">
-                                <Border Style="{StaticResource Tarjeta}" Padding="14,10">
+                                <Border Style="{StaticResource Tarjeta}" Padding="16,12">
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:CargaVehiculoViewModel}}, Path=ElegirHojaCommand}"
                                             CommandParameter="{Binding .}" />
                                     </Border.GestureRecognizers>
-                                    <VerticalStackLayout Spacing="2">
-                                        <Label Text="{Binding Titulo}" FontFamily="OpenSansSemibold" FontSize="16" />
-                                        <Label Text="{Binding Detalle}" Style="{StaticResource Secundario}" />
-                                    </VerticalStackLayout>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                        <Border StrokeThickness="0" StrokeShape="RoundRectangle 12"
+                                                WidthRequest="44" HeightRequest="44"
+                                                BackgroundColor="{StaticResource AzulClaro}">
+                                            <Label Text="🗺️" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center" />
+                                        </Border>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                            <Label Text="{Binding Titulo}" FontFamily="OpenSansSemibold" FontSize="16" />
+                                            <Label Text="{Binding Detalle}" Style="{StaticResource Secundario}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="2" Text="›" FontSize="26" VerticalOptions="Center"
+                                               TextColor="{StaticResource Gray400}" />
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
 
-                    <!-- 2. Resumen de la carga de la hoja elegida -->
-                    <Border StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="18"
-                            BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Tertiary}}"
-                            IsVisible="{Binding HayHojaElegida}">
-                        <VerticalStackLayout Spacing="8">
-                            <Label Text="{Binding HojaElegida.Titulo, StringFormat='Cargando: {0}'}"
-                                   TextColor="White" FontFamily="OpenSansSemibold" FontSize="20" />
+                    <!-- 2. Progreso de la carga de la hoja elegida -->
+                    <Border Style="{StaticResource Hero}" IsVisible="{Binding HayHojaElegida}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Cargando" TextColor="#CFE0F5" FontSize="13" />
+                            <Label Text="{Binding HojaElegida.Titulo}" TextColor="White"
+                                   FontFamily="OpenSansSemibold" FontSize="22" />
                             <ProgressBar Progress="{Binding Progreso}" ProgressColor="White" />
-                            <Label Text="{Binding TextoProgreso}" TextColor="#CFE0F5" FontSize="14" />
+                            <Label Text="{Binding TextoProgreso}" TextColor="#E3EEFA" FontSize="14" />
                         </VerticalStackLayout>
                     </Border>
 
-                    <!-- 3. Escanear: con lector o cámara entra solo; en el emulador se escribe y Enter -->
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HayHojaElegida}">
-                        <Entry x:Name="CampoCodigo"
-                               Placeholder="Código del bulto (ej. PED-300-1)"
-                               Text="{Binding Codigo}"
-                               ReturnType="Done"
-                               ReturnCommand="{Binding AgregarCodigoCommand}"
-                               Completed="AlConfirmarCodigo" />
-                        <Button Grid.Column="1" Text="Agregar"
-                                Command="{Binding AgregarCodigoCommand}" Clicked="AlConfirmarCodigo" />
-                    </Grid>
+                    <!-- 3. Escanear: con lector entra solo; en el emulador se escribe y Enter -->
+                    <Border Style="{StaticResource Tarjeta}" Padding="14" IsVisible="{Binding HayHojaElegida}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Escaneá o escribí el código del bulto" Style="{StaticResource EtiquetaCampo}" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <Border Style="{StaticResource Campo}">
+                                    <Entry x:Name="CampoCodigo"
+                                           Placeholder="Ej. PED-300-1"
+                                           Text="{Binding Codigo}"
+                                           ReturnType="Done"
+                                           ReturnCommand="{Binding AgregarCodigoCommand}"
+                                           Completed="AlConfirmarCodigo" />
+                                </Border>
+                                <Button Grid.Column="1" Text="Agregar" Style="{StaticResource BotonSecundario}"
+                                        Command="{Binding AgregarCodigoCommand}" Clicked="AlConfirmarCodigo" />
+                            </Grid>
 
-                    <!-- Respuesta a la última lectura: verde si está bien, roja si sobra -->
-                    <Border Style="{StaticResource Tarjeta}" Padding="14,10" IsVisible="{Binding HayMensaje}">
-                        <Label Text="{Binding Mensaje}" FontFamily="OpenSansSemibold">
-                            <Label.Triggers>
-                                <DataTrigger TargetType="Label" Binding="{Binding MensajeEsAlerta}" Value="True">
-                                    <Setter Property="TextColor" Value="{StaticResource Peligro}" />
-                                </DataTrigger>
-                                <DataTrigger TargetType="Label" Binding="{Binding MensajeEsAlerta}" Value="False">
-                                    <Setter Property="TextColor" Value="{StaticResource Exito}" />
-                                </DataTrigger>
-                            </Label.Triggers>
-                        </Label>
+                            <!-- Respuesta a la última lectura: verde si está bien, roja si sobra -->
+                            <Label Text="{Binding Mensaje}" FontFamily="OpenSansSemibold" FontSize="14"
+                                   IsVisible="{Binding HayMensaje}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding MensajeEsAlerta}" Value="True">
+                                        <Setter Property="TextColor" Value="{StaticResource Peligro}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label" Binding="{Binding MensajeEsAlerta}" Value="False">
+                                        <Setter Property="TextColor" Value="{StaticResource Exito}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </VerticalStackLayout>
                     </Border>
 
                     <!-- 4. Sobrantes (RF 19): bultos que no son de esta ruta -->
                     <Border Style="{StaticResource Tarjeta}" BackgroundColor="{StaticResource PeligroSuave}"
-                            Stroke="{StaticResource Peligro}" Padding="14,10" IsVisible="{Binding HaySobrantes}">
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="⚠ Sobran en el vehículo (no son de esta ruta)"
+                            Stroke="{StaticResource PeligroSuave}" Padding="14" IsVisible="{Binding HaySobrantes}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="⚠  Sobran en el vehículo: no son de esta ruta"
                                    TextColor="{StaticResource Peligro}" FontFamily="OpenSansSemibold" />
-                            <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding Sobrantes}">
+                            <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding Sobrantes}">
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <Label Text="{Binding .}" VerticalOptions="Center" />
-                                            <Button Grid.Column="1" Text="Ya lo bajé" Style="{StaticResource BotonPeligro}"
-                                                    Padding="12,4"
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <Label Text="{Binding .}" FontFamily="OpenSansSemibold" VerticalOptions="Center"
+                                                   TextColor="{StaticResource Peligro}" />
+                                            <Button Grid.Column="1" Text="Ya lo bajé" Style="{StaticResource BotonSecundario}"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type vm:CargaVehiculoViewModel}}, Path=QuitarSobranteCommand}"
                                                     CommandParameter="{Binding .}" />
                                         </Grid>
@@ -99,7 +118,7 @@
                         </VerticalStackLayout>
                     </Border>
 
-                    <Label Text="Bultos de la hoja" Style="{StaticResource Titulo}" FontSize="18"
+                    <Label Text="Bultos de la hoja" Style="{StaticResource Seccion}"
                            IsVisible="{Binding HayHojaElegida}" />
                 </VerticalStackLayout>
             </CollectionView.Header>
@@ -107,9 +126,9 @@
             <!-- ===== Cada bulto esperado: ✅ cargado o ⏳ falta ===== -->
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:BultoCarga">
-                    <Border Style="{StaticResource Tarjeta}" Padding="14,10" Margin="0,4">
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                            <Label Text="{Binding Icono}" FontSize="22" VerticalOptions="Center" />
+                    <Border Style="{StaticResource Tarjeta}" Padding="14,12" Margin="0,5">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                            <Label Text="{Binding Icono}" FontSize="24" VerticalOptions="Center" />
                             <VerticalStackLayout Grid.Column="1" Spacing="2">
                                 <Label Text="{Binding Codigo}" FontFamily="OpenSansSemibold" FontSize="16" />
                                 <Label Style="{StaticResource Secundario}">
@@ -134,12 +153,20 @@
             </CollectionView.Footer>
         </CollectionView>
 
-        <!-- ===== Despachar: se habilita solo con la carga completa ===== -->
-        <VerticalStackLayout Grid.Row="1" Padding="16,8,16,16" Spacing="6" IsVisible="{Binding HayHojaElegida}">
-            <Label HorizontalTextAlignment="Center" Style="{StaticResource Secundario}"
-                   Text="{Binding TextoDespacho}" />
-            <Button Text="🚚 Despachar ruta" Style="{StaticResource BotonExito}"
-                    Command="{Binding DespacharCommand}" />
-        </VerticalStackLayout>
+        <!-- ===== Despachar: barra fija abajo; se habilita solo con la carga completa ===== -->
+        <Border Grid.Row="1" StrokeThickness="0" Padding="16,12,16,16" IsVisible="{Binding HayHojaElegida}"
+                BackgroundColor="{AppThemeBinding Light={StaticResource FondoTarjeta}, Dark={StaticResource FondoTarjetaOscuro}}">
+            <Border.Shadow>
+                <Shadow Brush="#0F2A4A" Opacity="0.08" Radius="16" Offset="0,-4" />
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="8"
+                                 WidthRequest="{OnIdiom Phone=-1, Default=680}"
+                                 HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
+                <Label HorizontalTextAlignment="Center" Style="{StaticResource Secundario}"
+                       Text="{Binding TextoDespacho}" />
+                <Button Text="🚚  Despachar ruta" Style="{StaticResource BotonPrimario}"
+                        Command="{Binding DespacharCommand}" />
+            </VerticalStackLayout>
+        </Border>
     </Grid>
 </ContentPage>
