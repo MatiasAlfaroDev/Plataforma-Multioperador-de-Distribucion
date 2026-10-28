@@ -10,6 +10,12 @@ public interface IRepartidorRepository
         Guid repartidorId,
         CancellationToken ct);
 
+    /// <summary>El repartidor activo vinculado a ese usuario (el que inició sesión en la app).</summary>
+    Task<Repartidor?> ObtenerPorUsuarioAsync(
+        Guid operadorId,
+        Guid usuarioId,
+        CancellationToken ct);
+
     Task<IReadOnlyList<Repartidor>> ListarActivosAsync(
         Guid operadorId,
         CancellationToken ct);

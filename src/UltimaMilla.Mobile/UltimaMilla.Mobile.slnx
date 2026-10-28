@@ -1,3 +1,5 @@
 <Solution>
-  <Project Path="UltimaMilla.Mobile.csproj" />
+  <Project Path="UltimaMilla.Mobile.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
 </Solution>

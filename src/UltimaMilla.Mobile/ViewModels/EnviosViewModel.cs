@@ -170,6 +170,11 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
                     await _ruta.GuardarRutaAsync(Operador.Id, descargados.Where(e => e.OperadorId == Operador.Id));
                     Aviso = $"Ruta descargada a las {DateTime.Now:HH:mm}.";
                 }
+                catch (RutaNoDisponibleException ex)
+                {
+                    // Hay conexión, pero el servidor dice que este usuario no tiene ruta: se muestra el motivo.
+                    Error = ex.Message;
+                }
                 catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
                 {
                     SinConexion = true;

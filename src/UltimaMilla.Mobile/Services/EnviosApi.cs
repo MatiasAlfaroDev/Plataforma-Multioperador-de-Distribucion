@@ -19,8 +19,45 @@ public class EnviosApi : IEnviosApi
     public async Task<IReadOnlyList<OperadorItem>> ListarOperadoresAsync(CancellationToken ct = default) =>
         await _http.GetFromJsonAsync<List<OperadorItem>>("api/operadores", JsonOptions, ct) ?? [];
 
-    public async Task<IReadOnlyList<EnvioItem>> ListarEnviosAsync(Guid operadorId, CancellationToken ct = default) =>
-        await _http.GetFromJsonAsync<List<EnvioItem>>($"api/envios?operadorId={operadorId}", JsonOptions, ct) ?? [];
+    /// <summary>
+    /// La ruta del día (RF 18). Si inició sesión un repartidor, son las paradas de SUS hojas de ruta de hoy.
+    /// Si es otro perfil (por ejemplo admin.rapi, para probar), la API responde 403 y se descargan
+    /// todos los envíos del operador, como antes.
+    /// </summary>
+    public async Task<IReadOnlyList<EnvioItem>> ListarEnviosAsync(Guid operadorId, CancellationToken ct = default)
+    {
+        // "Hoy" según el teléfono (hora de Uruguay), no según el servidor (UTC).
+        var hoy = DateTime.Now.ToString("yyyy-MM-dd");
+        using var respuesta = await _http.GetAsync($"api/repartidor/hojas-de-ruta?fecha={hoy}", ct);
+
+        if (respuesta.StatusCode == HttpStatusCode.Forbidden)
+            return await _http.GetFromJsonAsync<List<EnvioItem>>($"api/envios?operadorId={operadorId}", JsonOptions, ct) ?? [];
+
+        if (respuesta.StatusCode == HttpStatusCode.NotFound)
+            throw new RutaNoDisponibleException(await LeerMotivoAsync(respuesta, ct));
+
+        respuesta.EnsureSuccessStatusCode();
+
+        var hojas = await respuesta.Content.ReadFromJsonAsync<List<HojaDeRutaItem>>(JsonOptions, ct) ?? [];
+
+        // Cada parada se guarda en el teléfono como un envío de la ruta, en el orden de recorrido.
+        return hojas
+            .SelectMany(h => h.Paradas.OrderBy(p => p.Orden))
+            .Select(p => new EnvioItem(
+                p.EnvioId,
+                p.ReferenciaExterna,
+                operadorId,
+                OperadorNombre: string.Empty,
+                ComercioNombre: string.Empty,
+                Modalidad: string.Empty,
+                p.Estado,
+                p.Destinatario,
+                $"{p.Direccion}, {p.Localidad}",
+                p.Bultos.Count,
+                PesoTotalKg: 0m,
+                FechaAlta: DateTimeOffset.Now))
+            .ToList();
+    }
 
     /// <summary>
     /// POST /api/envios/{envioId}/eventos-movil. El contrato está en LEEME-OFFLINE.md
@@ -83,3 +120,6 @@ public class EnviosApi : IEnviosApi
     }
     private static string Recortar(string texto) => texto.Length <= 200 ? texto : texto[..200];
 }
+
+/// <summary>El servidor respondió, pero no hay ruta para este usuario (por ejemplo, no está vinculado a un repartidor).</summary>
+public sealed class RutaNoDisponibleException(string mensaje) : Exception(mensaje);

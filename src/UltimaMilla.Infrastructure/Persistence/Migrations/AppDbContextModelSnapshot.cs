@@ -1055,9 +1055,18 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid?>("UsuarioId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("UsuarioId");
+
                     b.HasIndex("OperadorId", "Activo");
+
+                    b.HasIndex("OperadorId", "UsuarioId")
+                        .IsUnique()
+                        .HasFilter("\"UsuarioId\" IS NOT NULL");
 
                     b.ToTable("repartidores", (string)null);
                 });
@@ -1597,6 +1606,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OperadorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("UltimaMilla.Infrastructure.Identidad.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Organizacion.Vehiculo", b =>
