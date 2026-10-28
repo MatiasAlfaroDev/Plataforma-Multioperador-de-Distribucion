@@ -219,6 +219,34 @@ public class RegistrarEventoMovilHandlerTests
     }
 
     [Fact]
+    public async Task Envio_que_no_esta_en_transito_se_rechaza()
+    {
+        // Un envío recién creado: queda Admitido, nunca se despachó.
+        var cuenta = CuentaComercial.Crear(Guid.NewGuid(), _envio.OperadorId, Guid.NewGuid());
+        var admitido = Envio.Crear(
+            cuenta,
+            "PED-300",
+            Modalidad.Estandar,
+            new Destinatario("Luis Gómez", null),
+            new Direccion("18 de Julio", "512", "Montevideo", "Montevideo"),
+            [new NuevoBulto(1m, 10, 10, 10)],
+            Alta);
+        _envios.Lista.Add(admitido);
+
+        // El repartidor intenta entregarlo (mismos datos que una entrega válida, pero de este envío).
+        var comando = Entrega(Guid.NewGuid()) with { EnvioId = admitido.Id };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _handler.Handle(comando, CancellationToken.None));
+
+        // Gana el servidor: se rechaza con el motivo, el estado no cambia y no se guarda nada.
+        Assert.Contains("debe estar en tránsito", ex.Message);
+        Assert.Equal(EstadoEnvio.Admitido, admitido.Estado);
+        Assert.Empty(_eventos.Lista);
+        Assert.Equal(0, _unidadDeTrabajo.Guardados);
+    }
+
+    [Fact]
     public async Task Entrega_sin_coordenadas_se_rechaza()
     {
         var comando = Entrega(Guid.NewGuid()) with

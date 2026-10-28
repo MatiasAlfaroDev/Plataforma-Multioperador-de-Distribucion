@@ -17,6 +17,8 @@ using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.CrearZona;
+using UltimaMilla.Application.Configuracion.Commands.EditarZona;
+using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
@@ -305,6 +307,37 @@ api.MapPost("/zonas", async (
     return Results.Ok(new { id });
 });
 
+// GET /api/zonas/{id}?operadorId=... → detalle de una zona, para el formulario de edición del Backoffice.
+api.MapGet("/zonas/{zonaId:guid}", async (
+    Guid zonaId,
+    Guid operadorId,
+    ObtenerZonaHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ObtenerZonaQuery(operadorId, zonaId), ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador));
+
+// PUT /api/zonas/{id} → edición de una zona (RF 2). Configurar zonas es tarea del administrador del operador.
+api.MapPut("/zonas/{zonaId:guid}", async (
+    Guid zonaId,
+    EditarZonaRequest request,
+    EditarZonaHandler handler,
+    CancellationToken ct) =>
+{
+    await handler.Handle(
+        new EditarZonaCommand(
+            request.OperadorId,
+            zonaId,
+            request.Nombre,
+            request.Departamento,
+            request.MinutosTraslado,
+            request.Coberturas,
+            request.Franjas),
+        ct);
+
+    return Results.NoContent();
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador));
+
 api.MapPost("/hojas-de-ruta", async (
     CrearHojaDeRutaCommand command,
     CrearHojaDeRutaHandler handler,
@@ -373,3 +406,12 @@ public partial class Program { }
 
 public sealed record EventoMovilRequest( Guid IdEvento,  string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null);
 public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+
+/// <summary>Cuerpo de PUT /api/zonas/{id}; la zona viaja en la URL.</summary>
+public sealed record EditarZonaRequest(
+    Guid OperadorId,
+    string Nombre,
+    string Departamento,
+    int MinutosTraslado,
+    IReadOnlyList<CoberturaCommand> Coberturas,
+    IReadOnlyList<FranjaEntregaCommand> Franjas);

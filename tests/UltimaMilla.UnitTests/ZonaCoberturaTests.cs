@@ -98,6 +98,60 @@ public class ZonaCoberturaTests
             new TimeOnly(12, 0)));
     }
 
+    [Fact]
+    public void EditarReemplazaNombreCoberturasYFranjas()
+    {
+        var zona = CrearZona();
+        zona.AgregarLocalidad("Localidad A");
+        zona.AgregarFranja(new TimeOnly(9, 0), new TimeOnly(12, 0));
+
+        zona.Editar(
+            "Zona nueva",
+            "Canelones",
+            [("Localidad B", null), ("Montevideo", "Cordón")],
+            [(new TimeOnly(14, 0), new TimeOnly(18, 0))]);
+
+        Assert.Equal("Zona nueva", zona.Nombre);
+        Assert.Equal("Canelones", zona.Departamento);
+        Assert.False(zona.CubreDireccion("Localidad A", null));
+        Assert.True(zona.CubreDireccion("Localidad B", null));
+        Assert.True(zona.CubreDireccion("Montevideo", "Cordón"));
+        Assert.False(zona.OfreceFranja(new TimeOnly(9, 0), new TimeOnly(12, 0)));
+        Assert.True(zona.OfreceFranja(new TimeOnly(14, 0), new TimeOnly(18, 0)));
+    }
+
+    [Fact]
+    public void EditarConFranjasSuperpuestasNoCambiaLaZona()
+    {
+        var zona = CrearZona();
+        zona.AgregarLocalidad("Localidad A");
+        zona.AgregarFranja(new TimeOnly(9, 0), new TimeOnly(12, 0));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            zona.Editar(
+                "Otra zona",
+                "San José",
+                [("Localidad B", null)],
+                [(new TimeOnly(9, 0), new TimeOnly(12, 0)), (new TimeOnly(11, 0), new TimeOnly(13, 0))]));
+
+        Assert.Equal("Zona de prueba", zona.Nombre);
+        Assert.True(zona.CubreDireccion("Localidad A", null));
+        Assert.False(zona.CubreDireccion("Localidad B", null));
+    }
+
+    [Fact]
+    public void EditarSinCoberturasFalla()
+    {
+        var zona = CrearZona();
+
+        Assert.Throws<ArgumentException>(() =>
+            zona.Editar(
+                "Zona",
+                "San José",
+                [],
+                [(new TimeOnly(9, 0), new TimeOnly(12, 0))]));
+    }
+
     private static ZonaCobertura CrearZona()
     {
         return ZonaCobertura.Crear(
