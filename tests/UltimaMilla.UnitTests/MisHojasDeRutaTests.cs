@@ -1,5 +1,8 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
+using UltimaMilla.Application.Rutas;
+using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
+using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Configuracion;
@@ -9,7 +12,7 @@ using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.UnitTests;
 
-/// <summary>Repartidor vinculado a un usuario y descarga de su hoja de ruta desde la app.</summary>
+/// <summary>Repartidor vinculado a un usuario, descarga de su hoja de ruta y despacho con verificación de carga (RF 17–19).</summary>
 public class MisHojasDeRutaTests
 {
     private static readonly DateTimeOffset Alta = new(2026, 10, 28, 12, 0, 0, TimeSpan.Zero);
@@ -25,7 +28,9 @@ public class MisHojasDeRutaTests
     private readonly List<HojaDeRuta> _hojas = [];
     private readonly List<Repartidor> _repartidores = [];
     private readonly SesionFalsa _sesion;
+    private readonly UnidadDeTrabajoEnMemoria _unidad = new();
     private readonly ObtenerMisHojasDeRutaHandler _handler;
+    private readonly DespacharMiHojaDeRutaHandler _despachar;
 
     public MisHojasDeRutaTests()
     {
@@ -50,6 +55,18 @@ public class MisHojasDeRutaTests
             new HojasEnMemoria(_hojas),
             new EnviosEnMemoria(_envios),
             _sesion);
+
+        _despachar = new DespacharMiHojaDeRutaHandler(
+            new RepartidoresEnMemoria(_repartidores),
+            new HojasEnMemoria(_hojas),
+            new EnviosEnMemoria(_envios),
+            _sesion,
+            new DespacharHojaDeRutaHandler(
+                new HojasEnMemoria(_hojas),
+                new EnviosEnMemoria(_envios),
+                new ReglasEnMemoria(_reglas),
+                _unidad,
+                new RelojFijo(Alta.AddHours(1))));
     }
 
     // ----- Dominio: vínculo repartidor ↔ usuario -----
@@ -132,6 +149,78 @@ public class MisHojasDeRutaTests
             _handler.Handle(new ObtenerMisHojasDeRutaQuery(Hoy), CancellationToken.None));
     }
 
+    // ----- Verificación de la carga (RF 19) -----
+
+    [Fact]
+    public void Verificar_carga_separa_cargados_faltantes_y_sobrantes()
+    {
+        var resultado = VerificacionDeCarga.Verificar(
+            ["PED-1-1", "PED-1-2", "PED-2-1"],
+            ["ped-1-1 ", "PED-1-1", "PED-9-1"]);
+
+        Assert.Equal(new[] { "PED-1-1" }, resultado.Cargados);
+        Assert.Equal(new[] { "PED-1-2", "PED-2-1" }, resultado.Faltantes);
+        Assert.Equal(new[] { "PED-9-1" }, resultado.Sobrantes);
+        Assert.False(resultado.Completa);
+    }
+
+    // ----- Despacho desde la app -----
+
+    [Fact]
+    public async Task Con_todos_los_bultos_escaneados_despacha_y_quedan_en_transito()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-001", bultos: 2);
+
+        var cantidad = await _despachar.Handle(
+            new DespacharMiHojaDeRutaCommand(hoja.Id, ["PED-001-1", "PED-001-2"]),
+            CancellationToken.None);
+
+        Assert.Equal(1, cantidad);
+        Assert.Equal(EstadoEnvio.EnTransito, envio.Estado);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Si_falta_un_bulto_no_despacha_y_dice_cual()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-001", bultos: 2);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _despachar.Handle(new DespacharMiHojaDeRutaCommand(hoja.Id, ["PED-001-1"]), CancellationToken.None));
+
+        Assert.Contains("faltan PED-001-2", ex.Message);
+        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Si_sobra_un_bulto_no_despacha_y_dice_cual()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-001", bultos: 1);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _despachar.Handle(new DespacharMiHojaDeRutaCommand(hoja.Id, ["PED-001-1", "PED-999-1"]), CancellationToken.None));
+
+        Assert.Contains("sobran PED-999-1", ex.Message);
+        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
+    }
+
+    [Fact]
+    public async Task No_se_puede_despachar_la_hoja_de_otro_repartidor()
+    {
+        var otro = Repartidor.Crear(_operadorId, "Otro", "098");
+        _repartidores.Add(otro);
+        var hojaAjena = HojaDeRuta.Crear(_operadorId, otro, _vehiculo, Hoy, 5);
+        _hojas.Add(hojaAjena);
+        AgregarEnvio(hojaAjena, "PED-AJENO", bultos: 1);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _despachar.Handle(new DespacharMiHojaDeRutaCommand(hojaAjena.Id, ["PED-AJENO-1"]), CancellationToken.None));
+    }
+
     // ----- Ayudas -----
 
     private HojaDeRuta CrearHoja(DateOnly fecha)
@@ -206,6 +295,32 @@ public class MisHojasDeRutaTests
 
         public Task<IReadOnlyList<HojaDeRuta>> ListarAsync(Guid operadorId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<HojaDeRuta>>(lista.Where(h => h.OperadorId == operadorId).ToList());
+    }
+
+    private sealed class ReglasEnMemoria(VersionReglasOperativas reglas) : IVersionReglasOperativasRepository
+    {
+        public Task<VersionReglasOperativas?> ObtenerVigenteAsync(Guid operadorId, DateTimeOffset fecha, CancellationToken ct) =>
+            Task.FromResult<VersionReglasOperativas?>(reglas.OperadorId == operadorId ? reglas : null);
+
+        public Task<VersionReglasOperativas?> ObtenerPorIdAsync(Guid operadorId, Guid versionId, CancellationToken ct) =>
+            Task.FromResult<VersionReglasOperativas?>(
+                reglas.OperadorId == operadorId && reglas.Id == versionId ? reglas : null);
+    }
+
+    private sealed class UnidadDeTrabajoEnMemoria : IUnitOfWork
+    {
+        public int Guardados { get; private set; }
+
+        public Task<int> GuardarCambiosAsync(CancellationToken ct)
+        {
+            Guardados++;
+            return Task.FromResult(1);
+        }
+    }
+
+    private sealed class RelojFijo(DateTimeOffset ahora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => ahora;
     }
 
     private sealed class EnviosEnMemoria(List<Envio> lista) : IEnvioRepository
