@@ -5,6 +5,7 @@ using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
+using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.UnitTests;
 
@@ -101,7 +102,8 @@ public class RegistrarEventoMovilHandlerTests
             _unidadDeTrabajo,
             _publicador,
             new RegistrarEventoMovilValidator(),
-            new RelojFijo(Alta.AddHours(5)));
+            new RelojFijo(Alta.AddHours(5)),
+            new CacheEnMemoria());
     }
 
     private RegistrarEventoMovilCommand Entrega(
@@ -448,4 +450,37 @@ public class RegistrarEventoMovilHandlerTests
     {
         public override DateTimeOffset GetUtcNow() => ahora;
     }
+
+    private sealed class CacheEnMemoria : ICacheService
+{
+    private readonly Dictionary<string, object> _datos = new();
+
+    public Task<T?> ObtenerAsync<T>(
+        string clave,
+        CancellationToken ct = default)
+    {
+        if (_datos.TryGetValue(clave, out var valor) && valor is T dato)
+            return Task.FromResult<T?>(dato);
+
+        return Task.FromResult<T?>(default);
+    }
+
+    public Task GuardarAsync<T>(
+        string clave,
+        T valor,
+        TimeSpan duracion,
+        CancellationToken ct = default)
+    {
+        _datos[clave] = valor!;
+        return Task.CompletedTask;
+    }
+
+    public Task EliminarAsync(
+        string clave,
+        CancellationToken ct = default)
+    {
+        _datos.Remove(clave);
+        return Task.CompletedTask;
+    }
+}
 }
