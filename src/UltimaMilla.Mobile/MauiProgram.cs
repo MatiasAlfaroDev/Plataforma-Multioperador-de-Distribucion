@@ -87,6 +87,14 @@ public static class MauiProgram
         builder.Services.AddTransient<CargaVehiculoViewModel>();
         builder.Services.AddTransient<CargaVehiculoPage>();
 
+#if ANDROID
+        // Rediseño: cada Entry va dentro de una caja redondeada (estilo "Campo"), así que se saca
+        // la línea de abajo que Android les pone por defecto.
+        Microsoft.Maui.Handlers.EntryHandler.Mapper.AppendToMapping("SinLinea", (handler, _) =>
+            handler.PlatformView.BackgroundTintList =
+                global::Android.Content.Res.ColorStateList.ValueOf(global::Android.Graphics.Color.Transparent));
+#endif
+
         var app = builder.Build();
 
         // Se crea al arrancar para que empiece a escuchar los cambios de conexión

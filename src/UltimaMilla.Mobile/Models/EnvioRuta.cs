@@ -89,5 +89,7 @@ public sealed class EnvioRuta
     /// <summary>Conflicto: falta sincronizar y el servidor ya dijo que no.</summary>
     public bool Rechazado => PendienteDeSincronizar && UltimoError is not null;
 
-    public string DetalleBultos => $"{CantidadBultos} {(CantidadBultos == 1 ? "bulto" : "bultos")} · {Modalidad}";
+    public string DetalleBultos =>
+        $"{CantidadBultos} {(CantidadBultos == 1 ? "bulto" : "bultos")}"
+        + (string.IsNullOrEmpty(Modalidad) ? string.Empty : $" · {Modalidad}");
 }

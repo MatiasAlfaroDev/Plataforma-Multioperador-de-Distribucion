@@ -12,21 +12,32 @@
     </ContentPage.ToolbarItems>
 
     <RefreshView Command="{Binding CargarCommand}" IsRefreshing="{Binding EstaCargando}">
-        <CollectionView ItemsSource="{Binding Operadores}" Margin="16,0">
+        <!-- En el celular ocupa todo el ancho; en tablet o Windows queda centrada -->
+        <CollectionView ItemsSource="{Binding Operadores}" Margin="16,0"
+                        WidthRequest="{OnIdiom Phone=-1, Default=680}"
+                        HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
 
             <!-- ===== Bienvenida ===== -->
             <CollectionView.Header>
-                <VerticalStackLayout Spacing="6" Padding="0,24,0,12">
-                    <Label Text="📦" FontSize="40" />
-                    <Label Text="¡Hola!" Style="{StaticResource Titulo}" FontSize="26" />
-                    <Label Text="¿Para qué operador repartís hoy?" Style="{StaticResource Secundario}" FontSize="15" />
+                <VerticalStackLayout Spacing="14" Padding="0,16,0,8">
+                    <Border Style="{StaticResource Hero}">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="📦" FontSize="34" />
+                            <Label Text="¡Hola!" TextColor="White" FontFamily="OpenSansSemibold" FontSize="26" />
+                            <Label Text="¿Para qué operador repartís hoy?" TextColor="#CFE0F5" FontSize="15" />
+                        </VerticalStackLayout>
+                    </Border>
 
-                    <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" IsVisible="{Binding HayError}"
-                           Margin="0,8,0,0" />
+                    <Border Style="{StaticResource Chip}" BackgroundColor="{StaticResource PeligroSuave}"
+                            Padding="12,8" HorizontalOptions="Fill" IsVisible="{Binding HayError}">
+                        <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" FontSize="13" />
+                    </Border>
                     <Border Style="{StaticResource Tarjeta}" BackgroundColor="{StaticResource AlertaSuave}"
-                            Stroke="{StaticResource Alerta}" Padding="14,10" Margin="0,8,0,0" IsVisible="{Binding HayAviso}">
+                            Stroke="{StaticResource AlertaSuave}" Padding="14,10" IsVisible="{Binding HayAviso}">
                         <Label Text="{Binding Aviso, StringFormat='📡 {0}'}" TextColor="{StaticResource Alerta}" FontSize="13" />
                     </Border>
+
+                    <Label Text="Operadores" Style="{StaticResource Seccion}" />
                 </VerticalStackLayout>
             </CollectionView.Header>
 
@@ -42,7 +53,7 @@
             <!-- ===== Tarjeta de cada operador ===== -->
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:OperadorItem">
-                    <Border Style="{StaticResource Tarjeta}" Margin="0,6" Padding="14">
+                    <Border Style="{StaticResource Tarjeta}" Margin="0,6" Padding="16">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SeleccionOperadorViewModel}}, Path=ElegirCommand}"
@@ -50,7 +61,7 @@
                         </Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
                             <!-- Círculo con la inicial, en el color de marca del operador -->
-                            <Border StrokeThickness="0" StrokeShape="Ellipse" WidthRequest="48" HeightRequest="48"
+                            <Border StrokeThickness="0" StrokeShape="RoundRectangle 14" WidthRequest="52" HeightRequest="52"
                                     BackgroundColor="{Binding ColorMarca}">
                                 <Label Text="{Binding Inicial}" TextColor="White" FontFamily="OpenSansSemibold" FontSize="20"
                                        HorizontalOptions="Center" VerticalOptions="Center" />
