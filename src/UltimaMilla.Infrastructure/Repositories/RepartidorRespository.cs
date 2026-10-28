@@ -21,6 +21,20 @@ public sealed class RepartidorRepository(AppDbContext db)
             ct);
     }
 
+    public Task<Repartidor?> ObtenerPorUsuarioAsync(
+        Guid operadorId,
+        Guid usuarioId,
+        CancellationToken ct)
+    {
+        return db.Repartidores
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.OperadorId == operadorId &&
+                     x.UsuarioId == usuarioId &&
+                     x.Activo,
+                ct);
+    }
+
     public async Task<IReadOnlyList<Repartidor>> ListarActivosAsync(
         Guid operadorId,
         CancellationToken ct)

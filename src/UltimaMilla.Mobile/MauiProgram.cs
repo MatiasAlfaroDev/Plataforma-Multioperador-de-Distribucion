@@ -84,6 +84,8 @@ public static class MauiProgram
         builder.Services.AddTransient<SeleccionOperadorPage>();
         builder.Services.AddTransient<EnviosViewModel>();
         builder.Services.AddTransient<EnviosPage>();
+        builder.Services.AddTransient<CargaVehiculoViewModel>();
+        builder.Services.AddTransient<CargaVehiculoPage>();
 
         var app = builder.Build();
 

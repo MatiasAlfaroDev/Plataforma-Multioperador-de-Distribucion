@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Rutas;
+using UltimaMilla.Infrastructure.Identidad;
 
 namespace UltimaMilla.Infrastructure.Persistence.Configurations;
 
@@ -28,6 +29,17 @@ public sealed class RepartidorConfiguration
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.OperadorId, x.Activo });
+
+        // Si se borra el usuario, el repartidor queda sin cuenta (no se borra: tiene rutas).
+        builder.HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(x => x.UsuarioId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Una cuenta es de un solo repartidor por operador.
+        builder.HasIndex(x => new { x.OperadorId, x.UsuarioId })
+            .IsUnique()
+            .HasFilter("\"UsuarioId\" IS NOT NULL");
     }
 }
 

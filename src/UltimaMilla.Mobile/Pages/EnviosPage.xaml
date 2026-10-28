@@ -9,6 +9,7 @@
 
     <!-- Botón "Actualizar" arriba a la derecha (en Windows no se puede deslizar con el mouse) -->
     <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Cargar vehículo" Command="{Binding IrACargaCommand}" />
         <ToolbarItem Text="Actualizar" Command="{Binding CargarCommand}" />
     </ContentPage.ToolbarItems>
 
