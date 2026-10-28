@@ -1,4 +1,5 @@
 
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -26,6 +27,24 @@ public sealed record CrearZonaRequest(
     IReadOnlyList<FranjaZonaRequest> Franjas);
 
 public sealed record ZonaCreadaResponse(Guid Id);
+
+/// <summary>Lo que devuelve GET /api/zonas/{id}: la zona completa, para editarla.</summary>
+public sealed record ZonaDetalle(
+    Guid Id,
+    string Nombre,
+    string Departamento,
+    int? MinutosTraslado,
+    IReadOnlyList<CoberturaZonaRequest> Coberturas,
+    IReadOnlyList<FranjaZonaRequest> Franjas);
+
+/// <summary>Lo que se manda a PUT /api/zonas/{id}.</summary>
+public sealed record EditarZonaRequest(
+    Guid OperadorId,
+    string Nombre,
+    string Departamento,
+    int MinutosTraslado,
+    IReadOnlyList<CoberturaZonaRequest> Coberturas,
+    IReadOnlyList<FranjaZonaRequest> Franjas);
 
 public sealed class ZonasApiClient(HttpClient http)
 {
@@ -60,6 +79,39 @@ public sealed class ZonasApiClient(HttpClient http)
         return resultado?.Id
             ?? throw new InvalidOperationException(
                 "La API no devolvió el identificador de la zona.");
+    }
+
+    /// <summary>La zona completa, o null si no existe (o es de otro operador).</summary>
+    public async Task<ZonaDetalle?> ObtenerAsync(
+        Guid operadorId,
+        Guid zonaId,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await http.GetAsync(
+            $"api/zonas/{zonaId}?operadorId={operadorId}",
+            ct);
+
+        if (respuesta.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        if (!respuesta.IsSuccessStatusCode)
+            throw new InvalidOperationException(await LeerErrorAsync(respuesta, ct));
+
+        return await respuesta.Content.ReadFromJsonAsync<ZonaDetalle>(cancellationToken: ct);
+    }
+
+    public async Task EditarAsync(
+        Guid zonaId,
+        EditarZonaRequest solicitud,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await http.PutAsJsonAsync(
+            $"api/zonas/{zonaId}",
+            solicitud,
+            ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+            throw new InvalidOperationException(await LeerErrorAsync(respuesta, ct));
     }
 
     private static async Task<string> LeerErrorAsync(
