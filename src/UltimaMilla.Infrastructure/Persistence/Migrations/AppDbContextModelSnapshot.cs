@@ -814,7 +814,6 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("UltimaMilla.Domain.Envios.IntentoEntrega", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<bool>("Entregado")
@@ -852,7 +851,6 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("UltimaMilla.Domain.Envios.PruebaEntrega", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("DocumentoReceptor")
@@ -892,6 +890,49 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("pruebas_entrega", (string)null);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Plataforma")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset>("UltimoRegistroEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.HasIndex("OperadorId", "Token")
+                        .IsUnique();
+
+                    b.HasIndex("OperadorId", "UsuarioId");
+
+                    b.ToTable("dispositivos_moviles", (string)null);
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Organizacion.Comercio", b =>
@@ -1523,6 +1564,15 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .WithOne("PruebaEntrega")
                         .HasForeignKey("UltimaMilla.Domain.Envios.PruebaEntrega", "IntentoEntregaId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>
+                {
+                    b.HasOne("UltimaMilla.Infrastructure.Identidad.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Organizacion.CuentaComercial", b =>

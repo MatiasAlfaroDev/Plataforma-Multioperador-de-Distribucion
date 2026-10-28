@@ -9,11 +9,13 @@ public partial class LoginViewModel : ObservableObject
 {
     private readonly IAuthApi _auth;
     private readonly IEnviosApi _api;
+    private readonly RegistroDePush _push;
 
-    public LoginViewModel(IAuthApi auth, IEnviosApi api)
+    public LoginViewModel(IAuthApi auth, IEnviosApi api, RegistroDePush push)
     {
         _auth = auth;
         _api = api;
+        _push = push;
     }
 
     [ObservableProperty]
@@ -57,6 +59,10 @@ public partial class LoginViewModel : ObservableObject
 
             // ③ Elegirlo: la cookie nueva ya lleva el operador y el perfil.
             await _auth.SeleccionarOperadorAsync(membresia.Id);
+
+            // ④ Avisos push: con la cookie ya elegida, el teléfono queda registrado para este usuario y operador.
+            //    Si falla, no frena el login (RegistroDePush nunca lanza).
+            await _push.RegistrarAsync();
 
             // Nombre y color del operador para la pantalla de la ruta.
             var operadores = await _api.ListarOperadoresAsync();

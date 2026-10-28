@@ -14,6 +14,8 @@ using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
+using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
+using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
 
 namespace UltimaMilla.Application;
 
@@ -38,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<CrearHojaDeRutaHandler>();
         services.AddScoped<ConsultarHojasDeRutaHandler>();
         services.AddScoped<DespacharHojaDeRutaHandler>();
+        services.AddScoped<RegistrarDispositivoHandler>();
+        services.AddScoped<EnviarNotificacionDePruebaHandler>();
         return services;
     }
 }

@@ -54,6 +54,20 @@ public static class MauiProgram
             c.Timeout = TimeSpan.FromSeconds(20);
         }).ConfigurePrimaryHttpMessageHandler(CrearHandlerConCookies);
 
+        // Push: registrar el teléfono en la API (misma bolsa de cookies que el login).
+        builder.Services.AddHttpClient<IDispositivosApi, DispositivosApi>(c =>
+        {
+            c.BaseAddress = new Uri(Constants.BaseApiUrl);
+            c.Timeout = TimeSpan.FromSeconds(20);
+        }).ConfigurePrimaryHttpMessageHandler(CrearHandlerConCookies);
+
+#if ANDROID
+        builder.Services.AddSingleton<IServicioPush, ServicioPushAndroid>();
+#else
+        builder.Services.AddSingleton<IServicioPush, ServicioPushNulo>();
+#endif
+        builder.Services.AddTransient<RegistroDePush>();
+
         // Trabajo sin conexión: base local cifrada, repositorios y sincronización (una sola instancia para toda la app).
         builder.Services.AddSingleton<BaseDeDatosLocal>();
         builder.Services.AddSingleton<RutaRepository>();
