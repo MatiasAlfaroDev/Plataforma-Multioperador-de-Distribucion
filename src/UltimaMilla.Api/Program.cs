@@ -33,6 +33,8 @@ using UltimaMilla.Api.Seguridad;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Application.Seguridad;
 using Microsoft.AspNetCore.Antiforgery;
+using UltimaMilla.Application.Abstractions.Caching;
+using UltimaMilla.Infrastructure.Caching;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -103,6 +105,7 @@ builder.Services.AddOpenTelemetry()
         m.AddAspNetCoreInstrumentation();
         m.AddMeter("MassTransit");
         // .NET 10 emite las métricas de runtime (GC, hilos, memoria) en el medidor System.Runtime sin paquete extra.
+        m.AddMeter("UltimaMilla.Cache");
         m.AddMeter("System.Runtime");
     })
     .UseOtlpExporter();
@@ -133,6 +136,10 @@ if (!soloInicializar)
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+
+// Caché distribuida con Redis
+builder.Services.AddScoped<ICacheService, RedisCacheService>();
+
 var app = builder.Build();
 
 // Un solo proceso prepara la base. El servicio `inicializador` del compose corre con esta
@@ -253,7 +260,8 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                 request.Longitud,
                 request.EvidenciaFallo),ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
-    });
+    })
+    .RequireAuthorization();
 
 api.MapPost("/envios/{envioId:guid}/recepcion",
     async (
@@ -270,7 +278,10 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
             ct);
 
         return Results.NoContent();
-    });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
 
 api.MapPost("/tarifas", async (ActualizarTarifaCommand command, ActualizarTarifaHandler handler, CancellationToken ct) =>
 {
