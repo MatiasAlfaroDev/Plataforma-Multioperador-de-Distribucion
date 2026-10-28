@@ -23,6 +23,7 @@ using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
+using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using UltimaMilla.Infrastructure.Identidad;
@@ -414,6 +415,22 @@ api.MapGet("/repartidor/hojas-de-ruta", async (
     Results.Ok(await handler.Handle(new ObtenerMisHojasDeRutaQuery(fecha), ct)))
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
 
+// POST /api/repartidor/hojas-de-ruta/{id}/despachar → el repartidor terminó de cargar el vehículo (RF 17 y 19).
+// Manda los bultos que escaneó; si falta o sobra alguno responde 400 con la lista y no despacha nada.
+api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/despachar", async (
+    Guid hojaId,
+    DespacharMiHojaDeRutaRequest request,
+    DespacharMiHojaDeRutaHandler handler,
+    CancellationToken ct) =>
+{
+    var cantidad = await handler.Handle(
+        new DespacharMiHojaDeRutaCommand(hojaId, request.BultosEscaneados),
+        ct);
+
+    return Results.Ok(new { hojaDeRutaId = hojaId, enviosEnTransito = cantidad });
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
 // POST /api/dispositivos → la app registra el token de Firebase del teléfono al iniciar sesión.
 // El usuario y el operador salen de la cookie; si el token ya estaba, se renueva (no se duplica).
 api.MapPost("/dispositivos", async (
@@ -457,3 +474,6 @@ public sealed record EditarZonaRequest(
     int MinutosTraslado,
     IReadOnlyList<CoberturaCommand> Coberturas,
     IReadOnlyList<FranjaEntregaCommand> Franjas);
+
+/// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/despachar; la hoja viaja en la URL.</summary>
+public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEscaneados);

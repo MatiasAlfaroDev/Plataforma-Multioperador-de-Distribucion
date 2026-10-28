@@ -120,6 +120,11 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             Operador = elegido;
             CargarCommand.Execute(null);
         }
+        // Vuelta desde "Cargar vehículo" después de despachar: los envíos pasaron a En tránsito.
+        else if (query.ContainsKey("recargar"))
+        {
+            CargarCommand.Execute(null);
+        }
     }
 
     /// <summary>La página avisa que aparece o desaparece: así el ViewModel escucha los eventos solo mientras se ve.</summary>
@@ -195,6 +200,10 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             EstaCargando = false;
         }
     }
+
+    /// <summary>Abre la pantalla de carga del vehículo (escaneo de bultos y despacho, RF 19).</summary>
+    [RelayCommand]
+    private Task IrACargaAsync() => Shell.Current.GoToAsync("carga");
 
     [RelayCommand]
     private async Task EntregarAsync(EnvioRuta envio)

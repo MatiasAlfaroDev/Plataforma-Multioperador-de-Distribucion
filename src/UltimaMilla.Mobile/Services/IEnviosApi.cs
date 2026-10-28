@@ -22,6 +22,12 @@ public interface IEnviosApi
     Task<IReadOnlyList<OperadorItem>> ListarOperadoresAsync(CancellationToken ct = default);
     Task<IReadOnlyList<EnvioItem>> ListarEnviosAsync(Guid operadorId, CancellationToken ct = default);
 
+    /// <summary>Las hojas de ruta de hoy del repartidor logueado, con los bultos de cada parada (para cargar el vehículo).</summary>
+    Task<IReadOnlyList<HojaDeRutaItem>> ListarMisHojasAsync(CancellationToken ct = default);
+
+    /// <summary>Despacha la hoja con los bultos escaneados. Devuelve si salió bien y el mensaje para mostrar.</summary>
+    Task<(bool Ok, string Mensaje)> DespacharAsync(Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default);
+
     /// <summary>Manda al servidor un evento registrado en el teléfono (entrega o intento fallido).</summary>
     Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarEventoAsync(EventoPendiente evento, CancellationToken ct = default);
 }
