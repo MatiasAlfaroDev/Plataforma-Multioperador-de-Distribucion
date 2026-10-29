@@ -9,6 +9,7 @@ namespace UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 
 public sealed class RegistrarEventoMovilHandler(
     IEnvioRepository envios,
+    IHojaDeRutaRepository hojasDeRuta,
     IEventoMovilRepository eventosMovil,
     IVersionReglasOperativasRepository versionesReglas,
     IMotivoNoEntregaRepository motivos,
@@ -126,6 +127,15 @@ public sealed class RegistrarEventoMovilHandler(
             throw new ArgumentException(
                 "El tipo de evento móvil no es válido.");
         }
+
+        var hoja = await hojasDeRuta.ObtenerPorEnvioActivoAsync(
+            envio.OperadorId,
+            envio.Id,
+            ct)
+            ?? throw new InvalidOperationException(
+                "El envío no tiene una parada activa en ninguna hoja de ruta.");
+
+        hoja.FinalizarParada(envio, ocurridoEn);
 
         await eventosMovil.AgregarAsync(evento, ct);
 

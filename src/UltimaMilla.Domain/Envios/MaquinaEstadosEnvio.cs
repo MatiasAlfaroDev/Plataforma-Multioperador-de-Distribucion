@@ -4,9 +4,10 @@ namespace UltimaMilla.Domain.Envios;
 
 public static class MaquinaEstadosEnvio
 {
-    public static StateMachine<EstadoEnvio, DisparadorEnvio> Crear(
+   public static StateMachine<EstadoEnvio, DisparadorEnvio> Crear(
         Func<EstadoEnvio> obtenerEstado,
-        Action<EstadoEnvio> cambiarEstado)
+        Action<EstadoEnvio> cambiarEstado,
+        Func<EstadoEnvio>? obtenerEstadoRetorno = null)
     {
         var maquina = new StateMachine<EstadoEnvio, DisparadorEnvio>(
             obtenerEstado, cambiarEstado);
@@ -14,12 +15,15 @@ public static class MaquinaEstadosEnvio
         maquina.Configure(EstadoEnvio.Admitido)
             .Permit(DisparadorEnvio.RecibirEnDeposito, EstadoEnvio.EnDeposito);
 
-        maquina.Configure(EstadoEnvio.EnDeposito)
+       maquina.Configure(EstadoEnvio.EnDeposito)
             .Permit(DisparadorEnvio.AsignarARuta, EstadoEnvio.AsignadoARuta)
-            .Permit(DisparadorEnvio.Reprogramar, EstadoEnvio.Reprogramado);
+            .Permit(DisparadorEnvio.Reprogramar, EstadoEnvio.Reprogramado)
+            .Permit(DisparadorEnvio.IniciarDevolucion, EstadoEnvio.EnDevolucion);
 
         maquina.Configure(EstadoEnvio.AsignadoARuta)
-            .Permit(DisparadorEnvio.QuitarDeRuta, EstadoEnvio.EnDeposito)
+            .PermitDynamic(DisparadorEnvio.QuitarDeRuta,() => obtenerEstadoRetorno?.Invoke()
+                    ?? throw new InvalidOperationException(
+                        "No se puede quitar el envío sin conocer su estado de origen."))
             .Permit(DisparadorEnvio.Despachar, EstadoEnvio.EnTransito);
 
         maquina.Configure(EstadoEnvio.EnTransito)
@@ -27,8 +31,7 @@ public static class MaquinaEstadosEnvio
             .Permit(DisparadorEnvio.RegistrarIntentoFallido, EstadoEnvio.NoEntregado);
 
         maquina.Configure(EstadoEnvio.NoEntregado)
-            .Permit(DisparadorEnvio.RetornarADeposito, EstadoEnvio.EnDeposito)
-            .Permit(DisparadorEnvio.IniciarDevolucion, EstadoEnvio.EnDevolucion);
+            .Permit(DisparadorEnvio.RetornarADeposito, EstadoEnvio.EnDeposito);
 
         maquina.Configure(EstadoEnvio.Reprogramado)
             .Permit(DisparadorEnvio.AsignarARuta, EstadoEnvio.AsignadoARuta);

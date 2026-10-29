@@ -20,7 +20,8 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
     public decimal PesoAsignadoKg { get; private set; }
     public decimal VolumenAsignadoM3 { get; private set; }
-
+    public EstadoHojaDeRuta Estado { get; private set; }
+    public DateTimeOffset? DespachadaEn { get; private set; }
     public IReadOnlyCollection<ParadaRuta> Paradas => _paradas;
 
     private HojaDeRuta() { }
@@ -57,6 +58,7 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
         if (maximoParadas <= 0)
             throw new ArgumentOutOfRangeException(nameof(maximoParadas));
+            
 
         return new HojaDeRuta
         {
@@ -67,13 +69,16 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             Fecha = fecha,
             MaximoParadas = maximoParadas,
             CapacidadPesoKg = vehiculo.CapacidadPesoKg,
-            CapacidadVolumenM3 = vehiculo.CapacidadVolumenM3
+            CapacidadVolumenM3 = vehiculo.CapacidadVolumenM3,
+            Estado = EstadoHojaDeRuta.EnPreparacion
         };
     }
 
     public void AgregarEnvio(Envio envio)
     {
         ArgumentNullException.ThrowIfNull(envio);
+
+        VerificarEditable();
 
         if (envio.OperadorId != OperadorId)
             throw new InvalidOperationException(
@@ -86,9 +91,7 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
         if (envio.Estado == EstadoEnvio.Reprogramado)
         {
-            if (!envio.FechaReprogramada.HasValue ||
-                DateOnly.FromDateTime(
-                    envio.FechaReprogramada.Value.Date) != Fecha)
+            if (envio.FechaEntregaComprometida != Fecha)
             {
                 throw new InvalidOperationException(
                     "La fecha de la ruta no coincide con la reprogramación.");
@@ -153,7 +156,15 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
                 "Solo se puede quitar un envío asignado a ruta.");
 
         parada.Liberar(fecha);
+        var paradasActivas = _paradas
+            .Where(p => p.Activa)
+            .OrderBy(p => p.Orden)
+            .ToList();
 
+        for (var i = 0; i < paradasActivas.Count; i++)
+        {
+            paradasActivas[i].CambiarOrden(i + 1);
+        }
         PesoAsignadoKg -= envio.PesoTotalKg;
         VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
     }
@@ -161,5 +172,74 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
     public void ConfigurarHoraSalida(TimeOnly horaSalida)
     {
         HoraSalida = horaSalida;
+    }
+
+    public void FinalizarParada(Envio envio, DateTimeOffset fecha)
+    {
+        ArgumentNullException.ThrowIfNull(envio);
+
+        if (envio.OperadorId != OperadorId)
+            throw new InvalidOperationException(
+                "El envío pertenece a otro operador.");
+
+        if (envio.Estado != EstadoEnvio.Entregado &&
+            envio.Estado != EstadoEnvio.NoEntregado)
+            throw new InvalidOperationException(
+                "El envío debe tener un resultado de entrega registrado.");
+
+        var parada = _paradas.SingleOrDefault(
+            p => p.EnvioId == envio.Id && p.Activa);
+
+        if (parada is null)
+            throw new InvalidOperationException(
+                "No existe una parada activa para este envío.");
+
+        parada.Liberar(fecha.ToUniversalTime());
+    }
+
+    public void VerificarEditable()
+    {
+        if (Estado != EstadoHojaDeRuta.EnPreparacion)
+            throw new InvalidOperationException(
+                "No se puede modificar una hoja de ruta despachada.");
+    }
+
+    public void MarcarDespachada(DateTimeOffset fecha)
+    {
+        VerificarEditable();
+
+        if (!_paradas.Any(p => p.Activa))
+            throw new InvalidOperationException(
+                "No se puede despachar una hoja sin paradas activas.");
+
+        Estado = EstadoHojaDeRuta.Despachada;
+        DespachadaEn = fecha.ToUniversalTime();
+    }
+
+    public void ActualizarOrdenParadas(
+        IReadOnlyList<HorarioParada> horarios)
+    {
+        VerificarEditable();
+        ArgumentNullException.ThrowIfNull(horarios);
+
+        var activas = _paradas
+            .Where(p => p.Activa)
+            .ToList();
+
+        if (horarios.Count != activas.Count ||
+            horarios.Select(h => h.EnvioId).Distinct().Count() != horarios.Count ||
+            activas.Any(p => !horarios.Any(h => h.EnvioId == p.EnvioId)))
+        {
+            throw new InvalidOperationException(
+                "La planificación no coincide con las paradas activas.");
+        }
+
+        for (var i = 0; i < horarios.Count; i++)
+        {
+            var parada = activas.Single(
+                p => p.EnvioId == horarios[i].EnvioId);
+
+            parada.CambiarOrden(i + 1);
+        }
     }
 }

@@ -130,16 +130,60 @@ public class Envio : AuditableEntity, ITenantEntity
     public void EstablecerCompromisoEntrega(
         DateOnly fecha,
         TimeOnly horaDesde,
-        TimeOnly horaHasta)
+        TimeOnly horaHasta,
+        VersionReglasOperativas? reglas = null,
+        DateTimeOffset? inicioNuevaEntrega = null)
     {
         if (horaDesde >= horaHasta)
             throw new ArgumentException(
                 "La hora de inicio debe ser anterior a la hora de fin.");
 
         if (Estado != EstadoEnvio.Admitido &&
-            Estado != EstadoEnvio.EnDeposito)
+            Estado != EstadoEnvio.EnDeposito &&
+            Estado != EstadoEnvio.Reprogramado)
+        {
             throw new InvalidOperationException(
                 "No se puede modificar el compromiso de un envío en este estado.");
+        }
+
+        if (Estado == EstadoEnvio.Reprogramado)
+        {
+            if (reglas is null || !inicioNuevaEntrega.HasValue)
+                throw new ArgumentException(
+                    "La reprogramación requiere validar las reglas y la nueva fecha.");
+
+            if (reglas.Id != VersionReglasOperativasId ||
+                reglas.OperadorId != OperadorId)
+            {
+                throw new InvalidOperationException(
+                    "Las reglas no corresponden al envío.");
+            }
+
+            var ultimoFallo = _intentos
+                .Where(i => !i.Entregado)
+                .OrderByDescending(i => i.OcurridoEn)
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException(
+                    "No se encontró el intento fallido anterior.");
+
+            if (inicioNuevaEntrega.Value <
+                ultimoFallo.OcurridoEn.AddHours(
+                    reglas.HorasMinimasEntreIntentos))
+            {
+                throw new InvalidOperationException(
+                    "No se cumple el intervalo mínimo entre intentos.");
+            }
+
+            if (IntentosRealizados >= reglas.MaximoIntentosEntrega ||
+                UltimoMotivoRequiereDevolucion)
+            {
+                throw new InvalidOperationException(
+                    "El envío no admite nuevos intentos de entrega.");
+            }
+
+            FechaReprogramada = inicioNuevaEntrega.Value.ToUniversalTime();
+            FranjaReprogramada = $"{horaDesde:HH:mm}-{horaHasta:HH:mm}";
+        }
 
         FechaEntregaComprometida = fecha;
         HoraEntregaDesde = horaDesde;
@@ -179,7 +223,8 @@ public class Envio : AuditableEntity, ITenantEntity
 
         var maquina = MaquinaEstadosEnvio.Crear(
             () => Estado,
-            nuevoEstado => Estado = nuevoEstado);
+            nuevoEstado => Estado = nuevoEstado,
+            ObtenerEstadoAnteriorAsignacion);
 
         if (!maquina.CanFire(disparador))
         {
@@ -197,13 +242,6 @@ public class Envio : AuditableEntity, ITenantEntity
                 {
                     throw new InvalidOperationException(
                         "Después de un intento fallido debe reprogramarse.");
-                }
-
-                if (Estado == EstadoEnvio.Reprogramado &&
-                    !FechaReprogramada.HasValue)
-                {
-                    throw new InvalidOperationException(
-                        "El envío no tiene fecha de reprogramación.");
                 }
                 break;
 
@@ -254,12 +292,8 @@ public class Envio : AuditableEntity, ITenantEntity
                 break;
 
             case DisparadorEnvio.RetornarADeposito:
-                if (IntentosRealizados >= reglas.MaximoIntentosEntrega ||
-                    UltimoMotivoRequiereDevolucion)
-                {
-                    throw new InvalidOperationException(
-                        "Corresponde iniciar la devolución.");
-                }
+                // Se permite registrar el regreso físico al depósito.
+                // La decisión de devolverlo al comercio se realiza después.
                 break;
 
             case DisparadorEnvio.IniciarDevolucion:
@@ -276,32 +310,30 @@ public class Envio : AuditableEntity, ITenantEntity
                     throw new InvalidOperationException(
                         "La reprogramación requiere un intento fallido previo.");
 
-                if (!fechaReprogramada.HasValue ||
-                    string.IsNullOrWhiteSpace(franjaReprogramada))
-                {
-                    throw new ArgumentException(
-                        "Debe indicarse una nueva fecha y franja.");
-                }
-
-                var ultimoFallo = _intentos
-                    .Where(i => !i.Entregado)
-                    .OrderByDescending(i => i.OcurridoEn)
-                    .FirstOrDefault();
-
-                if (ultimoFallo is null ||
-                    fechaReprogramada.Value <
-                    ultimoFallo.OcurridoEn.AddHours(
-                        reglas.HorasMinimasEntreIntentos))
+                if (IntentosRealizados >= reglas.MaximoIntentosEntrega ||
+                    UltimoMotivoRequiereDevolucion)
                 {
                     throw new InvalidOperationException(
-                        "No se cumple el intervalo mínimo entre intentos.");
+                        "El envío no admite nuevos intentos de entrega.");
                 }
+
                 break;
 
             case DisparadorEnvio.DeclararExtraviado:
                 if (string.IsNullOrWhiteSpace(justificacion))
                     throw new ArgumentException(
                         "Debe justificarse la declaración de extravío.");
+                break;
+
+            case DisparadorEnvio.QuitarDeRuta:
+                if (ObtenerEstadoAnteriorAsignacion() == EstadoEnvio.Reprogramado)
+                {
+                    FechaReprogramada = null;
+                    FranjaReprogramada = null;
+                    FechaEntregaComprometida = null;
+                    HoraEntregaDesde = null;
+                    HoraEntregaHasta = null;
+                }
                 break;
         }
 
@@ -336,8 +368,8 @@ public class Envio : AuditableEntity, ITenantEntity
 
         if (disparador == DisparadorEnvio.Reprogramar)
         {
-            FechaReprogramada = fechaReprogramada;
-            FranjaReprogramada = franjaReprogramada!.Trim();
+            FechaReprogramada = null;
+            FranjaReprogramada = null;
         }
 
         _eventos.Add(evento);
@@ -349,7 +381,7 @@ public class Envio : AuditableEntity, ITenantEntity
         {
             DisparadorEnvio.RecibirEnDeposito => EstadoEnvio.EnDeposito,
             DisparadorEnvio.AsignarARuta => EstadoEnvio.AsignadoARuta,
-            DisparadorEnvio.QuitarDeRuta => EstadoEnvio.EnDeposito,
+            DisparadorEnvio.QuitarDeRuta => ObtenerEstadoAnteriorAsignacion(),
             DisparadorEnvio.Despachar => EstadoEnvio.EnTransito,
             DisparadorEnvio.Entregar => EstadoEnvio.Entregado,
             DisparadorEnvio.RegistrarIntentoFallido => EstadoEnvio.NoEntregado,
@@ -361,5 +393,25 @@ public class Envio : AuditableEntity, ITenantEntity
             DisparadorEnvio.Reaparecer => EstadoEnvio.EnDeposito,
             _ => throw new ArgumentOutOfRangeException(nameof(disparador))
         };
+    }
+
+    private EstadoEnvio ObtenerEstadoAnteriorAsignacion()
+    {
+        var asignacion = _eventos
+            .LastOrDefault(e =>
+                e.Disparador == DisparadorEnvio.AsignarARuta);
+
+        if (asignacion is null)
+            throw new InvalidOperationException(
+                "No existe una asignación previa registrada.");
+
+        if (asignacion.EstadoAnterior != EstadoEnvio.EnDeposito &&
+            asignacion.EstadoAnterior != EstadoEnvio.Reprogramado)
+        {
+            throw new InvalidOperationException(
+                "El estado anterior a la asignación no es válido.");
+        }
+
+        return asignacion.EstadoAnterior;
     }
 }

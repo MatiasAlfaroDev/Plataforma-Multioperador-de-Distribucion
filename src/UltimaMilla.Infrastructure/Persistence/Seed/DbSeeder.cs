@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Configuracion;
-using Microsoft.EntityFrameworkCore;
-using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Infrastructure.Persistence.Seed;
 

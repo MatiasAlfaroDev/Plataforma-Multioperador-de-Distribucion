@@ -5,6 +5,7 @@ using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.UnitTests;
 
@@ -24,6 +25,8 @@ public class RegistrarEventoMovilHandlerTests
     private readonly Envio _envio;
     private readonly VersionReglasOperativas _versionReglas;
     private readonly MotivoNoEntrega _motivo;
+    private readonly HojasEnMemoria _hojas = new();
+    private readonly HojaDeRuta _hoja;
 
     public RegistrarEventoMovilHandlerTests()
     {
@@ -77,6 +80,28 @@ public class RegistrarEventoMovilHandlerTests
             "Backoffice",
             "Operario");
 
+        var repartidor = Repartidor.Crear(
+            operadorId,
+            "Repartidor de prueba",
+            "099123456");
+
+        var vehiculo = Vehiculo.Crear(
+            operadorId,
+            "ABC1234",
+            capacidadPesoKg: 1000m,
+            capacidadVolumenM3: 10m);
+
+        _hoja = HojaDeRuta.Crear(
+            operadorId,
+            repartidor,
+            vehiculo,
+            DateOnly.FromDateTime(Alta.Date),
+            maximoParadas: 10);
+
+        _hoja.AgregarEnvio(_envio);
+
+        _hojas.Lista.Add(_hoja);
+
         _envio.Aplicar(
             DisparadorEnvio.AsignarARuta,
             _versionReglas,
@@ -95,6 +120,7 @@ public class RegistrarEventoMovilHandlerTests
 
         _handler = new RegistrarEventoMovilHandler(
             _envios,
+            _hojas,
             _eventos,
             _reglas,
             _motivos,
@@ -135,6 +161,9 @@ public class RegistrarEventoMovilHandlerTests
         await _handler.Handle(
             Entrega(Guid.NewGuid()),
             CancellationToken.None);
+        Assert.Single(_hoja.Paradas);
+        Assert.False(_hoja.Paradas.Single().Activa);
+        Assert.NotNull(_hoja.Paradas.Single().LiberadaEn);
 
         Assert.Equal(EstadoEnvio.Entregado, _envio.Estado);
         Assert.Equal(1, _envio.IntentosRealizados);
@@ -290,6 +319,50 @@ public class RegistrarEventoMovilHandlerTests
 
     // Dobles de prueba
 
+    private sealed class HojasEnMemoria : IHojaDeRutaRepository
+{
+    public List<HojaDeRuta> Lista { get; } = [];
+
+        public Task AgregarAsync(
+            HojaDeRuta hoja,
+            CancellationToken ct)
+        {
+            Lista.Add(hoja);
+            return Task.CompletedTask;
+        }
+
+        public Task<HojaDeRuta?> ObtenerAsync(
+            Guid operadorId,
+            Guid hojaId,
+            CancellationToken ct)
+        {
+            return Task.FromResult(
+                Lista.FirstOrDefault(h =>
+                    h.Id == hojaId &&
+                    h.OperadorId == operadorId));
+        }
+
+        public Task<IReadOnlyList<HojaDeRuta>> ListarAsync(
+            Guid operadorId,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<HojaDeRuta>>(
+                Lista.Where(h => h.OperadorId == operadorId).ToList());
+        }
+
+        public Task<HojaDeRuta?> ObtenerPorEnvioActivoAsync(
+            Guid operadorId,
+            Guid envioId,
+            CancellationToken ct)
+        {
+            return Task.FromResult(
+                Lista.SingleOrDefault(h =>
+                    h.OperadorId == operadorId &&
+                    h.Paradas.Any(p =>
+                        p.EnvioId == envioId &&
+                        p.Activa)));
+        }
+    }
     private sealed class EnviosEnMemoria : IEnvioRepository
     {
         public List<Envio> Lista { get; } = [];
@@ -321,6 +394,14 @@ public class RegistrarEventoMovilHandlerTests
                     (!cuentaComercialId.HasValue ||
                     e.CuentaComercialId == cuentaComercialId.Value))
                 .ToList());
+    
+        public Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
+            Guid operadorId,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza la consulta de planificación.");
+        }
     }
 
     private sealed class EventosEnMemoria : IEventoMovilRepository

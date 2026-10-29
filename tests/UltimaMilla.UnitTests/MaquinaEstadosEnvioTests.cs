@@ -14,7 +14,7 @@ public class MaquinaEstadosEnvioTests
     [InlineData(EstadoEnvio.EnTransito, DisparadorEnvio.Entregar, EstadoEnvio.Entregado)]
     [InlineData(EstadoEnvio.EnTransito, DisparadorEnvio.RegistrarIntentoFallido, EstadoEnvio.NoEntregado)]
     [InlineData(EstadoEnvio.NoEntregado, DisparadorEnvio.RetornarADeposito, EstadoEnvio.EnDeposito)]
-    [InlineData(EstadoEnvio.NoEntregado, DisparadorEnvio.IniciarDevolucion, EstadoEnvio.EnDevolucion)]
+    [InlineData(EstadoEnvio.EnDeposito, DisparadorEnvio.IniciarDevolucion, EstadoEnvio.EnDevolucion)]
     [InlineData(EstadoEnvio.Reprogramado, DisparadorEnvio.AsignarARuta, EstadoEnvio.AsignadoARuta)]
     [InlineData(EstadoEnvio.EnDevolucion, DisparadorEnvio.ConfirmarDevolucion, EstadoEnvio.Devuelto)]
     [InlineData(EstadoEnvio.Extraviado, DisparadorEnvio.Reaparecer, EstadoEnvio.EnDeposito)]
@@ -27,7 +27,8 @@ public class MaquinaEstadosEnvioTests
 
         var maquina = MaquinaEstadosEnvio.Crear(
             () => estado,
-            nuevo => estado = nuevo);
+            nuevo => estado = nuevo,
+            () => EstadoEnvio.EnDeposito);
 
         Assert.True(maquina.CanFire(disparador));
 
@@ -67,12 +68,13 @@ public class MaquinaEstadosEnvioTests
     [InlineData(EstadoEnvio.EnTransito, DisparadorEnvio.RecibirEnDeposito)]
     [InlineData(EstadoEnvio.Entregado, DisparadorEnvio.Reprogramar)]
     [InlineData(EstadoEnvio.Devuelto, DisparadorEnvio.AsignarARuta)]
+    [InlineData(EstadoEnvio.NoEntregado, DisparadorEnvio.IniciarDevolucion)]
     public void TransicionInvalida_EsRechazada(
         EstadoEnvio inicial,
         DisparadorEnvio disparador)
     {
         var estado = inicial;
-
+        
         var maquina = MaquinaEstadosEnvio.Crear(
             () => estado,
             nuevo => estado = nuevo);
@@ -82,6 +84,7 @@ public class MaquinaEstadosEnvioTests
             () => maquina.Fire(disparador));
 
         Assert.Equal(inicial, estado);
+
     }
 
     [Theory]
@@ -100,5 +103,23 @@ public class MaquinaEstadosEnvioTests
         {
             Assert.False(maquina.CanFire(disparador));
         }
+    }
+
+    [Theory]
+    [InlineData(EstadoEnvio.EnDeposito)]
+    [InlineData(EstadoEnvio.Reprogramado)]
+    public void QuitarDeRuta_RestauraEstadoAnterior(
+        EstadoEnvio estadoAnterior)
+    {
+        var estado = EstadoEnvio.AsignadoARuta;
+
+        var maquina = MaquinaEstadosEnvio.Crear(
+            () => estado,
+            nuevo => estado = nuevo,
+            () => estadoAnterior);
+
+        maquina.Fire(DisparadorEnvio.QuitarDeRuta);
+
+        Assert.Equal(estadoAnterior, estado);
     }
 }

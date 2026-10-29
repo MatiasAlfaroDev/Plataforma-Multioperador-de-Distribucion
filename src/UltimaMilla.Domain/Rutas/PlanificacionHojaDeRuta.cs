@@ -17,6 +17,8 @@ public static class PlanificacionHojaDeRuta
         ArgumentNullException.ThrowIfNull(ruta);
         ArgumentNullException.ThrowIfNull(envios);
 
+        ruta.VerificarEditable();
+
         if (!ruta.HoraSalida.HasValue)
             throw new InvalidOperationException(
                 "La hoja de ruta debe tener una hora de salida.");
@@ -25,29 +27,30 @@ public static class PlanificacionHojaDeRuta
             throw new InvalidOperationException(
                 "Debe seleccionarse al menos un envío.");
 
-        if (envios.Any(x => x is null))
+        if (envios.Any(x => x is null || x.Envio is null || x.Zona is null))
             throw new ArgumentException(
                 "La selección contiene datos inválidos.");
 
-        if (envios.Select(x => x.Envio.Id).Distinct().Count()
-            != envios.Count)
+        if (envios.Select(x => x.Envio.Id).Distinct().Count() != envios.Count)
             throw new InvalidOperationException(
                 "Hay envíos repetidos en la selección.");
 
-        var paradasActivas = ruta.Paradas
-            .Count(x => x.Activa);
+        var activas = ruta.Paradas
+            .Where(p => p.Activa)
+            .ToList();
 
-        if (paradasActivas + envios.Count > ruta.MaximoParadas)
+        var idsSeleccionados = envios
+            .Select(x => x.Envio.Id)
+            .ToHashSet();
+
+        // No permite recalcular omitiendo una parada existente.
+        if (activas.Any(p => !idsSeleccionados.Contains(p.EnvioId)))
+            throw new InvalidOperationException(
+                "La planificación debe incluir todas las paradas activas.");
+
+        if (envios.Count > ruta.MaximoParadas)
             throw new InvalidOperationException(
                 "Se supera el máximo de paradas.");
-
-        // Este cálculo inicial planifica rutas sin paradas
-        // anteriores. La ampliación de rutas requiere
-        // recalcular todas las paradas activas.
-        if (paradasActivas > 0)
-            throw new InvalidOperationException(
-                "La ruta ya tiene paradas. Debe recalcularse "
-                + "su planificación completa.");
 
         decimal pesoTotal = 0;
         decimal volumenTotal = 0;
@@ -66,29 +69,35 @@ public static class PlanificacionHojaDeRuta
                 throw new InvalidOperationException(
                     "La zona de cobertura está inactiva.");
 
-            if (envio.Estado != EstadoEnvio.EnDeposito &&
-                envio.Estado != EstadoEnvio.Reprogramado)
+            var yaAsignado = activas.Any(p => p.EnvioId == envio.Id);
+
+            if (yaAsignado)
+            {
+                if (envio.Estado != EstadoEnvio.AsignadoARuta)
+                    throw new InvalidOperationException(
+                        "Una parada activa tiene un envío con estado incorrecto.");
+            }
+            else if (envio.Estado != EstadoEnvio.EnDeposito &&
+                    envio.Estado != EstadoEnvio.Reprogramado)
+            {
                 throw new InvalidOperationException(
                     "El envío no está disponible para asignación.");
-
-            if (envio.Estado == EstadoEnvio.Reprogramado)
-            {
-                if (!envio.FechaReprogramada.HasValue ||
-                    DateOnly.FromDateTime(
-                        envio.FechaReprogramada.Value.Date) != ruta.Fecha)
-                    throw new InvalidOperationException(
-                        "La ruta no coincide con la reprogramación.");
             }
-            else if (envio.FechaEntregaComprometida != ruta.Fecha)
-            {
+
+            if (envio.FechaEntregaComprometida != ruta.Fecha)
                 throw new InvalidOperationException(
                     "La fecha comprometida no coincide con la ruta.");
-            }
 
             if (!envio.HoraEntregaDesde.HasValue ||
                 !envio.HoraEntregaHasta.HasValue)
                 throw new InvalidOperationException(
                     "El envío no tiene una franja comprometida.");
+
+            if (!zona.OfreceFranja(
+                    envio.HoraEntregaDesde.Value,
+                    envio.HoraEntregaHasta.Value))
+                throw new InvalidOperationException(
+                    "La zona no ofrece la franja comprometida.");
 
             if (zona.MinutosTrasladoEstimado is null or <= 0)
                 throw new InvalidOperationException(
@@ -106,9 +115,6 @@ public static class PlanificacionHojaDeRuta
             throw new InvalidOperationException(
                 "Se supera la capacidad de volumen del vehículo.");
 
-        // Criterio documentable:
-        // primero los compromisos que vencen antes.
-        // Para empates, priorizar el inicio de franja.
         var ordenados = envios
             .OrderBy(x => x.Envio.HoraEntregaHasta!.Value)
             .ThenBy(x => x.Envio.HoraEntregaDesde!.Value)
@@ -116,13 +122,13 @@ public static class PlanificacionHojaDeRuta
             .ThenBy(x => x.Envio.ReferenciaExterna)
             .ToList();
 
-        var paradas = ordenados.Select(item =>
-            new ParadaPlanificada(
+        var paradas = ordenados
+            .Select(item => new ParadaPlanificada(
                 item.Envio.Id,
                 item.Envio.HoraEntregaDesde!.Value,
                 item.Envio.HoraEntregaHasta!.Value,
-                item.Zona.MinutosTrasladoEstimado!.Value
-            )).ToList();
+                item.Zona.MinutosTrasladoEstimado!.Value))
+            .ToList();
 
         return PlanificadorHorarios.ValidarYCalcular(
             ruta.HoraSalida.Value,

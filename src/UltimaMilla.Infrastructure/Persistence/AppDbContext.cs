@@ -39,6 +39,7 @@ public sealed class AppDbContext(
     public DbSet<ParadaRuta> ParadasRuta => Set<ParadaRuta>();
     public DbSet<IntentoEntrega> IntentosEntrega => Set<IntentoEntrega>();
     public DbSet<PruebaEntrega> PruebasEntrega => Set<PruebaEntrega>();
+    public DbSet<SolicitudReprogramacion> SolicitudesReprogramacion => Set<SolicitudReprogramacion>();
     public DbSet<EventoMovil> EventosMovil => Set<EventoMovil>();
     public DbSet<ZonaCobertura> ZonasCobertura => Set<ZonaCobertura>();
     public DbSet<CuadroTarifario> CuadrosTarifarios => Set<CuadroTarifario>();
@@ -55,19 +56,19 @@ public sealed class AppDbContext(
             typeof(AppDbContext).Assembly);
 
         modelBuilder.Entity<CuentaComercial>()
-        .HasQueryFilter(c =>
-        AccesoInicializacion ||
-        c.OperadorId == OperadorActualId);
+            .HasQueryFilter(c =>
+                AccesoInicializacion ||
+                c.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<Envio>()
-        .HasQueryFilter(e =>
-        AccesoInicializacion ||
-        e.OperadorId == OperadorActualId);
+            .HasQueryFilter(e =>
+                AccesoInicializacion ||
+                e.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<CuadroTarifario>()
-    .HasQueryFilter(x =>
-        AccesoInicializacion ||
-        x.OperadorId == OperadorActualId);
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<Repartidor>()
             .HasQueryFilter(x =>
@@ -105,9 +106,14 @@ public sealed class AppDbContext(
                 x.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<MotivoNoEntrega>()
-        .HasQueryFilter(x =>
-        AccesoInicializacion ||
-        x.OperadorId == OperadorActualId);
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<SolicitudReprogramacion>()
+            .HasQueryFilter(s =>
+                AccesoInicializacion ||
+                s.OperadorId == OperadorActualId);
         // Tablas del outbox de MassTransit.
         modelBuilder.AddInboxStateEntity();
         modelBuilder.AddOutboxMessageEntity();

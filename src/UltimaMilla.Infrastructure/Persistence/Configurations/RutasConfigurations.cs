@@ -70,6 +70,14 @@ public sealed class HojaDeRutaConfiguration
 
         builder.Property(x => x.Id).ValueGeneratedNever();
 
+        builder.Property(x => x.Estado)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .IsRequired();
+
+        builder.Property(x => x.DespachadaEn)
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(x => x.CapacidadPesoKg)
             .HasPrecision(12, 3);
 
@@ -131,7 +139,8 @@ public sealed class ParadaRutaConfiguration
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.HojaDeRutaId, x.Orden })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("\"liberada_en\" IS NULL");
 
         // Impide que un mismo envío tenga dos
         // asignaciones activas al mismo tiempo.

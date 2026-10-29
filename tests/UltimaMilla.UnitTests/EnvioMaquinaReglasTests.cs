@@ -314,15 +314,25 @@ public class EnvioMaquinaReglasTests
 
         Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito);
 
-        Assert.Throws<InvalidOperationException>(() =>
-            Aplicar(
-                envio,
-                reglas,
-                DisparadorEnvio.Reprogramar,
-                fechaReprogramada: Ahora.AddHours(12),
-                franja: "14:00-18:00"));
+        // Se aprueba la reprogramación sin fecha.
+        Aplicar(envio, reglas, DisparadorEnvio.Reprogramar);
 
-        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+        Assert.Equal(EstadoEnvio.Reprogramado, envio.Estado);
+
+        // El último fallo fue en Ahora y el operador exige 24 horas.
+        // Intentar una nueva entrega 12 horas después debe rechazarse.
+        var inicioNuevaEntrega = Ahora.AddHours(12);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            envio.EstablecerCompromisoEntrega(
+                DateOnly.FromDateTime(inicioNuevaEntrega.Date),
+                new TimeOnly(0, 0),
+                new TimeOnly(4, 0),
+                reglas,
+                inicioNuevaEntrega));
+
+        Assert.Null(envio.FechaReprogramada);
+        Assert.Null(envio.FranjaReprogramada);
     }
 
     [Fact]
@@ -338,22 +348,37 @@ public class EnvioMaquinaReglasTests
 
         Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito);
 
-        var nuevaFecha = Ahora.AddHours(25);
-
-        Aplicar(
-            envio,
-            reglas,
-            DisparadorEnvio.Reprogramar,
-            fechaReprogramada: nuevaFecha,
-            franja: "14:00-18:00");
+        // Primero se aprueba sin fecha.
+        Aplicar(envio, reglas, DisparadorEnvio.Reprogramar);
 
         Assert.Equal(EstadoEnvio.Reprogramado, envio.Estado);
-        Assert.Equal(nuevaFecha, envio.FechaReprogramada);
-        Assert.Equal("14:00-18:00", envio.FranjaReprogramada);
+        Assert.Null(envio.FechaReprogramada);
+
+        // La nueva entrega será 25 horas después del fallo.
+        var inicioNuevaEntrega = Ahora.AddHours(25);
+
+        envio.EstablecerCompromisoEntrega(
+            DateOnly.FromDateTime(inicioNuevaEntrega.Date),
+            TimeOnly.FromDateTime(inicioNuevaEntrega.DateTime),
+            TimeOnly.FromDateTime(inicioNuevaEntrega.AddHours(2).DateTime),
+            reglas,
+            inicioNuevaEntrega);
+
+        Assert.Equal(inicioNuevaEntrega.ToUniversalTime(), envio.FechaReprogramada);
+        Assert.Equal(
+            DateOnly.FromDateTime(inicioNuevaEntrega.Date),
+            envio.FechaEntregaComprometida);
+
+        Assert.Equal(EstadoEnvio.Reprogramado, envio.Estado);
+
+        // Después de planificar, puede asignarse a una ruta.
+        Aplicar(envio, reglas, DisparadorEnvio.AsignarARuta);
+
+        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
     }
 
     [Fact]
-    public void Motivo_que_exige_devolucion_impide_regresar_a_deposito()
+    public void Motivo_que_exige_devolucion_permite_retorno_pero_no_reprogramacion()
     {
         var (envio, reglas) = Preparar();
         PonerEnTransito(envio, reglas);
@@ -363,8 +388,17 @@ public class EnvioMaquinaReglasTests
             envio, reglas, DisparadorEnvio.RegistrarIntentoFallido,
             motivo: motivo, evidencia: "foto-001");
 
+        Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito);
+
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+
         Assert.Throws<InvalidOperationException>(() =>
-            Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito));
+            Aplicar(
+                envio,
+                reglas,
+                DisparadorEnvio.Reprogramar,
+                fechaReprogramada: Ahora.AddHours(48),
+                franja: "14:00-18:00"));
 
         Aplicar(envio, reglas, DisparadorEnvio.IniciarDevolucion);
 
@@ -381,11 +415,12 @@ public class EnvioMaquinaReglasTests
         Aplicar(
             envio, reglas, DisparadorEnvio.RegistrarIntentoFallido,
             motivo: motivo, evidencia: "foto-001");
+        Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito);
 
         Assert.Throws<InvalidOperationException>(() =>
             Aplicar(envio, reglas, DisparadorEnvio.IniciarDevolucion));
 
-        Assert.Equal(EstadoEnvio.NoEntregado, envio.Estado);
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
     }
 
     [Fact]
@@ -399,8 +434,17 @@ public class EnvioMaquinaReglasTests
             envio, reglas, DisparadorEnvio.RegistrarIntentoFallido,
             motivo: motivo, evidencia: "foto-001");
 
+        Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito);
+
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+
         Assert.Throws<InvalidOperationException>(() =>
-            Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito));
+            Aplicar(
+                envio,
+                reglas,
+                DisparadorEnvio.Reprogramar,
+                fechaReprogramada: Ahora.AddHours(48),
+                franja: "14:00-18:00"));
 
         Aplicar(envio, reglas, DisparadorEnvio.IniciarDevolucion);
 
@@ -437,5 +481,57 @@ public class EnvioMaquinaReglasTests
 
         Assert.Equal(EstadoEnvio.Admitido, envio.Estado);
         Assert.Empty(envio.Eventos);
+    }
+
+    [Fact]
+    public void QuitarDeRuta_Reprogramado_RestauraEstadoYConservaIntentos()
+    {
+        var (envio, reglas) = Preparar(horasEntreIntentos: 24);
+
+        PonerEnTransito(envio, reglas);
+
+        var motivo = CrearMotivo(envio, reglas);
+
+        Aplicar(
+            envio,
+            reglas,
+            DisparadorEnvio.RegistrarIntentoFallido,
+            motivo: motivo,
+            evidencia: "foto-intento-001");
+
+        Aplicar(envio, reglas, DisparadorEnvio.RetornarADeposito);
+        Aplicar(envio, reglas, DisparadorEnvio.Reprogramar);
+
+        var inicio = Ahora.AddDays(2);
+
+        envio.EstablecerCompromisoEntrega(
+            DateOnly.FromDateTime(inicio.Date),
+            new TimeOnly(10, 0),
+            new TimeOnly(12, 0),
+            reglas,
+            inicio);
+
+        Aplicar(envio, reglas, DisparadorEnvio.AsignarARuta);
+
+        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
+        Assert.Equal(1, envio.IntentosRealizados);
+
+        Aplicar(envio, reglas, DisparadorEnvio.QuitarDeRuta);
+
+        Assert.Equal(EstadoEnvio.Reprogramado, envio.Estado);
+        Assert.Equal(1, envio.IntentosRealizados);
+        Assert.Single(envio.Intentos);
+
+        Assert.Null(envio.FechaReprogramada);
+        Assert.Null(envio.FranjaReprogramada);
+        Assert.Null(envio.FechaEntregaComprometida);
+        Assert.Null(envio.HoraEntregaDesde);
+        Assert.Null(envio.HoraEntregaHasta);
+
+        var ultimoEvento = envio.Eventos.Last();
+
+        Assert.Equal(DisparadorEnvio.QuitarDeRuta, ultimoEvento.Disparador);
+        Assert.Equal(EstadoEnvio.AsignadoARuta, ultimoEvento.EstadoAnterior);
+        Assert.Equal(EstadoEnvio.Reprogramado, ultimoEvento.EstadoNuevo);
     }
 }

@@ -40,4 +40,19 @@ public sealed class HojaDeRutaRepository(AppDbContext db)
             .OrderByDescending(x => x.Fecha)
             .ToListAsync(ct);
     }
+
+    public Task<HojaDeRuta?> ObtenerPorEnvioActivoAsync(
+        Guid operadorId,
+        Guid envioId,
+        CancellationToken ct)
+    {
+        return db.HojasDeRuta
+            .Include(x => x.Paradas)
+            .SingleOrDefaultAsync(
+                x => x.OperadorId == operadorId &&
+                    x.Paradas.Any(p =>
+                        p.EnvioId == envioId &&
+                        p.LiberadaEn == null),
+                ct);
+    }
 }

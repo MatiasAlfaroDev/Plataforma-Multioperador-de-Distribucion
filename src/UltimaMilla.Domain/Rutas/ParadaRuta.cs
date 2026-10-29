@@ -45,4 +45,16 @@ public sealed class ParadaRuta : AuditableEntity
 
         LiberadaEn = fecha;
     }
+
+    internal void CambiarOrden(int nuevoOrden)
+    {
+        if (!Activa)
+            throw new InvalidOperationException(
+                "No se puede reordenar una parada histórica.");
+
+        if (nuevoOrden <= 0)
+            throw new ArgumentOutOfRangeException(nameof(nuevoOrden));
+
+        Orden = nuevoOrden;
+    }
 }

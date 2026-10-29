@@ -161,6 +161,32 @@ public sealed class CrearHojaDeRutaHandler(
                         command.HoraEntregaHasta);
                 }
             }
+            else if (envio.Estado == EstadoEnvio.Reprogramado)
+            {
+                var zonaHoraria = TimeZoneInfo.FindSystemTimeZoneById(
+                    "America/Montevideo");
+
+                var fechaHoraLocal = DateTime.SpecifyKind(
+                    command.Fecha.ToDateTime(command.HoraEntregaDesde),
+                    DateTimeKind.Unspecified);
+
+                var inicioNuevaEntrega = new DateTimeOffset(
+                    fechaHoraLocal,
+                    zonaHoraria.GetUtcOffset(fechaHoraLocal));
+
+                if (inicioNuevaEntrega <= reloj.GetUtcNow())
+                {
+                    throw new InvalidOperationException(
+                        "La nueva entrega debe programarse para una fecha futura.");
+                }
+
+                envio.EstablecerCompromisoEntrega(
+                    command.Fecha,
+                    command.HoraEntregaDesde,
+                    command.HoraEntregaHasta,
+                    reglas,
+                    inicioNuevaEntrega);
+            }
 
             seleccion.Add(new EnvioParaPlanificar(
                 envio,
