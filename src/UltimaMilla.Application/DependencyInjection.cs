@@ -4,6 +4,9 @@ using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciale
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
+using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
+using UltimaMilla.Application.Envios.Commands.Reprogramacion;
+using UltimaMilla.Application.Envios.Queries.ListarSolicitudesReprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
 using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
@@ -14,6 +17,8 @@ using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
+using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
+using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
@@ -32,6 +37,10 @@ public static class DependencyInjection
         services.AddScoped<ListarEnviosHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();
+        services.AddScoped<RetornarADepositoHandler>();
+        services.AddScoped<SolicitarReprogramacionHandler>();
+        services.AddScoped<ConfirmarReprogramacionHandler>();
+        services.AddScoped<ListarSolicitudesReprogramacionHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
         services.AddScoped<ListarOperadoresHandler>();
         services.AddScoped<ActualizarTarifaHandler>();
@@ -42,6 +51,8 @@ public static class DependencyInjection
         services.AddScoped<CrearHojaDeRutaHandler>();
         services.AddScoped<ConsultarHojasDeRutaHandler>();
         services.AddScoped<DespacharHojaDeRutaHandler>();
+        services.AddScoped<QuitarEnvioDeRutaHandler>();
+        services.AddScoped<AgregarEnvioARutaHandler>();
         services.AddScoped<ObtenerMisHojasDeRutaHandler>();
         services.AddScoped<DespacharMiHojaDeRutaHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();

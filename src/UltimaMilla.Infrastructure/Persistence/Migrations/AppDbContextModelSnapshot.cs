@@ -892,6 +892,40 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.ToTable("pruebas_entrega", (string)null);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.SolicitudReprogramacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AtendidaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("SolicitadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId")
+                        .IsUnique()
+                        .HasFilter("\"Estado\" = 'Pendiente'");
+
+                    b.HasIndex("OperadorId", "Estado");
+
+                    b.ToTable("solicitudes_reprogramacion", (string)null);
+                });
+
             modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1128,6 +1162,14 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DespachadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<DateOnly>("Fecha")
                         .HasColumnType("date");
 
@@ -1196,7 +1238,8 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasFilter("\"liberada_en\" IS NULL");
 
                     b.HasIndex("HojaDeRutaId", "Orden")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"liberada_en\" IS NULL");
 
                     b.ToTable("paradas_ruta", (string)null);
                 });
@@ -1575,6 +1618,15 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.SolicitudReprogramacion", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Envios.Envio", null)
+                        .WithMany()
+                        .HasForeignKey("EnvioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+                
             modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>
                 {
                     b.HasOne("UltimaMilla.Infrastructure.Identidad.Usuario", null)

@@ -2,6 +2,7 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
+using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
@@ -124,6 +125,116 @@ public class DespacharHojaDeRutaHandlerTests
         Assert.Equal(0, _unidad.Guardados);
     }
 
+    private QuitarEnvioDeRutaHandler CrearHandlerQuitar() =>
+    new(
+        _hojas,
+        new EnviosEnMemoria(_envios),
+        new ReglasEnMemoria(_versiones),
+        _unidad,
+        new RelojFijo(Alta.AddMinutes(30)));
+
+    [Fact]
+    public async Task QuitarEnvioDeHojaEnPreparacion_VuelveADeposito()
+    {
+        var handler = CrearHandlerQuitar();
+
+        await handler.Handle(
+            new QuitarEnvioDeRutaCommand(
+                _operadorId,
+                _hoja.Id,
+                _primero.Id,
+                "Despachador"),
+            CancellationToken.None);
+
+        Assert.Equal(EstadoEnvio.EnDeposito, _primero.Estado);
+        Assert.Equal(EstadoEnvio.AsignadoARuta, _segundo.Estado);
+
+        Assert.Equal(
+            DisparadorEnvio.QuitarDeRuta,
+            _primero.Eventos.Last().Disparador);
+
+        Assert.Equal(
+            EstadoEnvio.EnDeposito,
+            _primero.Eventos.Last().EstadoNuevo);
+
+        Assert.Equal(2, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task QuitarEnvio_LiberaCapacidadDeLaHoja()
+    {
+        var pesoInicial = _hoja.PesoAsignadoKg;
+        var volumenInicial = _hoja.VolumenAsignadoM3;
+
+        var handler = CrearHandlerQuitar();
+
+        await handler.Handle(
+            new QuitarEnvioDeRutaCommand(
+                _operadorId,
+                _hoja.Id,
+                _primero.Id,
+                "Despachador"),
+            CancellationToken.None);
+
+        Assert.Equal(
+            pesoInicial - _primero.PesoTotalKg,
+            _hoja.PesoAsignadoKg);
+
+        Assert.Equal(
+            volumenInicial - _primero.VolumenTotalMetrosCubicos,
+            _hoja.VolumenAsignadoM3);
+
+        Assert.Single(
+            _hoja.Paradas,
+            p => p.EnvioId == _segundo.Id);
+
+        Assert.Equal(2, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task QuitarEnvioDeHojaDespachada_DebeRechazarse()
+    {
+        await _handler.Handle(
+            new DespacharHojaDeRutaCommand(
+                _operadorId,
+                _hoja.Id),
+            CancellationToken.None);
+
+        var guardadosAntes = _unidad.Guardados;
+        var handler = CrearHandlerQuitar();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.Handle(
+                new QuitarEnvioDeRutaCommand(
+                    _operadorId,
+                    _hoja.Id,
+                    _primero.Id,
+                    "Despachador"),
+                CancellationToken.None));
+
+        Assert.Equal(EstadoEnvio.EnTransito, _primero.Estado);
+        Assert.Equal(EstadoEnvio.EnTransito, _segundo.Estado);
+        Assert.Equal(guardadosAntes, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task QuitarEnvioDeHojaDeOtroOperador_DebeRechazarse()
+    {
+        var handler = CrearHandlerQuitar();
+
+        await Assert.ThrowsAsync<NoEncontradoException>(
+            () => handler.Handle(
+                new QuitarEnvioDeRutaCommand(
+                    Guid.NewGuid(),
+                    _hoja.Id,
+                    _primero.Id,
+                    "Despachador"),
+                CancellationToken.None));
+
+        Assert.Equal(EstadoEnvio.AsignadoARuta, _primero.Estado);
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
     private Envio CrearEnvio(string referencia)
     {
         var cuenta = CuentaComercial.Crear(
@@ -202,15 +313,23 @@ public class DespacharHojaDeRutaHandlerTests
                 e.ReferenciaExterna == referenciaExterna));
 
         public Task<IReadOnlyList<Envio>> ListarAsync(
-    Guid operadorId,
-    Guid? cuentaComercialId,
-    CancellationToken ct) =>
-    Task.FromResult<IReadOnlyList<Envio>>(
-        lista.Where(e =>
-            e.OperadorId == operadorId &&
-            (!cuentaComercialId.HasValue ||
-             e.CuentaComercialId == cuentaComercialId.Value))
-        .ToList());
+            Guid operadorId,
+            Guid? cuentaComercialId,
+            CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Envio>>(
+                lista.Where(e =>
+                    e.OperadorId == operadorId &&
+                    (!cuentaComercialId.HasValue ||
+                    e.CuentaComercialId == cuentaComercialId.Value))
+                .ToList());
+
+        public Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
+            Guid operadorId,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza la consulta de planificación.");
+        }
     }
 
     private sealed class HojasEnMemoria : IHojaDeRutaRepository
@@ -232,6 +351,13 @@ public class DespacharHojaDeRutaHandlerTests
             Guid operadorId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<HojaDeRuta>>(
                 Lista.Where(h => h.OperadorId == operadorId).ToList());
+        public Task<HojaDeRuta?> ObtenerPorEnvioActivoAsync(
+            Guid operadorId,
+            Guid envioId,
+            CancellationToken ct)
+        {
+            return Task.FromResult<HojaDeRuta?>(null);
+        }
 
         public Task<IReadOnlyList<HojaDeRuta>> ListarDelRepartidorAsync(
             Guid operadorId, Guid repartidorId, DateOnly fecha, CancellationToken ct) =>
@@ -266,6 +392,14 @@ public class DespacharHojaDeRutaHandlerTests
             Guardados++;
             return Task.FromResult(1);
         }
+        
+        public Task EjecutarEnTransaccionAsync(
+            Func<CancellationToken, Task> operacion,
+            CancellationToken ct)
+        {
+            return operacion(ct);
+        }
+
     }
 
     private sealed class RelojFijo(DateTimeOffset ahora) : TimeProvider

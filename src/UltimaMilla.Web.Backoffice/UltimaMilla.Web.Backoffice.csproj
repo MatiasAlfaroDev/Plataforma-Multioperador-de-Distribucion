@@ -3,7 +3,6 @@
   <ItemGroup>
     <!-- Observabilidad: la instrumentación de HttpClient es la que encadena la traza con la API. -->
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />
-    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
