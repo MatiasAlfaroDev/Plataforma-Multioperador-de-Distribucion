@@ -392,6 +392,17 @@ public class RegistrarEventoMovilHandlerTests
                         p.EnvioId == envioId &&
                         p.Activa)));
         }
+
+        public Task<IReadOnlyList<HojaDeRuta>> ListarDelRepartidorAsync(
+            Guid operadorId,
+            Guid repartidorId,
+            DateOnly fecha,
+            CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<HojaDeRuta>>(
+                Lista.Where(h =>
+                    h.OperadorId == operadorId &&
+                    h.RepartidorId == repartidorId &&
+                    h.Fecha == fecha).ToList());
     }
     private sealed class EnviosEnMemoria : IEnvioRepository
     {
