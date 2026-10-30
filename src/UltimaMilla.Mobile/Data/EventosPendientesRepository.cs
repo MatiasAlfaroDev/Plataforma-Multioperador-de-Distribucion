@@ -22,8 +22,8 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         var insertar = conexion.CreateCommand();
         insertar.Transaction = tx;
         insertar.CommandText = """
-            INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora)
-            VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha)
+            INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora, latitud, longitud, foto)
+            VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha, $lat, $lon, $foto)
             """;
         insertar.Parameters.AddWithValue("$id", evento.Id.ToString());
         insertar.Parameters.AddWithValue("$envio", evento.EnvioId.ToString());
@@ -31,6 +31,9 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         insertar.Parameters.AddWithValue("$motivo", (object?)evento.Motivo ?? DBNull.Value);
         insertar.Parameters.AddWithValue("$receptor", (object?)evento.Receptor ?? DBNull.Value);
         insertar.Parameters.AddWithValue("$fecha", evento.FechaHora.ToString("o", CultureInfo.InvariantCulture));
+        insertar.Parameters.AddWithValue("$lat", (object?)evento.Latitud ?? DBNull.Value);
+        insertar.Parameters.AddWithValue("$lon", (object?)evento.Longitud ?? DBNull.Value);
+        insertar.Parameters.AddWithValue("$foto", (object?)evento.ReferenciaFoto ?? DBNull.Value);
         await insertar.ExecuteNonQueryAsync();
 
         var marcar = conexion.CreateCommand();
@@ -49,7 +52,7 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         await using var conexion = await db.AbrirAsync();
         var comando = conexion.CreateCommand();
         comando.CommandText = """
-            SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error
+            SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error, latitud, longitud, foto
             FROM eventos_pendientes
             ORDER BY fecha_hora
             """;
@@ -67,7 +70,10 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
                 Receptor = lector.IsDBNull(4) ? null : lector.GetString(4),
                 FechaHora = DateTimeOffset.Parse(lector.GetString(5), CultureInfo.InvariantCulture),
                 Intentos = lector.GetInt32(6),
-                UltimoError = lector.IsDBNull(7) ? null : lector.GetString(7)
+                UltimoError = lector.IsDBNull(7) ? null : lector.GetString(7),
+                Latitud = lector.IsDBNull(8) ? null : (decimal)lector.GetDouble(8),
+                Longitud = lector.IsDBNull(9) ? null : (decimal)lector.GetDouble(9),
+                ReferenciaFoto = lector.IsDBNull(10) ? null : lector.GetString(10)
             });
         }
         return lista;
@@ -114,5 +120,29 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         comando.Parameters.AddWithValue("$error", error);
         comando.Parameters.AddWithValue("$id", evento.Id.ToString());
         await comando.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// El repartidor acepta lo que dice el servidor: se borra lo registrado para ese envío
+    /// y el envío vuelve a "Por entregar" en el teléfono. Es la última palabra del ADR de conflictos.
+    /// </summary>
+    public async Task DescartarAsync(Guid envioId)
+    {
+        await using var conexion = await db.AbrirAsync();
+        await using var tx = (SqliteTransaction)await conexion.BeginTransactionAsync();
+
+        var borrar = conexion.CreateCommand();
+        borrar.Transaction = tx;
+        borrar.CommandText = "DELETE FROM eventos_pendientes WHERE envio_id = $envio";
+        borrar.Parameters.AddWithValue("$envio", envioId.ToString());
+        await borrar.ExecuteNonQueryAsync();
+
+        var reiniciar = conexion.CreateCommand();
+        reiniciar.Transaction = tx;
+        reiniciar.CommandText = "UPDATE envios_ruta SET resultado_local = NULL, pendiente = 0 WHERE id = $envio";
+        reiniciar.Parameters.AddWithValue("$envio", envioId.ToString());
+        await reiniciar.ExecuteNonQueryAsync();
+
+        await tx.CommitAsync();
     }
 }

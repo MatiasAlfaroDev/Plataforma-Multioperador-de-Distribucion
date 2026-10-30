@@ -4,6 +4,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Envios.Eventos;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 
@@ -16,7 +17,8 @@ public sealed class RegistrarEventoMovilHandler(
     IUnitOfWork unitOfWork,
     IPublicadorDeEventos eventos,
     IValidator<RegistrarEventoMovilCommand> validator,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICacheService cache)
 {
     public async Task Handle(
         RegistrarEventoMovilCommand command,
@@ -148,6 +150,17 @@ public sealed class RegistrarEventoMovilHandler(
                 evento.OcurridoEn),
             ct);
 
-        await unitOfWork.GuardarCambiosAsync(ct);
-    }
+            // Guardar el evento y el nuevo estado del envío.
+            await unitOfWork.GuardarCambiosAsync(ct);
+
+            // Invalidar el listado general del operador.
+            var claveOperador = $"envios:operador:{envio.OperadorId}";
+            await cache.EliminarAsync(claveOperador, ct);
+
+            // Invalidar el listado de la cuenta comercial.
+            var claveComercio =
+                $"envios:operador:{envio.OperadorId}:cuenta:{envio.CuentaComercialId}";
+
+            await cache.EliminarAsync(claveComercio, ct);    
+        }
 }

@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Logging;
 using UltimaMilla.Mobile.Data;
 using UltimaMilla.Mobile.Pages;
@@ -26,6 +27,17 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
+        // Sesión con cookie: UNA sola bolsa de cookies para toda la app. La cookie que deja el login
+        // viaja sola en todos los pedidos (envíos, sincronización), porque los dos HttpClient la comparten.
+        builder.Services.AddSingleton<CookieContainer>();
+
+        static HttpMessageHandler CrearHandlerConCookies(IServiceProvider sp) =>
+            new HttpClientHandler
+            {
+                CookieContainer = sp.GetRequiredService<CookieContainer>(),
+                UseCookies = true
+            };
+
         // HttpClient tipado hacia la API, configurado como en la demo BeatScan.
         builder.Services.AddHttpClient<IEnviosApi, EnviosApi>(c =>
         {
@@ -33,7 +45,28 @@ public static class MauiProgram
             c.Timeout = TimeSpan.FromSeconds(20);
             c.DefaultRequestVersion = System.Net.HttpVersion.Version11;
             c.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
-        });
+        }).ConfigurePrimaryHttpMessageHandler(CrearHandlerConCookies);
+
+        // HttpClient para el inicio de sesión (misma dirección y misma bolsa de cookies).
+        builder.Services.AddHttpClient<IAuthApi, AuthApi>(c =>
+        {
+            c.BaseAddress = new Uri(Constants.BaseApiUrl);
+            c.Timeout = TimeSpan.FromSeconds(20);
+        }).ConfigurePrimaryHttpMessageHandler(CrearHandlerConCookies);
+
+        // Push: registrar el teléfono en la API (misma bolsa de cookies que el login).
+        builder.Services.AddHttpClient<IDispositivosApi, DispositivosApi>(c =>
+        {
+            c.BaseAddress = new Uri(Constants.BaseApiUrl);
+            c.Timeout = TimeSpan.FromSeconds(20);
+        }).ConfigurePrimaryHttpMessageHandler(CrearHandlerConCookies);
+
+#if ANDROID
+        builder.Services.AddSingleton<IServicioPush, ServicioPushAndroid>();
+#else
+        builder.Services.AddSingleton<IServicioPush, ServicioPushNulo>();
+#endif
+        builder.Services.AddTransient<RegistroDePush>();
 
         // Trabajo sin conexión: base local cifrada, repositorios y sincronización (una sola instancia para toda la app).
         builder.Services.AddSingleton<BaseDeDatosLocal>();
@@ -42,12 +75,25 @@ public static class MauiProgram
         builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
         builder.Services.AddSingleton<SincronizacionService>();
         builder.Services.AddSingleton<IDialogos, DialogosShell>();
+        builder.Services.AddSingleton<ICaptura, Captura>();
 
         // MVVM: cada página recibe su ViewModel por constructor.
+        builder.Services.AddTransient<LoginViewModel>();
+        builder.Services.AddTransient<LoginPage>();
         builder.Services.AddTransient<SeleccionOperadorViewModel>();
         builder.Services.AddTransient<SeleccionOperadorPage>();
         builder.Services.AddTransient<EnviosViewModel>();
         builder.Services.AddTransient<EnviosPage>();
+        builder.Services.AddTransient<CargaVehiculoViewModel>();
+        builder.Services.AddTransient<CargaVehiculoPage>();
+
+#if ANDROID
+        // Rediseño: cada Entry va dentro de una caja redondeada (estilo "Campo"), así que se saca
+        // la línea de abajo que Android les pone por defecto.
+        Microsoft.Maui.Handlers.EntryHandler.Mapper.AppendToMapping("SinLinea", (handler, _) =>
+            handler.PlatformView.BackgroundTintList =
+                global::Android.Content.Res.ColorStateList.ValueOf(global::Android.Graphics.Color.Transparent));
+#endif
 
         var app = builder.Build();
 

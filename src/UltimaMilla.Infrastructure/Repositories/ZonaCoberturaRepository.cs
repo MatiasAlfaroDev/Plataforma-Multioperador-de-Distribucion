@@ -45,4 +45,34 @@ public sealed class ZonaCoberturaRepository(AppDbContext db)
 
         await db.ZonasCobertura.AddAsync(zona, ct);
     }
+
+    // Con seguimiento (sin AsNoTracking): EF Core detecta las coberturas y franjas
+    // que se quitan y se agregan, y las guarda en GuardarCambiosAsync.
+    public async Task<ZonaCobertura?> ObtenerAsync(
+        Guid operadorId,
+        Guid zonaId,
+        CancellationToken ct)
+    {
+        return await db.ZonasCobertura
+            .Include(z => z.Localidades)
+            .Include(z => z.Franjas)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(z => z.OperadorId == operadorId && z.Id == zonaId, ct);
+    }
+
+    public async Task<bool> ExisteNombreEnOtraZonaAsync(
+        Guid operadorId,
+        string nombre,
+        Guid zonaId,
+        CancellationToken ct)
+    {
+        var normalizado = nombre.Trim().ToLowerInvariant();
+
+        return await db.ZonasCobertura
+            .AnyAsync(z =>
+                z.OperadorId == operadorId &&
+                z.Id != zonaId &&
+                z.Nombre.ToLower() == normalizado,
+                ct);
+    }
 }

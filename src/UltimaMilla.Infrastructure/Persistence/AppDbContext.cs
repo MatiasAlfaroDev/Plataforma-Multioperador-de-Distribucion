@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using UltimaMilla.Infrastructure.Identidad;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Common;
+using UltimaMilla.Domain.Notificaciones;
 
 namespace UltimaMilla.Infrastructure.Persistence;
 
@@ -46,6 +47,7 @@ public sealed class AppDbContext(
     public DbSet<VersionTarifaria> VersionesTarifarias => Set<VersionTarifaria>();
     public DbSet<VersionReglasOperativas> VersionesReglasOperativas => Set<VersionReglasOperativas>();
     public DbSet<MembresiaUsuario> MembresiasUsuarios=> Set<MembresiaUsuario>();
+    public DbSet<DispositivoMovil> DispositivosMoviles => Set<DispositivoMovil>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configuración de las tablas de ASP.NET Core Identity.
@@ -76,6 +78,12 @@ public sealed class AppDbContext(
                 x.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<Vehiculo>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        // Teléfonos para push: cada operador ve solo los suyos.
+        modelBuilder.Entity<DispositivoMovil>()
             .HasQueryFilter(x =>
                 AccesoInicializacion ||
                 x.OperadorId == OperadorActualId);

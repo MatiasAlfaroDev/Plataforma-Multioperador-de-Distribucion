@@ -12,5 +12,14 @@ namespace UltimaMilla.Mobile
         }
 
         protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+
+        public override void OnCreate()
+        {
+            base.OnCreate();
+
+            // Canal de los avisos push: tiene que existir antes de que llegue el primero,
+            // aunque la app la abra una notificación con la app cerrada.
+            CanalesDeAvisos.Crear(this);
+        }
     }
 }

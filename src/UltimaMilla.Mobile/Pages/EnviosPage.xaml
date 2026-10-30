@@ -13,86 +13,104 @@
     </ContentPage.ToolbarItems>
 
     <RefreshView Command="{Binding CargarCommand}" IsRefreshing="{Binding EstaCargando}">
-        <CollectionView ItemsSource="{Binding Envios}" Margin="16,0">
+        <!-- En el celular ocupa todo el ancho; en tablet o Windows queda centrada con 680 de ancho -->
+        <CollectionView ItemsSource="{Binding Envios}" Margin="16,0"
+                        WidthRequest="{OnIdiom Phone=-1, Default=680}"
+                        HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
 
             <!-- ===== CABECERA: resumen del día, conexión y pendientes ===== -->
             <CollectionView.Header>
-                <VerticalStackLayout Spacing="12" Padding="0,16,0,4">
+                <VerticalStackLayout Spacing="14" Padding="0,16,0,4">
 
-                    <!-- Tarjeta azul con el resumen -->
-                    <Border StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="18"
-                            BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Tertiary}}">
-                        <VerticalStackLayout Spacing="10">
+                    <!-- Tarjeta principal con degradado -->
+                    <Border Style="{StaticResource Hero}">
+                        <VerticalStackLayout Spacing="14">
                             <Grid ColumnDefinitions="*,Auto">
                                 <VerticalStackLayout Spacing="2">
                                     <Label Text="{Binding FechaHoy}" TextColor="#CFE0F5" FontSize="13" />
                                     <Label Text="{Binding Operador.Nombre}" TextColor="White"
-                                           FontFamily="OpenSansSemibold" FontSize="22" />
+                                           FontFamily="OpenSansSemibold" FontSize="24" />
                                 </VerticalStackLayout>
-                                <Label Grid.Column="1" Text="🚚" FontSize="34" VerticalOptions="Center" />
+                                <!-- Conexión: punto verde o naranja -->
+                                <Border Grid.Column="1" Style="{StaticResource Chip}" BackgroundColor="#26FFFFFF"
+                                        VerticalOptions="Start">
+                                    <Grid>
+                                        <Label Text="● En línea" TextColor="#B9F6CA" FontSize="12"
+                                               FontFamily="OpenSansSemibold" IsVisible="{Binding EnLinea}" />
+                                        <Label Text="● Sin conexión" TextColor="#FFD8A8" FontSize="12"
+                                               FontFamily="OpenSansSemibold" IsVisible="{Binding SinConexion}" />
+                                    </Grid>
+                                </Border>
                             </Grid>
 
-                            <ProgressBar Progress="{Binding Progreso}" ProgressColor="White" />
-                            <Label Text="{Binding TextoProgreso}" TextColor="#CFE0F5" FontSize="13" />
+                            <VerticalStackLayout Spacing="6">
+                                <ProgressBar Progress="{Binding Progreso}" ProgressColor="White" />
+                                <Label Text="{Binding TextoProgreso}" TextColor="#CFE0F5" FontSize="13" />
+                            </VerticalStackLayout>
 
                             <!-- Tres contadores -->
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                                <Border Grid.Column="0" StrokeThickness="0" StrokeShape="RoundRectangle 12"
-                                        Padding="8,10" BackgroundColor="#33FFFFFF">
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                <Border Style="{StaticResource Contador}">
                                     <VerticalStackLayout HorizontalOptions="Center">
                                         <Label Text="{Binding PorEntregar}" TextColor="White" FontFamily="OpenSansSemibold"
-                                               FontSize="22" HorizontalOptions="Center" />
+                                               FontSize="24" HorizontalOptions="Center" />
                                         <Label Text="Por entregar" TextColor="#E3EEFA" FontSize="12" HorizontalOptions="Center" />
                                     </VerticalStackLayout>
                                 </Border>
-                                <Border Grid.Column="1" StrokeThickness="0" StrokeShape="RoundRectangle 12"
-                                        Padding="8,10" BackgroundColor="#33FFFFFF">
+                                <Border Grid.Column="1" Style="{StaticResource Contador}">
                                     <VerticalStackLayout HorizontalOptions="Center">
                                         <Label Text="{Binding Entregados}" TextColor="White" FontFamily="OpenSansSemibold"
-                                               FontSize="22" HorizontalOptions="Center" />
+                                               FontSize="24" HorizontalOptions="Center" />
                                         <Label Text="Entregados" TextColor="#E3EEFA" FontSize="12" HorizontalOptions="Center" />
                                     </VerticalStackLayout>
                                 </Border>
-                                <Border Grid.Column="2" StrokeThickness="0" StrokeShape="RoundRectangle 12"
-                                        Padding="8,10" BackgroundColor="#33FFFFFF">
+                                <Border Grid.Column="2" Style="{StaticResource Contador}">
                                     <VerticalStackLayout HorizontalOptions="Center">
                                         <Label Text="{Binding NoEntregados}" TextColor="White" FontFamily="OpenSansSemibold"
-                                               FontSize="22" HorizontalOptions="Center" />
+                                               FontSize="24" HorizontalOptions="Center" />
                                         <Label Text="No entregados" TextColor="#E3EEFA" FontSize="12" HorizontalOptions="Center" />
                                     </VerticalStackLayout>
                                 </Border>
                             </Grid>
+
+                            <!-- Acción principal antes de salir: cargar el vehículo y despachar -->
+                            <Button Text="📦  Cargar vehículo y despachar" Style="{StaticResource BotonSobreHero}"
+                                    Command="{Binding IrACargaCommand}" />
                         </VerticalStackLayout>
                     </Border>
 
-                    <!-- Estado de la conexión: verde en línea, naranja sin conexión -->
-                    <Border Style="{StaticResource Chip}" BackgroundColor="{StaticResource ExitoSuave}"
-                            HorizontalOptions="Start" IsVisible="{Binding EnLinea}">
-                        <Label Text="● En línea" TextColor="{StaticResource Exito}" FontSize="12" FontFamily="OpenSansSemibold" />
-                    </Border>
+                    <!-- Sin conexión: explicación -->
                     <Border Style="{StaticResource Tarjeta}" BackgroundColor="{StaticResource AlertaSuave}"
-                            Stroke="{StaticResource Alerta}" Padding="14,10" IsVisible="{Binding SinConexion}">
-                        <VerticalStackLayout Spacing="2">
-                            <Label Text="📡 Sin conexión" TextColor="{StaticResource Alerta}" FontFamily="OpenSansSemibold" />
-                            <Label Text="Podés seguir trabajando: todo queda guardado en el teléfono."
-                                   TextColor="{StaticResource Alerta}" FontSize="13" />
-                        </VerticalStackLayout>
-                    </Border>
-
-                    <!-- Registros sin enviar al servidor -->
-                    <Border Style="{StaticResource Tarjeta}" Padding="14,10" IsVisible="{Binding HayPendientes}">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                            <Label Text="{Binding TextoPendientes, StringFormat='⏳ {0}'}" VerticalOptions="Center"
-                                   TextColor="{StaticResource Alerta}" FontSize="13" />
-                            <Button Grid.Column="1" Text="{Binding TextoBotonSincronizar}"
-                                    Command="{Binding SincronizarCommand}" Padding="14,6" />
+                            Stroke="{StaticResource AlertaSuave}" Padding="14,12" IsVisible="{Binding SinConexion}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Label Text="📡" FontSize="22" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="Estás sin conexión" TextColor="{StaticResource Alerta}" FontFamily="OpenSansSemibold" />
+                                <Label Text="Seguí trabajando: todo queda guardado en el teléfono."
+                                       TextColor="{StaticResource Alerta}" FontSize="13" />
+                            </VerticalStackLayout>
                         </Grid>
                     </Border>
 
-                    <Label Text="{Binding Aviso}" Style="{StaticResource Secundario}" IsVisible="{Binding HayAviso}" />
-                    <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" IsVisible="{Binding HayError}" />
+                    <!-- Registros sin enviar al servidor -->
+                    <Border Style="{StaticResource Tarjeta}" Padding="14,12" IsVisible="{Binding HayPendientes}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Label Text="⏳" FontSize="22" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="{Binding TextoPendientes}" VerticalOptions="Center"
+                                   TextColor="{StaticResource Alerta}" FontSize="13" />
+                            <Button Grid.Column="2" Text="{Binding TextoBotonSincronizar}" Style="{StaticResource BotonSecundario}"
+                                    Command="{Binding SincronizarCommand}" />
+                        </Grid>
+                    </Border>
 
-                    <Label Text="Envíos" Style="{StaticResource Titulo}" FontSize="18" Margin="0,4,0,0" />
+                    <Label Text="{Binding Aviso}" Style="{StaticResource Secundario}" IsVisible="{Binding HayAviso}"
+                           HorizontalOptions="Center" />
+                    <Border Style="{StaticResource Chip}" BackgroundColor="{StaticResource PeligroSuave}"
+                            Padding="12,8" HorizontalOptions="Fill" IsVisible="{Binding HayError}">
+                        <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" FontSize="13" />
+                    </Border>
+
+                    <Label Text="Envíos" Style="{StaticResource Seccion}" />
                 </VerticalStackLayout>
             </CollectionView.Header>
 
@@ -111,17 +129,17 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:EnvioRuta">
                     <Border Style="{StaticResource Tarjeta}" Padding="0" Margin="0,6">
-                        <Grid ColumnDefinitions="6,*">
+                        <Grid ColumnDefinitions="5,*">
 
                             <!-- Franja de color según el estado -->
                             <BoxView Color="{Binding ColorEstado}" />
 
-                            <VerticalStackLayout Grid.Column="1" Padding="14,12" Spacing="6">
+                            <VerticalStackLayout Grid.Column="1" Padding="16,14" Spacing="8">
 
                                 <!-- Referencia + etiqueta de estado -->
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                     <Label Text="{Binding ReferenciaExterna}" FontFamily="OpenSansSemibold"
-                                           FontSize="16" VerticalOptions="Center" />
+                                           FontSize="17" VerticalOptions="Center" />
                                     <Border Grid.Column="1" Style="{StaticResource Chip}"
                                             BackgroundColor="{Binding ColorEstadoSuave}">
                                         <Label Text="{Binding EtiquetaEstado}" TextColor="{Binding ColorEstado}"
@@ -129,29 +147,32 @@
                                     </Border>
                                 </Grid>
 
-                                <Label Text="{Binding DestinatarioNombre, StringFormat='👤 {0}'}" FontSize="15" />
-                                <Label Text="{Binding Direccion, StringFormat='📍 {0}'}" FontSize="14" />
-                                <Label Style="{StaticResource Secundario}">
-                                    <Label.FormattedText>
-                                        <FormattedString>
-                                            <Span Text="{Binding ComercioNombre}" />
-                                            <Span Text=" · " />
-                                            <Span Text="{Binding DetalleBultos}" />
-                                        </FormattedString>
-                                    </Label.FormattedText>
-                                </Label>
+                                <!-- Destinatario, dirección y bultos -->
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="{Binding DestinatarioNombre, StringFormat='👤  {0}'}" FontSize="15" />
+                                    <Label Text="{Binding Direccion, StringFormat='📍  {0}'}" FontSize="14"
+                                           LineBreakMode="WordWrap" />
+                                    <Label Text="{Binding DetalleBultos, StringFormat='📦  {0}'}" Style="{StaticResource Secundario}" />
+                                </VerticalStackLayout>
 
                                 <!-- ¿Ya llegó al servidor? -->
                                 <Label Text="{Binding TextoSincronizacion}" TextColor="{Binding ColorSincronizacion}"
                                        FontSize="12" FontFamily="OpenSansSemibold" IsVisible="{Binding MostrarSincronizacion}" />
 
+                                <!-- Conflicto: el servidor rechazó lo registrado -->
+                                <Button Text="Descartar" Style="{StaticResource BotonPeligro}"
+                                        HorizontalOptions="Start" Padding="18,6"
+                                        IsVisible="{Binding Rechazado}"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=DescartarCommand}"
+                                        CommandParameter="{Binding .}" />
+
                                 <!-- Botones: solo si todavía no se registró el resultado -->
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,6,0,0"
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,2,0,0"
                                       IsVisible="{Binding PuedeRegistrar}">
-                                    <Button Text="✓ Entregado" Style="{StaticResource BotonExito}"
+                                    <Button Text="✓  Entregado" Style="{StaticResource BotonExito}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=EntregarCommand}"
                                             CommandParameter="{Binding .}" />
-                                    <Button Grid.Column="1" Text="✕ No entregado" Style="{StaticResource BotonPeligro}"
+                                    <Button Grid.Column="1" Text="✕  No entregado" Style="{StaticResource BotonPeligro}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=NoEntregadoCommand}"
                                             CommandParameter="{Binding .}" />
                                 </Grid>

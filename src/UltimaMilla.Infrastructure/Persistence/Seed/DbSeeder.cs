@@ -148,6 +148,25 @@ public static class DbSeeder
 
         await db.SaveChangesAsync(ct);
 
+        // Catálogo de motivos de no entrega de cada operador (RF 4 y 21). La app los muestra
+        // y el servidor los busca por descripción al sincronizar un intento fallido.
+        foreach (var version in await db.VersionesReglasOperativas.ToListAsync(ct))
+        {
+            var tieneMotivos = await db.Set<MotivoNoEntrega>()
+                .AnyAsync(m => m.VersionReglasOperativasId == version.Id, ct);
+
+            if (tieneMotivos)
+                continue;
+
+            db.Set<MotivoNoEntrega>().AddRange(
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "AUSENTE", "Destinatario ausente", requiereDevolucion: false),
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "DIRECCION", "Dirección incorrecta o inexistente", requiereDevolucion: false),
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "RECHAZADO", "Rechazado por el destinatario", requiereDevolucion: true),
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "INACCESIBLE", "Zona inaccesible", requiereDevolucion: false));
+        }
+
+        await db.SaveChangesAsync(ct);
+
         // Datos iniciales para probar la planificación de rutas.
         var operadores = await db.Operadores
             .AsNoTracking()

@@ -1,13 +1,15 @@
 
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.Application.Envios.Queries.ListarEnvios;
 
 public sealed class ListarEnviosHandler(
     IEnvioRepository envios,
     ICuentaComercialRepository cuentas,
-    ITenantContext tenantContext)
+    ITenantContext tenantContext,
+    ICacheService cache)
 {
     public async Task<IReadOnlyList<EnvioDto>> Handle(
         ListarEnviosQuery query,
@@ -43,6 +45,21 @@ public sealed class ListarEnviosHandler(
                     "No tiene una cuenta comercial seleccionada.");
         }
 
+        // La clave se construye con el contexto autenticado,
+        // nunca con identificadores enviados por el cliente.
+        var claveCache = cuentaComercialId.HasValue
+            ? $"envios:operador:{operadorId}:cuenta:{cuentaComercialId.Value}"
+            : $"envios:operador:{operadorId}";
+
+        var resultadoCache = await cache.ObtenerAsync<List<EnvioDto>>(
+            claveCache,
+            ct);
+
+        if (resultadoCache is not null)
+        {
+            return resultadoCache;
+        }
+
         var lista = await envios.ListarAsync(
             operadorId,
             cuentaComercialId,
@@ -53,8 +70,8 @@ public sealed class ListarEnviosHandler(
             cuentaComercialId,
             ct))
             .ToDictionary(c => c.Id);
-        return lista
-            .Select(e =>
+        var resultado = lista
+         .Select(e =>
             {
                 cuentasPorId.TryGetValue(
                     e.CuentaComercialId,
@@ -76,5 +93,12 @@ public sealed class ListarEnviosHandler(
                     e.FechaAlta);
             })
             .ToList();
+
+        await cache.GuardarAsync(
+            claveCache,
+            resultado,
+            TimeSpan.FromSeconds(30),
+            ct);
+        return resultado;
     }
 }

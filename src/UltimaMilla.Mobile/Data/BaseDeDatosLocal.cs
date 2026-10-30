@@ -72,10 +72,19 @@ public sealed class BaseDeDatosLocal
                     receptor     TEXT,
                     fecha_hora   TEXT NOT NULL,
                     intentos     INTEGER NOT NULL DEFAULT 0,
-                    ultimo_error TEXT
+                    ultimo_error TEXT,
+                    latitud      REAL,
+                    longitud     REAL,
+                    foto         TEXT
+
                 );
                 """;
             await comando.ExecuteNonQueryAsync();
+
+            // Migración local: teléfonos con la base de una versión anterior.
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "latitud", "REAL");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "longitud", "REAL");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "foto", "TEXT");
 
             _cadenaDeConexion = cadena;
         }
@@ -95,5 +104,18 @@ public sealed class BaseDeDatosLocal
             await SecureStorage.Default.SetAsync(Constants.ClaveBaseLocalKey, clave);
         }
         return clave;
+    }
+
+    /// <summary>SQLite no tiene "ADD COLUMN IF NOT EXISTS": se pregunta primero si la columna está.</summary>
+    private static async Task AgregarColumnaSiFaltaAsync(SqliteConnection conexion, string tabla, string columna, string tipo)
+    {
+        var existe = conexion.CreateCommand();
+        existe.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{tabla}') WHERE name = '{columna}'";
+        if (Convert.ToInt32(await existe.ExecuteScalarAsync()) > 0)
+            return;
+
+        var agregar = conexion.CreateCommand();
+        agregar.CommandText = $"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}";
+        await agregar.ExecuteNonQueryAsync();
     }
 }

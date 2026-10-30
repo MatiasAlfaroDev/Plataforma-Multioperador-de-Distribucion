@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using MassTransit;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Infrastructure.Mensajeria;
+using UltimaMilla.Infrastructure.Notificaciones;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Infrastructure.Persistence.Interceptors;
 using UltimaMilla.Infrastructure.Persistence.Seed;
@@ -58,6 +59,10 @@ public static class DependencyInjection
         services.AddScoped<IVehiculoRepository, VehiculoRepository>();
         services.AddScoped<IHojaDeRutaRepository, HojaDeRutaRepository>();
         services.AddScoped<IPublicadorDeEventos, PublicadorDeEventos>();
+        services.AddScoped<IDispositivoMovilRepository, DispositivoMovilRepository>();
+
+        // Push con Firebase: una sola instancia, porque la conexión con Firebase se crea una vez y se reutiliza.
+        services.AddSingleton<INotificadorPush, FirebaseNotificadorPush>();
 
         // El outbox (RNF 6.8) guarda el mensaje en la misma transacción y un servicio en segundo plano
         // de cada réplica lo entrega a RabbitMQ; UsePostgres hace que las dos réplicas no se pisen (bloqueo por fila).

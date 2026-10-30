@@ -1,0 +1,97 @@
+@page "{id:guid}"
+@model UltimaMilla.Web.Backoffice.Pages.EditarZonaModel
+
+@{
+    ViewData["Title"] = "Editar zona";
+}
+
+<h1>Editar zona de cobertura</h1>
+
+<p class="nota">
+    Las coberturas y franjas que guardes reemplazan a las actuales.
+    Una localidad no puede quedar cubierta por dos zonas del mismo departamento.
+</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <p class="aviso error" role="alert">@Model.Error</p>
+}
+
+@if (Model.OperadorIdSesion != Guid.Empty)
+{
+    <section>
+        <form method="post">
+            <div asp-validation-summary="All"
+                 class="error"></div>
+
+            <div class="campos">
+                <div>
+                    <label asp-for="Formulario.Nombre">
+                        Nombre de la zona
+                    </label>
+                    <input asp-for="Formulario.Nombre" />
+                </div>
+
+                <div>
+                    <label asp-for="Formulario.Departamento">
+                        Departamento
+                    </label>
+                    <input asp-for="Formulario.Departamento" />
+                </div>
+
+                <div>
+                    <label asp-for="Formulario.MinutosTraslado">
+                        Tiempo estimado entre paradas (minutos)
+                    </label>
+                    <input asp-for="Formulario.MinutosTraslado"
+                           type="number"
+                           min="1" />
+                </div>
+            </div>
+
+            <label asp-for="Formulario.Coberturas">
+                Localidades y sectores cubiertos
+            </label>
+
+            <textarea asp-for="Formulario.Coberturas"
+                      rows="5"
+                      style="width:100%;box-sizing:border-box;
+                             background:var(--superficie);
+                             color:var(--texto);
+                             border:1px solid var(--borde);
+                             border-radius:var(--radio);
+                             padding:.6rem;font:inherit;"></textarea>
+
+            <p class="nota">
+                Escribí una cobertura por línea.
+                Para cubrir toda una localidad, escribí su nombre.
+                Para un sector, utilizá: Localidad | Sector.
+            </p>
+
+            <label asp-for="Formulario.Franjas">
+                Franjas horarias disponibles
+            </label>
+
+            <textarea asp-for="Formulario.Franjas"
+                      rows="4"
+                      style="width:100%;box-sizing:border-box;
+                             background:var(--superficie);
+                             color:var(--texto);
+                             border:1px solid var(--borde);
+                             border-radius:var(--radio);
+                             padding:.6rem;font:inherit;"></textarea>
+
+            <p class="nota">
+                Una franja por línea, con formato HH:mm-HH:mm.
+                Las franjas no pueden superponerse.
+            </p>
+
+            <div class="acciones">
+                <a asp-page="/Zonas">Cancelar</a>
+                <button type="submit" class="primario">
+                    Guardar cambios
+                </button>
+            </div>
+        </form>
+    </section>
+}

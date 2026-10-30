@@ -4,6 +4,7 @@ using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Application.Envios.Eventos;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.Application.Envios.Commands.CrearEnvio;
 
@@ -21,7 +22,8 @@ public sealed class CrearEnvioHandler(
     IPublicadorDeEventos eventos,
     IValidator<CrearEnvioCommand> validator,
     ITenantContext tenantContext,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICacheService cache)
 {
     public async Task<Guid> Handle(
     CrearEnvioCommand command,
@@ -111,6 +113,18 @@ if (tenantContext.Perfil == Perfiles.Comercio &&
         await eventos.PublicarAsync(new EnvioCreado(envio.Id, envio.OperadorId, envio.CuentaComercialId, envio.ReferenciaExterna, envio.FechaAlta), ct);
 
         await unitOfWork.GuardarCambiosAsync(ct);
+
+        // Invalidar el listado general del operador.
+        var claveOperador = $"envios:operador:{envio.OperadorId}";
+
+        await cache.EliminarAsync(claveOperador, ct);
+
+        // Invalidar el listado del comercio correspondiente.
+        var claveComercio =
+            $"envios:operador:{envio.OperadorId}:cuenta:{envio.CuentaComercialId}";
+
+        await cache.EliminarAsync(claveComercio, ct);
+
         return envio.Id;
     }
 }

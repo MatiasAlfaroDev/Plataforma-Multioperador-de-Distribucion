@@ -20,12 +20,16 @@ using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.CrearZona;
+using UltimaMilla.Application.Configuracion.Commands.EditarZona;
+using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
 using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
+using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
+using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using UltimaMilla.Infrastructure.Identidad;
@@ -37,6 +41,10 @@ using UltimaMilla.Api.Seguridad;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Application.Seguridad;
 using Microsoft.AspNetCore.Antiforgery;
+using UltimaMilla.Application.Abstractions.Caching;
+using UltimaMilla.Infrastructure.Caching;
+using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
+using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,6 +115,7 @@ builder.Services.AddOpenTelemetry()
         m.AddAspNetCoreInstrumentation();
         m.AddMeter("MassTransit");
         // .NET 10 emite las métricas de runtime (GC, hilos, memoria) en el medidor System.Runtime sin paquete extra.
+        m.AddMeter("UltimaMilla.Cache");
         m.AddMeter("System.Runtime");
     })
     .UseOtlpExporter();
@@ -137,6 +146,10 @@ if (!soloInicializar)
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+
+// Caché distribuida con Redis
+builder.Services.AddScoped<ICacheService, RedisCacheService>();
+
 var app = builder.Build();
 
 // Un solo proceso prepara la base. El servicio `inicializador` del compose corre con esta
@@ -257,7 +270,8 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                 request.Longitud,
                 request.EvidenciaFallo),ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
-    });
+    })
+    .RequireAuthorization();
 
 api.MapPost("/envios/{envioId:guid}/recepcion",
     async (
@@ -274,7 +288,10 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
             ct);
 
         return Results.NoContent();
-    });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
 
 api.MapPost("/envios/{envioId:guid}/retorno-deposito",
     async (
@@ -369,6 +386,37 @@ api.MapPost("/zonas", async (
 
     return Results.Ok(new { id });
 });
+
+// GET /api/zonas/{id}?operadorId=... → detalle de una zona, para el formulario de edición del Backoffice.
+api.MapGet("/zonas/{zonaId:guid}", async (
+    Guid zonaId,
+    Guid operadorId,
+    ObtenerZonaHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ObtenerZonaQuery(operadorId, zonaId), ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador));
+
+// PUT /api/zonas/{id} → edición de una zona (RF 2). Configurar zonas es tarea del administrador del operador.
+api.MapPut("/zonas/{zonaId:guid}", async (
+    Guid zonaId,
+    EditarZonaRequest request,
+    EditarZonaHandler handler,
+    CancellationToken ct) =>
+{
+    await handler.Handle(
+        new EditarZonaCommand(
+            request.OperadorId,
+            zonaId,
+            request.Nombre,
+            request.Departamento,
+            request.MinutosTraslado,
+            request.Coberturas,
+            request.Franjas),
+        ct);
+
+    return Results.NoContent();
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador));
 
 api.MapPost("/hojas-de-ruta", async (
     CrearHojaDeRutaCommand command,
@@ -514,6 +562,51 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios",
         Perfiles.AdministradorOperador,
         Perfiles.Operador));
 
+// GET /api/repartidor/hojas-de-ruta?fecha=2026-10-28 → las hojas de ruta del repartidor logueado en la app,
+// con sus paradas y los bultos a cargar. La fecha la manda el teléfono (es "hoy" en Uruguay, no en UTC).
+api.MapGet("/repartidor/hojas-de-ruta", async (
+    DateOnly fecha,
+    ObtenerMisHojasDeRutaHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ObtenerMisHojasDeRutaQuery(fecha), ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
+// POST /api/repartidor/hojas-de-ruta/{id}/despachar → el repartidor terminó de cargar el vehículo (RF 17 y 19).
+// Manda los bultos que escaneó; si falta o sobra alguno responde 400 con la lista y no despacha nada.
+api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/despachar", async (
+    Guid hojaId,
+    DespacharMiHojaDeRutaRequest request,
+    DespacharMiHojaDeRutaHandler handler,
+    CancellationToken ct) =>
+{
+    var cantidad = await handler.Handle(
+        new DespacharMiHojaDeRutaCommand(hojaId, request.BultosEscaneados),
+        ct);
+
+    return Results.Ok(new { hojaDeRutaId = hojaId, enviosEnTransito = cantidad });
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
+// POST /api/dispositivos → la app registra el token de Firebase del teléfono al iniciar sesión.
+// El usuario y el operador salen de la cookie; si el token ya estaba, se renueva (no se duplica).
+api.MapPost("/dispositivos", async (
+    RegistrarDispositivoCommand command,
+    RegistrarDispositivoHandler handler,
+    CancellationToken ct) =>
+{
+    await handler.Handle(command, ct);
+    return Results.NoContent();
+})
+.RequireAuthorization();
+
+// POST /api/notificaciones/prueba → aviso a los teléfonos del usuario logueado (probar push con la app cerrada).
+api.MapPost("/notificaciones/prueba", async (
+    EnviarNotificacionDePruebaCommand command,
+    EnviarNotificacionDePruebaHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(command, ct)))
+.RequireAuthorization();
+
 app.Run();
 
 // Las sondas de salud no se instrumentan: al descartarse la span del request, la consulta
@@ -531,3 +624,15 @@ public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> Identificac
 public sealed record ConfirmarReprogramacionRequest( string Responsable);
 public sealed record QuitarEnvioDeRutaRequest(string Responsable);
 public sealed record AgregarEnvioARutaRequest( Guid EnvioId, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta);
+
+/// <summary>Cuerpo de PUT /api/zonas/{id}; la zona viaja en la URL.</summary>
+public sealed record EditarZonaRequest(
+    Guid OperadorId,
+    string Nombre,
+    string Departamento,
+    int MinutosTraslado,
+    IReadOnlyList<CoberturaCommand> Coberturas,
+    IReadOnlyList<FranjaEntregaCommand> Franjas);
+
+/// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/despachar; la hoja viaja en la URL.</summary>
+public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEscaneados);

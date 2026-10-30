@@ -150,6 +150,52 @@ public class ZonaCobertura : AuditableEntity, ITenantEntity
         MinutosTrasladoEstimado = minutosEntreParadas;
     }
 
+    /// <summary>
+    /// Edición desde el Backoffice (RF 2): cambia el nombre y el departamento, y reemplaza
+    /// las coberturas y las franjas. Primero valida todo sobre una copia: si algo no es
+    /// válido, lanza la excepción y la zona queda exactamente como estaba.
+    /// </summary>
+    public void Editar(
+        string nombre,
+        string departamento,
+        IReadOnlyList<(string Localidad, string? Sector)> coberturas,
+        IReadOnlyList<(TimeOnly Desde, TimeOnly Hasta)> franjas)
+    {
+        // Las mismas reglas que al crear: nombre, departamento, coberturas sin
+        // repetir y franjas sin superponer. Si algo falla, falla acá.
+        var copia = Crear(OperadorId, nombre, departamento);
+        copia.Cargar(coberturas, franjas);
+
+        Nombre = copia.Nombre;
+        Departamento = copia.Departamento;
+
+        _localidades.Clear();
+        _franjas.Clear();
+        Cargar(coberturas, franjas);
+    }
+
+    private void Cargar(
+        IReadOnlyList<(string Localidad, string? Sector)> coberturas,
+        IReadOnlyList<(TimeOnly Desde, TimeOnly Hasta)> franjas)
+    {
+        if (coberturas is null || coberturas.Count == 0)
+            throw new ArgumentException("La zona debe tener al menos una cobertura.");
+
+        if (franjas is null || franjas.Count == 0)
+            throw new ArgumentException("La zona debe tener al menos una franja.");
+
+        foreach (var (localidad, sector) in coberturas)
+        {
+            if (string.IsNullOrWhiteSpace(sector))
+                AgregarLocalidad(localidad);
+            else
+                AgregarSector(localidad, sector);
+        }
+
+        foreach (var (desde, hasta) in franjas)
+            AgregarFranja(desde, hasta);
+    }
+
     public void Desactivar() => Activa = false;
 
     public void Activar() => Activa = true;

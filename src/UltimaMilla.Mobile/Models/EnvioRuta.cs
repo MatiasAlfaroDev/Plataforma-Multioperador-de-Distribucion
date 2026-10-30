@@ -26,8 +26,10 @@ public sealed class EnvioRuta
     public bool PendienteDeSincronizar { get; set; }
 
     public bool PuedeRegistrar => ResultadoLocal is null;
-    public bool EsEntregado => ResultadoLocal == "Entregado";
-    public bool EsNoEntregado => ResultadoLocal == "NoEntregado";
+    
+    // Un registro rechazado por el servidor no cuenta: gana lo que dice el servidor.
+    public bool EsEntregado => ResultadoLocal == "Entregado" && !Rechazado;
+    public bool EsNoEntregado => ResultadoLocal == "NoEntregado" && !Rechazado;
 
     public string EstadoMostrado => ResultadoLocal switch
     {
@@ -38,40 +40,56 @@ public sealed class EnvioRuta
 
     // ----- Solo para la pantalla: textos y colores ya resueltos, así el XAML queda simple -----
 
-    /// <summary>Texto de la etiqueta de color de la tarjeta.</summary>
-    public string EtiquetaEstado => ResultadoLocal switch
-    {
-        null => "Por entregar",
-        "NoEntregado" => "No entregado",
-        _ => "Entregado"
-    };
+    /// <summary>Texto de la etiqueta de color de la tarjeta. El conflicto tiene prioridad.</summary>
+    public string EtiquetaEstado =>
+        Rechazado ? "Rechazado"
+        : ResultadoLocal switch
+        {
+            null => "Por entregar",
+            "NoEntregado" => "No entregado",
+            _ => "Entregado"
+        };
 
     /// <summary>Color fuerte del estado: franja lateral y texto de la etiqueta.</summary>
-    public Color ColorEstado => ResultadoLocal switch
-    {
-        null => Color.FromArgb("#1F5FAD"),
-        "NoEntregado" => Color.FromArgb("#C5221F"),
-        _ => Color.FromArgb("#1E8E3E")
-    };
+    public Color ColorEstado =>
+        Rechazado ? Color.FromArgb("#C5221F")
+        : ResultadoLocal switch
+        {
+            null => Color.FromArgb("#1F5FAD"),
+            "NoEntregado" => Color.FromArgb("#C5221F"),
+            _ => Color.FromArgb("#1E8E3E")
+        };
 
     /// <summary>Color suave del estado: fondo de la etiqueta.</summary>
-    public Color ColorEstadoSuave => ResultadoLocal switch
-    {
-        null => Color.FromArgb("#DCE8F7"),
-        "NoEntregado" => Color.FromArgb("#FCE8E6"),
-        _ => Color.FromArgb("#E6F4EA")
-    };
+    public Color ColorEstadoSuave =>
+        Rechazado ? Color.FromArgb("#FCE8E6")
+        : ResultadoLocal switch
+        {
+            null => Color.FromArgb("#DCE8F7"),
+            "NoEntregado" => Color.FromArgb("#FCE8E6"),
+            _ => Color.FromArgb("#E6F4EA")
+        };
 
     /// <summary>La línea de sincronización se muestra solo si ya se registró algo.</summary>
     public bool MostrarSincronizacion => ResultadoLocal is not null;
 
-    public string TextoSincronizacion => PendienteDeSincronizar
-        ? "⏳ Guardado en el teléfono · falta enviarlo"
+    public string TextoSincronizacion =>
+        Rechazado ? $"⚠ Rechazado por el servidor: {UltimoError}"
+        : PendienteDeSincronizar ? "⏳ Guardado en el teléfono · falta enviarlo"
         : "✓ Enviado al servidor";
 
-    public Color ColorSincronizacion => PendienteDeSincronizar
-        ? Color.FromArgb("#B05A00")
+    public Color ColorSincronizacion =>
+        Rechazado ? Color.FromArgb("#C5221F")
+        : PendienteDeSincronizar ? Color.FromArgb("#B05A00")
         : Color.FromArgb("#1E8E3E");
 
-    public string DetalleBultos => $"{CantidadBultos} {(CantidadBultos == 1 ? "bulto" : "bultos")} · {Modalidad}";
+    /// <summary>Por qué el servidor rechazó lo registrado (null si nunca lo rechazó).</summary>
+    public string? UltimoError { get; set; }
+
+    /// <summary>Conflicto: falta sincronizar y el servidor ya dijo que no.</summary>
+    public bool Rechazado => PendienteDeSincronizar && UltimoError is not null;
+
+    public string DetalleBultos =>
+        $"{CantidadBultos} {(CantidadBultos == 1 ? "bulto" : "bultos")}"
+        + (string.IsNullOrEmpty(Modalidad) ? string.Empty : $" · {Modalidad}");
 }

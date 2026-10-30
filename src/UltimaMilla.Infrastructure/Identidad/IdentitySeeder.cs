@@ -78,7 +78,43 @@ public static class IdentitySeeder
             DbSeeder.LogisticaSurId,
             Guid.Parse("33333333-0000-0000-0000-000000000002"));
 
-        async Task CrearUsuarioAsync(
+        // Repartidores de demo: inician sesión en la app y quedan vinculados al
+        // "Repartidor de prueba" de su operador (el que sembró DbSeeder).
+        await VincularRepartidorAsync(
+            await CrearUsuarioAsync(
+                "repartidor.rapi@demo.local",
+                "Repartidor RapiEnvíos",
+                Perfiles.Repartidor,
+                DbSeeder.RapiEnviosId,
+                null),
+            DbSeeder.RapiEnviosId);
+
+        await VincularRepartidorAsync(
+            await CrearUsuarioAsync(
+                "repartidor.sur@demo.local",
+                "Repartidor Logística Sur",
+                Perfiles.Repartidor,
+                DbSeeder.LogisticaSurId,
+                null),
+            DbSeeder.LogisticaSurId);
+
+        async Task VincularRepartidorAsync(Usuario usuario, Guid operadorId)
+        {
+            var yaVinculado = await db.Repartidores
+                .AnyAsync(r => r.OperadorId == operadorId && r.UsuarioId == usuario.Id, ct);
+
+            if (yaVinculado)
+                return;
+
+            var libre = await db.Repartidores
+                .Where(r => r.OperadorId == operadorId && r.UsuarioId == null && r.Activo)
+                .OrderBy(r => r.Nombre)
+                .FirstOrDefaultAsync(ct);
+
+            libre?.VincularUsuario(usuario.Id);
+        }
+
+        async Task<Usuario> CrearUsuarioAsync(
             string email,
             string nombre,
             string perfil,
@@ -137,6 +173,8 @@ public static class IdentitySeeder
                     Activa = true
                 });
             }
+
+            return usuario;
         }
 
         await db.SaveChangesAsync(ct);

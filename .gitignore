@@ -5,3 +5,8 @@ obj/
 *.user
 .env
 TestResults/
+
+# Secretos y configuración de Firebase (push): cada integrante usa los suyos
+docker/secretos/*
+!docker/secretos/LEEME.md
+src/UltimaMilla.Mobile/Platforms/Android/google-services.json

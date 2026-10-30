@@ -83,39 +83,7 @@ public sealed class CrearZonaHandler(
             command.OperadorId,
             ct);
 
-        foreach (var existente in existentes)
-        {
-            if (!string.Equals(
-                    existente.Departamento,
-                    zona.Departamento,
-                    StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            foreach (var cobertura in zona.Localidades)
-            {
-                foreach (var otra in existente.Localidades)
-                {
-                    if (!string.Equals(
-                            cobertura.Nombre,
-                            otra.Nombre,
-                            StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    bool superpuestas =
-                        cobertura.Sector is null ||
-                        otra.Sector is null ||
-                        string.Equals(
-                            cobertura.Sector,
-                            otra.Sector,
-                            StringComparison.OrdinalIgnoreCase);
-
-                    if (superpuestas)
-                        throw new InvalidOperationException(
-                            $"La cobertura de '{cobertura.Nombre}' " +
-                            $"se superpone con la zona '{existente.Nombre}'.");
-                }
-            }
-        }
+        ValidacionCoberturas.ValidarSinSuperposicion(zona, existentes);
 
         await zonas.AgregarAsync(zona, ct);
         await unitOfWork.GuardarCambiosAsync(ct);

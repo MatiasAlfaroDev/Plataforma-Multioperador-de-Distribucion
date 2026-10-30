@@ -6,6 +6,7 @@ using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Rutas;
+using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.UnitTests;
 
@@ -127,7 +128,8 @@ public class RegistrarEventoMovilHandlerTests
             _unidadDeTrabajo,
             _publicador,
             new RegistrarEventoMovilValidator(),
-            new RelojFijo(Alta.AddHours(5)));
+            new RelojFijo(Alta.AddHours(5)),
+            new CacheEnMemoria());
     }
 
     private RegistrarEventoMovilCommand Entrega(
@@ -243,6 +245,34 @@ public class RegistrarEventoMovilHandlerTests
         await Assert.ThrowsAsync<NoEncontradoException>(() =>
             _handler.Handle(comando, CancellationToken.None));
 
+        Assert.Empty(_eventos.Lista);
+        Assert.Equal(0, _unidadDeTrabajo.Guardados);
+    }
+
+    [Fact]
+    public async Task Envio_que_no_esta_en_transito_se_rechaza()
+    {
+        // Un envío recién creado: queda Admitido, nunca se despachó.
+        var cuenta = CuentaComercial.Crear(Guid.NewGuid(), _envio.OperadorId, Guid.NewGuid());
+        var admitido = Envio.Crear(
+            cuenta,
+            "PED-300",
+            Modalidad.Estandar,
+            new Destinatario("Luis Gómez", null),
+            new Direccion("18 de Julio", "512", "Montevideo", "Montevideo"),
+            [new NuevoBulto(1m, 10, 10, 10)],
+            Alta);
+        _envios.Lista.Add(admitido);
+
+        // El repartidor intenta entregarlo (mismos datos que una entrega válida, pero de este envío).
+        var comando = Entrega(Guid.NewGuid()) with { EnvioId = admitido.Id };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _handler.Handle(comando, CancellationToken.None));
+
+        // Gana el servidor: se rechaza con el motivo, el estado no cambia y no se guarda nada.
+        Assert.Contains("debe estar en tránsito", ex.Message);
+        Assert.Equal(EstadoEnvio.Admitido, admitido.Estado);
         Assert.Empty(_eventos.Lista);
         Assert.Equal(0, _unidadDeTrabajo.Guardados);
     }
@@ -509,4 +539,37 @@ public class RegistrarEventoMovilHandlerTests
     {
         public override DateTimeOffset GetUtcNow() => ahora;
     }
+
+    private sealed class CacheEnMemoria : ICacheService
+{
+    private readonly Dictionary<string, object> _datos = new();
+
+    public Task<T?> ObtenerAsync<T>(
+        string clave,
+        CancellationToken ct = default)
+    {
+        if (_datos.TryGetValue(clave, out var valor) && valor is T dato)
+            return Task.FromResult<T?>(dato);
+
+        return Task.FromResult<T?>(default);
+    }
+
+    public Task GuardarAsync<T>(
+        string clave,
+        T valor,
+        TimeSpan duracion,
+        CancellationToken ct = default)
+    {
+        _datos[clave] = valor!;
+        return Task.CompletedTask;
+    }
+
+    public Task EliminarAsync(
+        string clave,
+        CancellationToken ct = default)
+    {
+        _datos.Remove(clave);
+        return Task.CompletedTask;
+    }
+}
 }

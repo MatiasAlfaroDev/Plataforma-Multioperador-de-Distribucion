@@ -29,6 +29,22 @@ public sealed class HojaDeRutaRepository(AppDbContext db)
                 ct);
     }
 
+    public async Task<IReadOnlyList<HojaDeRuta>> ListarDelRepartidorAsync(
+        Guid operadorId,
+        Guid repartidorId,
+        DateOnly fecha,
+        CancellationToken ct)
+    {
+        return await db.HojasDeRuta
+            .AsNoTracking()
+            .Include(x => x.Paradas)
+            .Where(x => x.OperadorId == operadorId &&
+                        x.RepartidorId == repartidorId &&
+                        x.Fecha == fecha)
+            .OrderBy(x => x.HoraSalida)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<HojaDeRuta>> ListarAsync(
         Guid operadorId,
         CancellationToken ct)
