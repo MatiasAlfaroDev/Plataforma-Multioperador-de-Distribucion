@@ -157,7 +157,7 @@ public class DespacharHojaDeRutaHandlerTests
             EstadoEnvio.EnDeposito,
             _primero.Eventos.Last().EstadoNuevo);
 
-        Assert.Equal(1, _unidad.Guardados);
+        Assert.Equal(2, _unidad.Guardados);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class DespacharHojaDeRutaHandlerTests
             _hoja.Paradas,
             p => p.EnvioId == _segundo.Id);
 
-        Assert.Equal(1, _unidad.Guardados);
+        Assert.Equal(2, _unidad.Guardados);
     }
 
     [Fact]
@@ -385,6 +385,14 @@ public class DespacharHojaDeRutaHandlerTests
             Guardados++;
             return Task.FromResult(1);
         }
+        
+        public Task EjecutarEnTransaccionAsync(
+            Func<CancellationToken, Task> operacion,
+            CancellationToken ct)
+        {
+            return operacion(ct);
+        }
+
     }
 
     private sealed class RelojFijo(DateTimeOffset ahora) : TimeProvider

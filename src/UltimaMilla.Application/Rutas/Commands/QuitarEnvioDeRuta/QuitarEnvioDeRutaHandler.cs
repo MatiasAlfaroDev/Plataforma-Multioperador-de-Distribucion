@@ -59,18 +59,31 @@ public sealed class QuitarEnvioDeRutaHandler(
 
         var ahora = reloj.GetUtcNow();
 
-        // Libera la parada y actualiza la capacidad asignada.
-        hoja.QuitarEnvio(envio, ahora);
+    await unitOfWork.EjecutarEnTransaccionAsync(
+        async transaccionCt =>
+        {
+            // Libera la parada y actualiza la capacidad.
+            hoja.QuitarEnvio(envio, ahora);
 
-        // Restaura EnDeposito o Reprogramado según el origen.
-        envio.Aplicar(
-            DisparadorEnvio.QuitarDeRuta,
-            reglas,
-            ahora,
-            "Backoffice",
-            command.Responsable.Trim());
+            // Evita conflictos temporales con el índice único.
+            hoja.PrepararRenumeracionParadas();
 
-        // Guarda el estado del envío, la parada y el evento juntos.
-        await unitOfWork.GuardarCambiosAsync(ct);
+            // Restaura EnDeposito o Reprogramado según el origen.
+            envio.Aplicar(
+                DisparadorEnvio.QuitarDeRuta,
+                reglas,
+                ahora,
+                "Backoffice",
+                command.Responsable.Trim());
+
+            // Primera fase: persiste la liberación y los órdenes temporales.
+            await unitOfWork.GuardarCambiosAsync(transaccionCt);
+
+            // Segunda fase: asigna los órdenes consecutivos definitivos.
+            hoja.RenumerarParadasActivas();
+
+            await unitOfWork.GuardarCambiosAsync(transaccionCt);
+        },
+        ct);
     }
 }

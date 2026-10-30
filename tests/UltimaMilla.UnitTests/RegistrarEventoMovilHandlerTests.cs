@@ -495,6 +495,14 @@ public class RegistrarEventoMovilHandlerTests
             Guardados++;
             return Task.FromResult(1);
         }
+        public Task EjecutarEnTransaccionAsync(
+            Func<CancellationToken, Task> operacion,
+            CancellationToken ct)
+        {
+            ArgumentNullException.ThrowIfNull(operacion);
+
+            return operacion(ct);
+        }
     }
 
     private sealed class RelojFijo(DateTimeOffset ahora) : TimeProvider

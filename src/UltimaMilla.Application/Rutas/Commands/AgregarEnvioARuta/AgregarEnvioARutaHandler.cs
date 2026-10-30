@@ -181,19 +181,32 @@ public sealed class AgregarEnvioARutaHandler(
 
         var ahora = reloj.GetUtcNow();
 
-        hoja.AgregarEnvio(nuevo);
+        await unitOfWork.EjecutarEnTransaccionAsync(
+            async transaccionCt =>
+            {
+                // Agrega el envío y reserva su parada.
+                hoja.AgregarEnvio(nuevo);
 
-        // Actualiza el orden de todas las paradas activas.
-        hoja.ActualizarOrdenParadas(horarios);
+                // Mueve temporalmente las paradas activas
+                // para evitar colisiones con el índice único.
+                hoja.PrepararRenumeracionParadas();
 
-        nuevo.Aplicar(
-            DisparadorEnvio.AsignarARuta,
-            reglas,
-            ahora,
-            "Backoffice",
-            "Despachador");
+                nuevo.Aplicar(
+                    DisparadorEnvio.AsignarARuta,
+                    reglas,
+                    ahora,
+                    "Backoffice",
+                    "Despachador");
 
-        await unitOfWork.GuardarCambiosAsync(ct);
+                // Primera fase: persiste las paradas con órdenes temporales.
+                await unitOfWork.GuardarCambiosAsync(transaccionCt);
+
+                // Segunda fase: establece el orden calculado para la ruta.
+                hoja.ActualizarOrdenParadas(horarios);
+
+                await unitOfWork.GuardarCambiosAsync(transaccionCt);
+            },
+            ct);
 
         return horarios;
     }

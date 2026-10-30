@@ -156,17 +156,44 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
                 "Solo se puede quitar un envío asignado a ruta.");
 
         parada.Liberar(fecha);
-        var paradasActivas = _paradas
+
+        PesoAsignadoKg -= envio.PesoTotalKg;
+        VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+    }
+
+    public void PrepararRenumeracionParadas()
+    {
+        VerificarEditable();
+
+        var activas = _paradas
             .Where(p => p.Activa)
             .OrderBy(p => p.Orden)
             .ToList();
 
-        for (var i = 0; i < paradasActivas.Count; i++)
+        if (activas.Count == 0)
+            return;
+
+        var siguienteOrden = _paradas.Max(p => p.Orden) + 1;
+
+        foreach (var parada in activas)
         {
-            paradasActivas[i].CambiarOrden(i + 1);
+            parada.CambiarOrden(siguienteOrden++);
         }
-        PesoAsignadoKg -= envio.PesoTotalKg;
-        VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+    }
+
+    public void RenumerarParadasActivas()
+    {
+        VerificarEditable();
+
+        var activas = _paradas
+            .Where(p => p.Activa)
+            .OrderBy(p => p.Orden)
+            .ToList();
+
+        for (var i = 0; i < activas.Count; i++)
+        {
+            activas[i].CambiarOrden(i + 1);
+        }
     }
 
     public void ConfigurarHoraSalida(TimeOnly horaSalida)
