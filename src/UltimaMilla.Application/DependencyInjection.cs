@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
+using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining<CrearEnvioValidator>();
 
         services.AddScoped<CrearEnvioHandler>();
+        services.AddScoped<ImportarEnviosCsvHandler>();
         services.AddScoped<ListarEnviosHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();

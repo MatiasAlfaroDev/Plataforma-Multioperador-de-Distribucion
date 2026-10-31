@@ -3,6 +3,7 @@
     <ProjectReference Include="..\UltimaMilla.Domain\UltimaMilla.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="CsvHelper" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
   </ItemGroup>

@@ -9,6 +9,7 @@ using UltimaMilla.Api.Salud;
 using UltimaMilla.Application;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
+using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 using UltimaMilla.Application.Envios.Commands.Reprogramacion;
@@ -235,6 +236,55 @@ api.MapPost("/envios", async (
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
     Perfiles.Comercio));
+
+
+api.MapPost("/envios/importar-csv", async (
+    HttpContext context,
+    IAntiforgery antiforgery,
+    IFormFile archivo,
+    [FromForm] Guid cuentaComercialId,
+    ImportarEnviosCsvHandler handler,
+    CancellationToken ct) =>
+{
+    if (!await antiforgery.IsRequestValidAsync(context))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Token de seguridad inválido",
+            detail: "La solicitud no contiene un token antifalsificación válido.");
+    }
+
+    const long maxBytes = 5 * 1024 * 1024;
+
+    if (archivo.Length == 0 || archivo.Length > maxBytes)
+    {
+        return Results.BadRequest(
+            "El archivo debe tener contenido y no superar los 5 MB.");
+    }
+
+    if (!Path.GetExtension(archivo.FileName)
+        .Equals(".csv", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(
+            "El archivo debe tener extensión .csv.");
+    }
+
+    await using var stream = archivo.OpenReadStream();
+    using var lector = new StreamReader(stream);
+
+    var resultado = await handler.Handle(
+        cuentaComercialId,
+        lector,
+        ct);
+
+    return Results.Ok(resultado);
+})
+.DisableAntiforgery()
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
+
 // GET /api/envios?operadorId=... → listado para el Backoffice.
 // GET /api/envios → listado según el operador y perfil autenticado.
 api.MapGet("/envios", async (

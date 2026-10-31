@@ -132,6 +132,102 @@ async crearEnvio(datos) {
         // Conservamos el mensaje HTTP original.
     }
 
+    
+    return {
+        exito: false,
+        mensaje
+    };
+},
+
+async importarEnviosCsv(cuentaComercialId) {
+    const archivo = document.getElementById("archivoCsv")?.files?.[0];
+
+    if (!cuentaComercialId) {
+        return {
+            exito: false,
+            mensaje: "Seleccioná una cuenta comercial."
+        };
+    }
+
+    if (!archivo) {
+        return {
+            exito: false,
+            mensaje: "Seleccioná un archivo CSV."
+        };
+    }
+
+    const maxBytes = 5 * 1024 * 1024;
+
+    if (archivo.size === 0 || archivo.size > maxBytes) {
+        return {
+            exito: false,
+            mensaje: "El archivo debe tener contenido y no superar los 5 MB."
+        };
+    }
+
+    if (!archivo.name.toLowerCase().endsWith(".csv")) {
+        return {
+            exito: false,
+            mensaje: "El archivo debe tener extensión .csv."
+        };
+    }
+
+    // Obtener el token CSRF, igual que en el alta individual.
+    const respuestaToken = await fetch("/api/antiforgery/token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!respuestaToken.ok) {
+        return {
+            exito: false,
+            mensaje: "No se pudo obtener el token de seguridad."
+        };
+    }
+
+    const { token } = await respuestaToken.json();
+
+    // Los nombres coinciden con los parámetros del endpoint.
+    const datos = new FormData();
+    datos.append("archivo", archivo);
+    datos.append("cuentaComercialId", cuentaComercialId);
+
+    const respuesta = await fetch("/api/envios/importar-csv", {
+        method: "POST",
+        headers: {
+            "X-CSRF-TOKEN": token
+        },
+        credentials: "same-origin",
+        body: datos
+    });
+
+    // No establecer Content-Type manualmente:
+    // el navegador agrega el boundary de multipart/form-data.
+    if (respuesta.ok) {
+        return {
+            exito: true,
+            mensaje: "Importación procesada.",
+            resultado: await respuesta.json()
+        };
+    }
+
+    let mensaje = `La API respondió HTTP ${respuesta.status}.`;
+
+    try {
+        const problema = await respuesta.json();
+
+        if (problema.errors) {
+            mensaje = Object.values(problema.errors).flat().join(" ");
+        } else if (problema.detail) {
+            mensaje = problema.detail;
+        } else if (problema.title) {
+            mensaje = problema.title;
+        }
+    } catch {
+        // Mantener el mensaje HTTP.
+    }
+
     return {
         exito: false,
         mensaje
