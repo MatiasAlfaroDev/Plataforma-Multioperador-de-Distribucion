@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
+using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
@@ -19,6 +20,8 @@ using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
 using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
@@ -34,6 +37,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining<CrearEnvioValidator>();
 
         services.AddScoped<CrearEnvioHandler>();
+        services.AddScoped<ImportarEnviosCsvHandler>();
         services.AddScoped<ListarEnviosHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();
@@ -53,6 +57,8 @@ public static class DependencyInjection
         services.AddScoped<DespacharHojaDeRutaHandler>();
         services.AddScoped<QuitarEnvioDeRutaHandler>();
         services.AddScoped<AgregarEnvioARutaHandler>();
+        services.AddScoped<DeclararExtravioHandler>();
+        services.AddScoped<RegistrarReaparicionHandler>();
         services.AddScoped<ObtenerMisHojasDeRutaHandler>();
         services.AddScoped<DespacharMiHojaDeRutaHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();

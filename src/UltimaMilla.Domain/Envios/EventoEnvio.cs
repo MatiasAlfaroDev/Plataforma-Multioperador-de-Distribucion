@@ -11,6 +11,7 @@ public sealed class EventoEnvio
     public DateTimeOffset OcurridoEn { get; private set; }
     public string Origen { get; private set; } = string.Empty;
     public string Responsable { get; private set; } = string.Empty;
+    public string? Justificacion { get; private set; }
     public decimal? Latitud { get; private set; }
     public decimal? Longitud { get; private set; }
 
@@ -26,7 +27,8 @@ public sealed class EventoEnvio
         string origen,
         string responsable,
         decimal? latitud = null,
-        decimal? longitud = null)
+        decimal? longitud = null,
+        string? justificacion = null)
     {
         if (operadorId == Guid.Empty || envioId == Guid.Empty)
             throw new ArgumentException("El operador y el envío son obligatorios.");
@@ -53,7 +55,10 @@ public sealed class EventoEnvio
             Origen = origen.Trim(),
             Responsable = responsable.Trim(),
             Latitud = latitud,
-            Longitud = longitud
+            Longitud = longitud,
+            Justificacion = string.IsNullOrWhiteSpace(justificacion)
+                ? null
+                : justificacion.Trim(),
         };
     }
 }

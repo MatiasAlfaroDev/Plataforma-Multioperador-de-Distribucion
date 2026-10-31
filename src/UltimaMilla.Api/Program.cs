@@ -9,6 +9,7 @@ using UltimaMilla.Api.Salud;
 using UltimaMilla.Application;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
+using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 using UltimaMilla.Application.Envios.Commands.Reprogramacion;
@@ -30,6 +31,8 @@ using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using UltimaMilla.Infrastructure.Identidad;
@@ -233,6 +236,55 @@ api.MapPost("/envios", async (
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
     Perfiles.Comercio));
+
+
+api.MapPost("/envios/importar-csv", async (
+    HttpContext context,
+    IAntiforgery antiforgery,
+    IFormFile archivo,
+    [FromForm] Guid cuentaComercialId,
+    ImportarEnviosCsvHandler handler,
+    CancellationToken ct) =>
+{
+    if (!await antiforgery.IsRequestValidAsync(context))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Token de seguridad inválido",
+            detail: "La solicitud no contiene un token antifalsificación válido.");
+    }
+
+    const long maxBytes = 5 * 1024 * 1024;
+
+    if (archivo.Length == 0 || archivo.Length > maxBytes)
+    {
+        return Results.BadRequest(
+            "El archivo debe tener contenido y no superar los 5 MB.");
+    }
+
+    if (!Path.GetExtension(archivo.FileName)
+        .Equals(".csv", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(
+            "El archivo debe tener extensión .csv.");
+    }
+
+    await using var stream = archivo.OpenReadStream();
+    using var lector = new StreamReader(stream);
+
+    var resultado = await handler.Handle(
+        cuentaComercialId,
+        lector,
+        ct);
+
+    return Results.Ok(resultado);
+})
+.DisableAntiforgery()
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
+
 // GET /api/envios?operadorId=... → listado para el Backoffice.
 // GET /api/envios → listado según el operador y perfil autenticado.
 api.MapGet("/envios", async (
@@ -309,6 +361,85 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
 
         return Results.NoContent();
     });
+
+// Declarar un envío como extraviado.
+api.MapPost("/envios/{envioId:guid}/extravio",
+    async (
+        Guid envioId,
+        DeclararExtravioRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        DeclararExtravioHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new DeclararExtravioCommand(
+                operadorId,
+                envioId,
+                request.Justificacion,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+
+// Registrar la reaparición de un envío extraviado.
+api.MapPost("/envios/{envioId:guid}/reaparicion",
+    async (
+        Guid envioId,
+        RegistrarReaparicionRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        RegistrarReaparicionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new RegistrarReaparicionCommand(
+                operadorId,
+                envioId,
+                request.IdentificacionesEscaneadas,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
 
 // Solicitudes de reprogramación pendientes para Backoffice.
 api.MapGet("/solicitudes-reprogramacion/pendientes",
@@ -636,3 +767,6 @@ public sealed record EditarZonaRequest(
 
 /// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/despachar; la hoja viaja en la URL.</summary>
 public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEscaneados);
+
+public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
+public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);

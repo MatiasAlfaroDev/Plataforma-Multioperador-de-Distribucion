@@ -269,4 +269,34 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             parada.CambiarOrden(i + 1);
         }
     }
+
+    public void LiberarParadaPorExtravio(
+        Envio envio,
+        DateTimeOffset fecha)
+    {
+        ArgumentNullException.ThrowIfNull(envio);
+
+        if (envio.OperadorId != OperadorId)
+            throw new InvalidOperationException(
+                "El envío pertenece a otro operador.");
+
+        if (envio.Estado != EstadoEnvio.AsignadoARuta &&
+            envio.Estado != EstadoEnvio.EnTransito)
+        {
+            throw new InvalidOperationException(
+                "El envío no está en un estado válido para liberar su parada por extravío.");
+        }
+
+        var parada = _paradas.SingleOrDefault(
+            p => p.EnvioId == envio.Id && p.Activa);
+
+        if (parada is null)
+            throw new InvalidOperationException(
+                "No existe una parada activa para este envío.");
+
+        parada.Liberar(fecha.ToUniversalTime());
+
+        PesoAsignadoKg -= envio.PesoTotalKg;
+        VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+    }
 }
