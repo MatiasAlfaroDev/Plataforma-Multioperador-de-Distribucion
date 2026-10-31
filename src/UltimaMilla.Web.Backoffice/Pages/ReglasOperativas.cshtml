@@ -1,0 +1,89 @@
+
+@page
+@model UltimaMilla.Web.Backoffice.Pages.ReglasOperativasModel
+@using UltimaMilla.Web.Backoffice.Services
+
+@{
+    ViewData["Title"] = "Reglas operativas";
+}
+
+<p class="nota">
+    Configurá las condiciones de entrega y devolución
+    de tu operador logístico.
+</p>
+
+@if (TempData["Mensaje"] is string mensaje)
+{
+    <p class="aviso ok" role="status">@mensaje</p>
+}
+
+@if (Model.Error is not null)
+{
+    <p class="aviso error" role="alert">@Model.Error</p>
+}
+
+@if (Model.OperadorIdSesion != Guid.Empty && Model.Error is null)
+{
+    <h2>
+        @(Model.ReglasEncontradas
+            ? "Reglas operativas vigentes"
+            : "Crear reglas operativas")
+    </h2>
+
+    @if (Model.VigenciaDesde.HasValue)
+    {
+        <p class="nota">
+            Vigente desde el @Formato.Hora(Model.VigenciaDesde.Value)
+        </p>
+    }
+
+    <form method="post">
+        <div class="campos">
+            <div>
+                <label asp-for="MaximoIntentosEntrega">
+                    Máximo de intentos de entrega
+                </label>
+                <input asp-for="MaximoIntentosEntrega"
+                       type="number"
+                       min="1"
+                       required />
+            </div>
+
+            <div>
+                <label asp-for="HorasMinimasEntreIntentos">
+                    Horas mínimas entre intentos
+                </label>
+                <input asp-for="HorasMinimasEntreIntentos"
+                       type="number"
+                       min="0"
+                       required />
+            </div>
+
+            <div>
+                <label asp-for="DiasMaximosParaDevolucion">
+                    Días máximos para devolución
+                </label>
+                <input asp-for="DiasMaximosParaDevolucion"
+                       type="number"
+                       min="1"
+                       required />
+            </div>
+
+            <div>
+                <label asp-for="RequierePruebaEntrega">
+                    Requiere prueba de entrega
+                </label>
+                <input asp-for="RequierePruebaEntrega"
+                       type="checkbox" />
+            </div>
+        </div>
+
+        <div class="acciones">
+            <button type="submit" class="primario">
+                @(Model.ReglasEncontradas
+                    ? "Guardar nueva versión"
+                    : "Crear reglas operativas")
+            </button>
+        </div>
+    </form>
+}

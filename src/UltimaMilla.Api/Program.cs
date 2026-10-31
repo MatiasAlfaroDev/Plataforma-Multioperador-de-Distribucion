@@ -19,6 +19,8 @@ using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
 using UltimaMilla.Infrastructure;
 using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
+using UltimaMilla.Application.Configuracion.Commands.ActualizarReglasOperativas;
+using UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigentes;
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.CrearZona;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
@@ -498,6 +500,56 @@ api.MapGet("/tarifas/vigente", async (Guid operadorId, Guid zonaCoberturaId, Obt
         ? Results.NotFound()
         : Results.Ok(tarifa);
 });
+
+api.MapGet("/reglas-operativas/vigente", async (
+    Guid operadorId,
+    HttpContext context,
+    ObtenerReglasOperativasVigentesHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorSesion) ||
+        operadorSesion != operadorId)
+    {
+        return Results.Forbid();
+    }
+
+    var reglas = await handler.Handle(
+        new ObtenerReglasOperativasVigentesQuery(operadorSesion),
+        ct);
+
+    return reglas is null
+        ? Results.NotFound()
+        : Results.Ok(reglas);
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapPost("/reglas-operativas", async (
+    ActualizarReglasOperativasCommand command,
+    HttpContext context,
+    ActualizarReglasOperativasHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorSesion) ||
+        operadorSesion != command.OperadorId)
+    {
+        return Results.Forbid();
+    }
+
+    var id = await handler.Handle(command, ct);
+
+    return Results.Ok(new { id });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+    
 api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, CancellationToken ct) =>
 {
     var zonas = await handler.Handle(
