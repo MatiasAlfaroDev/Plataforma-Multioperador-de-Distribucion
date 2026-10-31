@@ -733,6 +733,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("Justificacion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<decimal?>("Latitud")
                         .HasPrecision(9, 6)
                         .HasColumnType("numeric(9,6)");
@@ -1626,7 +1630,7 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
-                
+
             modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>
                 {
                     b.HasOne("UltimaMilla.Infrastructure.Identidad.Usuario", null)

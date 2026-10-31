@@ -19,6 +19,8 @@ using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
 using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
@@ -53,6 +55,8 @@ public static class DependencyInjection
         services.AddScoped<DespacharHojaDeRutaHandler>();
         services.AddScoped<QuitarEnvioDeRutaHandler>();
         services.AddScoped<AgregarEnvioARutaHandler>();
+        services.AddScoped<DeclararExtravioHandler>();
+        services.AddScoped<RegistrarReaparicionHandler>();
         services.AddScoped<ObtenerMisHojasDeRutaHandler>();
         services.AddScoped<DespacharMiHojaDeRutaHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();

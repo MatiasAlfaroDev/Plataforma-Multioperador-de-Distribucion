@@ -29,6 +29,9 @@ public sealed class EventoEnvioConfiguration : IEntityTypeConfiguration<EventoEn
         builder.Property(e => e.Responsable)
             .HasMaxLength(200).IsRequired();
 
+        builder.Property(e => e.Justificacion)
+            .HasMaxLength(1000);
+
         builder.Property(e => e.Latitud).HasPrecision(9, 6);
         builder.Property(e => e.Longitud).HasPrecision(9, 6);
 

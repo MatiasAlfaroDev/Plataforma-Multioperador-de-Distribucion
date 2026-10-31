@@ -30,6 +30,8 @@ using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using UltimaMilla.Infrastructure.Identidad;
@@ -309,6 +311,85 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
 
         return Results.NoContent();
     });
+
+// Declarar un envío como extraviado.
+api.MapPost("/envios/{envioId:guid}/extravio",
+    async (
+        Guid envioId,
+        DeclararExtravioRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        DeclararExtravioHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new DeclararExtravioCommand(
+                operadorId,
+                envioId,
+                request.Justificacion,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+
+// Registrar la reaparición de un envío extraviado.
+api.MapPost("/envios/{envioId:guid}/reaparicion",
+    async (
+        Guid envioId,
+        RegistrarReaparicionRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        RegistrarReaparicionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new RegistrarReaparicionCommand(
+                operadorId,
+                envioId,
+                request.IdentificacionesEscaneadas,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
 
 // Solicitudes de reprogramación pendientes para Backoffice.
 api.MapGet("/solicitudes-reprogramacion/pendientes",
@@ -636,3 +717,6 @@ public sealed record EditarZonaRequest(
 
 /// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/despachar; la hoja viaja en la URL.</summary>
 public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEscaneados);
+
+public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
+public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);

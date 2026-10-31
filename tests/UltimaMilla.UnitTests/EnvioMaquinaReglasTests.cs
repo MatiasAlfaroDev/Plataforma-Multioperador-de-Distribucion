@@ -534,4 +534,87 @@ public class EnvioMaquinaReglasTests
         Assert.Equal(EstadoEnvio.AsignadoARuta, ultimoEvento.EstadoAnterior);
         Assert.Equal(EstadoEnvio.Reprogramado, ultimoEvento.EstadoNuevo);
     }
+
+    [Fact]
+    public void DeclararExtravio_GuardaJustificacionEnHistorial()
+    {
+        var (envio, reglas) = Preparar();
+
+        Aplicar(
+            envio,
+            reglas,
+            DisparadorEnvio.RecibirEnDeposito);
+
+        Aplicar(
+            envio,
+            reglas,
+            DisparadorEnvio.DeclararExtraviado,
+            justificacion: "  Bulto perdido en depósito  ");
+
+        Assert.Equal(EstadoEnvio.Extraviado, envio.Estado);
+
+        var evento = envio.Eventos.Last();
+
+        Assert.Equal(
+            DisparadorEnvio.DeclararExtraviado,
+            evento.Disparador);
+
+        Assert.Equal(
+            EstadoEnvio.EnDeposito,
+            evento.EstadoAnterior);
+
+        Assert.Equal(
+            EstadoEnvio.Extraviado,
+            evento.EstadoNuevo);
+
+        Assert.Equal(
+            "Bulto perdido en depósito",
+            evento.Justificacion);
+
+        Assert.Equal("OperarioTest", evento.Responsable);
+    }
+
+    [Fact]
+    public void Reaparecer_RestauraEnDepositoYConservaHistorial()
+    {
+        var (envio, reglas) = Preparar();
+
+        Aplicar(
+            envio,
+            reglas,
+            DisparadorEnvio.RecibirEnDeposito);
+
+        Aplicar(
+            envio,
+            reglas,
+            DisparadorEnvio.DeclararExtraviado,
+            justificacion: "Bulto extraviado");
+
+        Aplicar(
+            envio,
+            reglas,
+            DisparadorEnvio.Reaparecer);
+
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+        Assert.Equal(3, envio.Eventos.Count);
+
+        var ultimoEvento = envio.Eventos.Last();
+
+        Assert.Equal(
+            DisparadorEnvio.Reaparecer,
+            ultimoEvento.Disparador);
+
+        Assert.Equal(
+            EstadoEnvio.Extraviado,
+            ultimoEvento.EstadoAnterior);
+
+        Assert.Equal(
+            EstadoEnvio.EnDeposito,
+            ultimoEvento.EstadoNuevo);
+
+        Assert.Contains(
+            envio.Eventos,
+            e => e.Disparador == DisparadorEnvio.DeclararExtraviado &&
+                e.Justificacion == "Bulto extraviado");
+    }
 }
