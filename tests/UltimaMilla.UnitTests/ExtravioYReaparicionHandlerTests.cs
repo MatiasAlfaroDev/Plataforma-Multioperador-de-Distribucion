@@ -430,6 +430,23 @@ public class ExtravioYReaparicionHandlerTests
             CancellationToken ct) =>
             Task.FromResult(lista.FirstOrDefault(r =>
                 r.OperadorId == operadorId && r.Id == versionId));
+
+        public Task<VersionReglasOperativas?> ObtenerVigenteParaActualizarAsync(
+            Guid operadorId,
+            DateTimeOffset fecha,
+            CancellationToken ct) =>
+            Task.FromResult(lista
+                .Where(r => r.OperadorId == operadorId && r.EstaVigente(fecha))
+                .OrderByDescending(r => r.VigenciaDesde)
+                .FirstOrDefault());
+
+        public Task AgregarAsync(
+            VersionReglasOperativas version,
+            CancellationToken ct)
+        {
+            lista.Add(version);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class UnidadEnMemoria : IUnitOfWork

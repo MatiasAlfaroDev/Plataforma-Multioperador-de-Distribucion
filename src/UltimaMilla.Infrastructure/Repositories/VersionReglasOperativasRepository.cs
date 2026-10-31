@@ -35,4 +35,26 @@ public sealed class VersionReglasOperativasRepository(AppDbContext db)
                 v.OperadorId == operadorId,
                 ct);
     }
+
+    public async Task<VersionReglasOperativas?> ObtenerVigenteParaActualizarAsync(
+        Guid operadorId,
+        DateTimeOffset fecha,
+        CancellationToken ct)
+    {
+        return await db.VersionesReglasOperativas
+            .Where(v =>
+                v.OperadorId == operadorId &&
+                v.VigenciaDesde <= fecha &&
+                (v.VigenciaHasta == null || fecha < v.VigenciaHasta))
+            .OrderByDescending(v => v.VigenciaDesde)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task AgregarAsync(
+        VersionReglasOperativas version,
+        CancellationToken ct)
+    {
+        await db.VersionesReglasOperativas.AddAsync(version, ct);
+    }
+
 }

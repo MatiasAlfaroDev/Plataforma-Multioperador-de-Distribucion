@@ -484,6 +484,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OperadorId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_reglas_operativas_una_vigente_por_operador")
+                        .HasFilter("\"VigenciaHasta\" IS NULL");
+
                     b.HasIndex("OperadorId", "VigenciaDesde");
 
                     b.ToTable("versiones_reglas_operativas", (string)null);

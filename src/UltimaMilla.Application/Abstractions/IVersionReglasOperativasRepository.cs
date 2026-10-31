@@ -13,4 +13,13 @@ public interface IVersionReglasOperativasRepository
         Guid operadorId,
         Guid versionId,
         CancellationToken ct);
+
+    Task<VersionReglasOperativas?> ObtenerVigenteParaActualizarAsync(
+        Guid operadorId,
+        DateTimeOffset fecha,
+        CancellationToken ct);
+
+    Task AgregarAsync(
+        VersionReglasOperativas version,
+        CancellationToken ct);
 }

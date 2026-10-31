@@ -12,6 +12,8 @@ using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
 using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
+using UltimaMilla.Application.Configuracion.Commands.ActualizarReglasOperativas;
+using UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigentes;
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
@@ -49,6 +51,8 @@ public static class DependencyInjection
         services.AddScoped<ListarOperadoresHandler>();
         services.AddScoped<ActualizarTarifaHandler>();
         services.AddScoped<ObtenerTarifaVigenteHandler>();
+        services.AddScoped<ActualizarReglasOperativasHandler>();
+        services.AddScoped<ObtenerReglasOperativasVigentesHandler>();
         services.AddScoped<ListarZonasHandler>();
         services.AddScoped<ObtenerZonaHandler>();
         services.AddScoped<EditarZonaHandler>();

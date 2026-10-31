@@ -40,12 +40,13 @@ public sealed class ImportarEnviosCsvHandler(
         {
             HasHeaderRecord = true,
             Delimiter = ",",
-            TrimOptions = TrimOptions.Trim
+            TrimOptions = TrimOptions.Trim,
+            DetectColumnCountChanges = true
         };
 
         using var csv = new CsvReader(contenido, configuracion);
 
-        if (!await csv.ReadAsync())
+        if (!await LeerFilaAsync(csv))
             throw new ArgumentException("El archivo CSV está vacío.");
 
         csv.ReadHeader();
@@ -81,7 +82,7 @@ public sealed class ImportarEnviosCsvHandler(
         string Campo(string nombre) =>
             csv.GetField(nombre)?.Trim() ?? "";
 
-        while (await csv.ReadAsync())
+        while (await LeerFilaAsync(csv))
         {
             ct.ThrowIfCancellationRequested();
 
@@ -233,8 +234,23 @@ public sealed class ImportarEnviosCsvHandler(
                     null,
                     "Ya existe un envío con esta referencia."));
             }
+            
+            catch (FluentValidation.ValidationException ex)
+            {
+                var mensaje = string.Join(" ",
+                    ex.Errors.Select(error =>
+                        error.PropertyName.Contains("PesoKg")
+                            ? "El peso del bulto debe ser mayor que 0 kg y no superar los 1000 kg."
+                            : error.ErrorMessage));
+
+                resultados.Add(new ResultadoEnvioImportado(
+                    grupo.Key,
+                    primera.Numero,
+                    EstadoImportacionCsv.Error,
+                    null,
+                    mensaje));
+            }
             catch (Exception ex) when (
-                ex is FluentValidation.ValidationException ||
                 ex is ArgumentException ||
                 ex is InvalidOperationException ||
                 ex is NoEncontradoException)
@@ -246,6 +262,7 @@ public sealed class ImportarEnviosCsvHandler(
                     null,
                     ex.Message));
             }
+
         }
 
         return new ResultadoImportacionCsv(
@@ -257,5 +274,18 @@ public sealed class ImportarEnviosCsvHandler(
             resultados.Count(r =>
                 r.Estado == EstadoImportacionCsv.Error),
             resultados);
+    }
+    private static async Task<bool> LeerFilaAsync(
+        CsvReader csv)
+    {
+        try
+        {
+            return await csv.ReadAsync();
+        }
+        catch (CsvHelperException)
+        {
+            throw new ArgumentException(
+                "El archivo CSV tiene un formato incorrecto. Revisá las columnas y los separadores.");
+        }
     }
 }
