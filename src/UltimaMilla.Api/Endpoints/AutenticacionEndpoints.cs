@@ -200,6 +200,114 @@ grupo.MapPost("/registro-comercio", async (
 })
 .AllowAnonymous();
 
+grupo.MapPost("/registro-operador", async (
+    RegistroOperadorRequest request,
+    UserManager<Usuario> userManager,
+    AppDbContext db) =>
+{
+    // 1. Validar campos obligatorios
+    if (string.IsNullOrWhiteSpace(request.NombreCompleto) ||
+        string.IsNullOrWhiteSpace(request.Email) ||
+        string.IsNullOrWhiteSpace(request.Password) ||
+        string.IsNullOrWhiteSpace(request.NombreOperador) ||
+        string.IsNullOrWhiteSpace(request.ColorPrimario) ||
+        string.IsNullOrWhiteSpace(request.EmailContacto))
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = "Todos los campos son obligatorios."
+        });
+    }
+
+    var nombre = request.NombreCompleto.Trim();
+    var email = request.Email.Trim();
+    var nombreOperador = request.NombreOperador.Trim();
+    var colorPrimario = request.ColorPrimario.Trim();
+    var emailContacto = request.EmailContacto.Trim();
+
+    if (nombre.Length > 150)
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = "El nombre no puede superar los 150 caracteres."
+        });
+    }
+
+    // 2. Verificar que el usuario no exista
+    if (await userManager.FindByEmailAsync(email) is not null)
+    {
+        return Results.Conflict(new
+        {
+            mensaje = "Ya existe una cuenta con ese correo electrónico."
+        });
+    }
+
+    // 3. Iniciar transacción
+    await using var transaccion =
+        await db.Database.BeginTransactionAsync();
+
+    // 4. Crear usuario global
+    var usuario = new Usuario
+    {
+        Id = Guid.NewGuid(),
+        UserName = email,
+        Email = email,
+        NombreCompleto = nombre,
+        Activo = true
+    };
+
+    var resultado = await userManager.CreateAsync(
+        usuario,
+        request.Password);
+
+    if (!resultado.Succeeded)
+    {
+        await transaccion.RollbackAsync();
+
+        return Results.BadRequest(new
+        {
+            mensaje = "No se pudo crear el usuario.",
+            errores = resultado.Errors.Select(e => e.Description)
+        });
+    }
+
+    // 5. Crear operador logístico
+    var operador = Operador.Crear(
+        Guid.NewGuid(),
+        nombreOperador,
+        colorPrimario,
+        emailContacto);
+
+    db.Operadores.Add(operador);
+
+    // 6. Vincular usuario y operador
+    var membresia = new MembresiaUsuario
+    {
+        UsuarioId = usuario.Id,
+        OperadorId = operador.Id,
+        CuentaComercialId = null,
+        Perfil = "Administrador",
+        Activa = true
+    };
+
+    db.MembresiasUsuarios.Add(membresia);
+
+    // 7. Guardar todo
+    await db.SaveChangesAsync();
+    await transaccion.CommitAsync();
+
+    return Results.Created("/api/auth/registro-operador", new
+    {
+        usuarioId = usuario.Id,
+        operadorId = operador.Id,
+        membresiaId = membresia.Id,
+        nombreOperador = operador.Nombre,
+        perfil = membresia.Perfil,
+        mensaje = "Operador y administrador registrados correctamente."
+    });
+})
+.AllowAnonymous();
+
         grupo.MapPost("/login", async (
             LoginRequest request,
             UserManager<Usuario> userManager,
@@ -434,17 +542,11 @@ grupo.MapPost("/seleccionar-comercio", async (
     }
 }
 
-public sealed record RegistroUsuarioRequest(
-    string NombreCompleto,
-    string Email,
-    string Password);
+public sealed record RegistroUsuarioRequest(string NombreCompleto, string Email, string Password);
 
-    public sealed record RegistroComercioRequest(
-    string NombreCompleto,
-    string Email,
-    string Password,
-    string NombreComercio,
-    string Rut);
+public sealed record RegistroComercioRequest(string NombreCompleto, string Email, string Password, string NombreComercio, string Rut);
+
+public sealed record RegistroOperadorRequest(string NombreCompleto, string Email, string Password, string NombreOperador, string ColorPrimario, string EmailContacto);
 
 public sealed record LoginRequest(string Email, string Password);
 
