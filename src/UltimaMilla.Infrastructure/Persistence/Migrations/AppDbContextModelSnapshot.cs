@@ -1351,6 +1351,36 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Infrastructure.Identidad.UsuarioComercio", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ComercioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Perfil")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComercioId");
+
+                    b.HasIndex("UsuarioId", "ComercioId")
+                        .IsUnique();
+
+                    b.ToTable("usuarios_comercios", (string)null);
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
                 {
                     b.HasOne("MassTransit.EntityFrameworkCoreIntegration.OutboxState", null)
@@ -1626,7 +1656,7 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
-                
+
             modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>
                 {
                     b.HasOne("UltimaMilla.Infrastructure.Identidad.Usuario", null)
@@ -1720,6 +1750,23 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.HasOne("UltimaMilla.Domain.Organizacion.Operador", null)
                         .WithMany()
                         .HasForeignKey("OperadorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UltimaMilla.Infrastructure.Identidad.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UltimaMilla.Infrastructure.Identidad.UsuarioComercio", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Organizacion.Comercio", null)
+                        .WithMany()
+                        .HasForeignKey("ComercioId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

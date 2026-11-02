@@ -47,6 +47,7 @@ public sealed class AppDbContext(
     public DbSet<VersionTarifaria> VersionesTarifarias => Set<VersionTarifaria>();
     public DbSet<VersionReglasOperativas> VersionesReglasOperativas => Set<VersionReglasOperativas>();
     public DbSet<MembresiaUsuario> MembresiasUsuarios=> Set<MembresiaUsuario>();
+    public DbSet<UsuarioComercio> UsuariosComercios=> Set<UsuarioComercio>();
     public DbSet<DispositivoMovil> DispositivosMoviles => Set<DispositivoMovil>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

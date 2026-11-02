@@ -1,4 +1,38 @@
 window.autenticacionPortal = {
+    async registrar(nombreCompleto, email, password) {
+    const respuesta = await fetch("/api/auth/registro", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+            nombreCompleto,
+            email,
+            password
+        })
+    });
+
+    if (!respuesta.ok) {
+        let mensaje = "No se pudo completar el registro.";
+
+        try {
+            const error = await respuesta.json();
+
+            if (error.errores && error.errores.length > 0) {
+                mensaje = error.errores.join(" ");
+            } else if (error.mensaje) {
+                mensaje = error.mensaje;
+            }
+        } catch {
+            // Conservamos el mensaje predeterminado.
+        }
+
+        throw new Error(mensaje);
+    }
+
+    return await respuesta.json();
+},
     async login(email, password) {
         const respuesta = await fetch("/api/auth/login", {
             method: "POST",
