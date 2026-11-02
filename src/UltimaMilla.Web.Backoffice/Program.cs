@@ -57,6 +57,7 @@ builder.Services.AddRazorPages(options =>
         "OperadorBackoffice");
 
     options.Conventions.AllowAnonymousToPage("/Login");
+    options.Conventions.AllowAnonymousToPage("/Registro");
     options.Conventions.AllowAnonymousToPage("/SeleccionarOperador");
 });
 

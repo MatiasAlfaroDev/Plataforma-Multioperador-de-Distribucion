@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Infrastructure.Identidad;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Domain.Organizacion;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Api.Endpoints;
 
@@ -180,7 +181,7 @@ grupo.MapPost("/registro-comercio", async (
     {
         UsuarioId = usuario.Id,
         ComercioId = comercio.Id,
-        Perfil = "Administrador",
+        Perfil = Perfiles.AdministradorComercio,        
         Activa = true
     };
 
@@ -286,7 +287,7 @@ grupo.MapPost("/registro-operador", async (
         UsuarioId = usuario.Id,
         OperadorId = operador.Id,
         CuentaComercialId = null,
-        Perfil = "Administrador",
+        Perfil = Perfiles.AdministradorOperador,
         Activa = true
     };
 
