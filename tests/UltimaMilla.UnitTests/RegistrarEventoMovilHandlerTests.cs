@@ -487,6 +487,23 @@ public class RegistrarEventoMovilHandlerTests
             Task.FromResult(Lista.FirstOrDefault(r =>
                 r.OperadorId == operadorId &&
                 r.Id == versionId));
+
+        public Task<VersionReglasOperativas?> ObtenerVigenteParaActualizarAsync(
+            Guid operadorId,
+            DateTimeOffset fecha,
+            CancellationToken ct) =>
+            Task.FromResult(Lista
+                .Where(r => r.OperadorId == operadorId && r.EstaVigente(fecha))
+                .OrderByDescending(r => r.VigenciaDesde)
+                .FirstOrDefault());
+
+        public Task AgregarAsync(
+            VersionReglasOperativas version,
+            CancellationToken ct)
+        {
+            Lista.Add(version);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class MotivosEnMemoria : IMotivoNoEntregaRepository

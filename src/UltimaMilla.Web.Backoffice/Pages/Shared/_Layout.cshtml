@@ -67,19 +67,20 @@
       }
 
       @if (mostrarMenu)
-      {
-        <nav>
-          <a asp-page="/Index">Envíos</a>
-          <a asp-page="/Tarifas">Tarifas</a>
-          <a asp-page="/Zonas">Zonas de cobertura</a>
-          <a asp-page="/HojasDeRuta">Hojas de ruta</a>
-          <a asp-page="/SeleccionarOperador">Cambiar operador</a>
+{
+    <nav>
+        <a asp-page="/Index">Envíos</a>
+        <a asp-page="/Tarifas">Tarifas</a>
+        <a asp-page="/ReglasOperativas">Reglas operativas</a>
+        <a asp-page="/Zonas">Zonas de cobertura</a>
+        <a asp-page="/HojasDeRuta">Hojas de ruta</a>
+        <a asp-page="/SeleccionarOperador">Cambiar operador</a>
 
-          <button type="button" id="btnCerrarSesion" class="peligro">
-              Cerrar sesión
-          </button>
-      </nav>
-      }
+        <button type="button" id="btnCerrarSesion" class="peligro">
+            Cerrar sesión
+        </button>
+    </nav>
+}
     </header>
     <main>@RenderBody()</main>
     <script>

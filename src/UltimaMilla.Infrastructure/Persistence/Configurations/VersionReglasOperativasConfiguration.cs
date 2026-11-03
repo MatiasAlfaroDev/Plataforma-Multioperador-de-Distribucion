@@ -31,5 +31,9 @@ public sealed class VersionReglasOperativasConfiguration
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(v => new { v.OperadorId, v.VigenciaDesde });
+        builder.HasIndex(v => v.OperadorId)
+            .IsUnique()
+            .HasFilter("\"VigenciaHasta\" IS NULL")
+            .HasDatabaseName("IX_reglas_operativas_una_vigente_por_operador");
     }
 }

@@ -323,6 +323,10 @@ public class Envio : AuditableEntity, ITenantEntity
                 if (string.IsNullOrWhiteSpace(justificacion))
                     throw new ArgumentException(
                         "Debe justificarse la declaración de extravío.");
+
+                if (justificacion!.Trim().Length > 1000)
+                    throw new ArgumentException(
+                        "La justificación no puede superar los 1000 caracteres.");
                 break;
 
             case DisparadorEnvio.QuitarDeRuta:
@@ -349,7 +353,10 @@ public class Envio : AuditableEntity, ITenantEntity
             origen,
             responsable,
             latitud,
-            longitud);
+            longitud,
+            disparador == DisparadorEnvio.DeclararExtraviado
+                ? justificacion
+                : null);
 
         maquina.Fire(disparador);
 

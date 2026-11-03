@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Versiones corregidas de dependencias transitivas -->
+    <PackageVersion Include="CsvHelper" Version="33.1.0" />
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
     <!-- Application -->

@@ -308,6 +308,21 @@ public class MisHojasDeRutaTests
         public Task<VersionReglasOperativas?> ObtenerPorIdAsync(Guid operadorId, Guid versionId, CancellationToken ct) =>
             Task.FromResult<VersionReglasOperativas?>(
                 reglas.OperadorId == operadorId && reglas.Id == versionId ? reglas : null);
+
+        public Task<VersionReglasOperativas?> ObtenerVigenteParaActualizarAsync(
+            Guid operadorId,
+            DateTimeOffset fecha,
+            CancellationToken ct) =>
+            Task.FromResult<VersionReglasOperativas?>(
+                reglas.OperadorId == operadorId && reglas.EstaVigente(fecha)
+                    ? reglas
+                    : null);
+
+        public Task AgregarAsync(
+            VersionReglasOperativas version,
+            CancellationToken ct) =>
+            throw new NotSupportedException(
+                "Este repositorio de prueba no permite agregar versiones.");
     }
 
     private sealed class UnidadDeTrabajoEnMemoria : IUnitOfWork

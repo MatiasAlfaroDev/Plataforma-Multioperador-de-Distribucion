@@ -484,6 +484,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OperadorId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_reglas_operativas_una_vigente_por_operador")
+                        .HasFilter("\"VigenciaHasta\" IS NULL");
+
                     b.HasIndex("OperadorId", "VigenciaDesde");
 
                     b.ToTable("versiones_reglas_operativas", (string)null);
@@ -732,6 +737,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Justificacion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<decimal?>("Latitud")
                         .HasPrecision(9, 6)
