@@ -75,7 +75,9 @@ public sealed class BaseDeDatosLocal
                     ultimo_error TEXT,
                     latitud      REAL,
                     longitud     REAL,
-                    foto         TEXT
+                    foto         TEXT,
+                    documento    TEXT,
+                    firma        TEXT
 
                 );
                 """;
@@ -85,6 +87,8 @@ public sealed class BaseDeDatosLocal
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "latitud", "REAL");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "longitud", "REAL");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "foto", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "documento", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "firma", "TEXT");
 
             _cadenaDeConexion = cadena;
         }

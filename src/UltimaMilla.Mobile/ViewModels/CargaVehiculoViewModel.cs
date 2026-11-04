@@ -15,11 +15,40 @@ public partial class CargaVehiculoViewModel : ObservableObject
 {
     private readonly IEnviosApi _api;
     private readonly IDialogos _dialogos;
+    private readonly ILectorCodigos _lector;
 
-    public CargaVehiculoViewModel(IEnviosApi api, IDialogos dialogos)
+    public CargaVehiculoViewModel(IEnviosApi api, IDialogos dialogos, ILectorCodigos lector)
     {
         _api = api;
         _dialogos = dialogos;
+        _lector = lector;
+    }
+
+    /// <summary>En Windows no hay lector de cámara: se muestra solo el campo de texto.</summary>
+    public bool HayLectorCamara => _lector.Disponible;
+
+    /// <summary>Saca una foto del código del bulto y lo agrega como si se hubiera escrito.</summary>
+    [RelayCommand]
+    private Task EscanearAsync() => LeerCodigoAsync(desdeGaleria: false);
+
+    /// <summary>Lee el código de una imagen guardada (sirve para probar en el emulador, que no ve etiquetas reales).</summary>
+    [RelayCommand]
+    private Task EscanearDesdeImagenAsync() => LeerCodigoAsync(desdeGaleria: true);
+
+    private async Task LeerCodigoAsync(bool desdeGaleria)
+    {
+        if (HojaElegida is null)
+            return;
+
+        var leido = await _lector.LeerAsync(desdeGaleria);
+        if (leido is null)
+        {
+            MostrarMensaje("No se encontró ningún código en la imagen. Probá de nuevo, más cerca y con buena luz.", alerta: true);
+            return;
+        }
+
+        Codigo = leido;
+        AgregarCodigo();
     }
 
     /// <summary>Las hojas de ruta de hoy del repartidor.</summary>

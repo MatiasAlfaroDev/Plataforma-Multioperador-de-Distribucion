@@ -68,6 +68,15 @@
                     <Border Style="{StaticResource Tarjeta}" Padding="14" IsVisible="{Binding HayHojaElegida}">
                         <VerticalStackLayout Spacing="8">
                             <Label Text="Escaneá o escribí el código del bulto" Style="{StaticResource EtiquetaCampo}" />
+
+                            <!-- Con la cámara del celular (o una imagen guardada, para probar en el emulador) -->
+                            <Grid ColumnDefinitions="2*,*" ColumnSpacing="10" IsVisible="{Binding HayLectorCamara}">
+                                <Button Text="📷  Escanear con la cámara" Style="{StaticResource BotonPrimario}"
+                                        Command="{Binding EscanearCommand}" />
+                                <Button Grid.Column="1" Text="🖼️  Imagen" Style="{StaticResource BotonSecundario}"
+                                        Command="{Binding EscanearDesdeImagenCommand}" />
+                            </Grid>
+
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                 <Border Style="{StaticResource Campo}">
                                     <Entry x:Name="CampoCodigo"

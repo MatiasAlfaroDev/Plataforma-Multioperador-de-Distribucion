@@ -31,6 +31,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     private readonly IConnectivity _conectividad;
     private readonly IDialogos _dialogos;
     private readonly ICaptura _captura;
+    private readonly IFirma _firma;
 
     public EnviosViewModel(
         IEnviosApi api,
@@ -39,7 +40,8 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         SincronizacionService sincronizacion,
         IConnectivity conectividad,
         IDialogos dialogos,
-        ICaptura captura)
+        ICaptura captura,
+        IFirma firma)
     {
         _api = api;
         _ruta = ruta;
@@ -48,6 +50,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         _conectividad = conectividad;
         _dialogos = dialogos;
         _captura = captura;
+        _firma = firma;
     }
 
     public ObservableCollection<EnvioRuta> Envios { get; } = new();
@@ -215,8 +218,19 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         if (receptor is null)
             return;
 
-        // Prueba de entrega (RF 20): foto + posición y hora del dispositivo.
+        // Prueba de entrega (RF 20): nombre, documento, firma en pantalla, foto, y posición y hora del dispositivo.
+        var documento = await _dialogos.PedirTextoAsync("Entrega", $"Documento de {receptor}:");
+        if (documento is null)
+            return;
+
         var id = Guid.NewGuid();
+        var firma = await _firma.PedirFirmaAsync(id, receptor);
+        if (firma is null)
+        {
+            await _dialogos.AvisarAsync("Entrega", "La entrega necesita la firma del receptor.");
+            return;
+        }
+
         var foto = await _captura.SacarFotoAsync(id);
         if (foto is null)
         {
@@ -237,6 +251,8 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             EnvioId = envio.Id,
             Tipo = "Entregado",
             Receptor = receptor,
+            DocumentoReceptor = documento,
+            ReferenciaFirma = firma,
             FechaHora = DateTimeOffset.UtcNow,
             Latitud = ubicacion.Value.Latitud,
             Longitud = ubicacion.Value.Longitud,

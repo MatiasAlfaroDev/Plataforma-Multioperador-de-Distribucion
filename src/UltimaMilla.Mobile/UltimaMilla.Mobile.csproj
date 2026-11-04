@@ -72,6 +72,8 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.11" />
+		<!-- Lectura de códigos de barras y QR (6.11). Biblioteca 100 % .NET: no trae dependencias de AndroidX. -->
+		<PackageReference Include="ZXing.Net" Version="0.16.11" />
 	</ItemGroup>
 
 	<!-- Notificaciones push (solo Android): Firebase Cloud Messaging.

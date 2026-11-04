@@ -111,6 +111,8 @@ public class EnviosApi : IEnviosApi
             longitud = evento.Longitud,
             // La misma foto es prueba de entrega o evidencia del intento fallido, según el tipo.
             referenciaFotografia = esEntrega ? evento.ReferenciaFoto : null,
+            documentoReceptor = esEntrega ? evento.DocumentoReceptor : null,
+            referenciaFirma = esEntrega ? evento.ReferenciaFirma : null,
             evidenciaFallo = esEntrega ? null : evento.ReferenciaFoto
         };
 
