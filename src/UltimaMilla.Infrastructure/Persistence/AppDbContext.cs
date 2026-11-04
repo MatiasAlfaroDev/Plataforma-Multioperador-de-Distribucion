@@ -42,6 +42,7 @@ public sealed class AppDbContext(
     public DbSet<PruebaEntrega> PruebasEntrega => Set<PruebaEntrega>();
     public DbSet<SolicitudReprogramacion> SolicitudesReprogramacion => Set<SolicitudReprogramacion>();
     public DbSet<EventoMovil> EventosMovil => Set<EventoMovil>();
+    public DbSet<PosicionRepartidor> PosicionesRepartidor => Set<PosicionRepartidor>();
     public DbSet<ZonaCobertura> ZonasCobertura => Set<ZonaCobertura>();
     public DbSet<CuadroTarifario> CuadrosTarifarios => Set<CuadroTarifario>();
     public DbSet<VersionTarifaria> VersionesTarifarias => Set<VersionTarifaria>();
@@ -104,6 +105,12 @@ public sealed class AppDbContext(
                x.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<EventoMovil>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        // Recorrido de los repartidores: cada operador ve solo el de los suyos.
+        modelBuilder.Entity<PosicionRepartidor>()
             .HasQueryFilter(x =>
                 AccesoInicializacion ||
                 x.OperadorId == OperadorActualId);

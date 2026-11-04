@@ -26,6 +26,9 @@ public interface IEnviosApi
     Task<IReadOnlyList<HojaDeRutaItem>> ListarMisHojasAsync(CancellationToken ct = default);
 
     /// <summary>Despacha la hoja con los bultos escaneados. Devuelve si salió bien y el mensaje para mostrar.</summary>
+    /// <summary>Manda un lote de posiciones de la jornada (RF 23).</summary>
+    Task<ResultadoEnvio> EnviarPosicionesAsync(IReadOnlyList<PosicionPendiente> posiciones, CancellationToken ct = default);
+
     Task<(bool Ok, string Mensaje)> DespacharAsync(Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default);
 
     /// <summary>Manda al servidor un evento registrado en el teléfono (entrega o intento fallido).</summary>

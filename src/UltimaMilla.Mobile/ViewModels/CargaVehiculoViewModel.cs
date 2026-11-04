@@ -16,12 +16,17 @@ public partial class CargaVehiculoViewModel : ObservableObject
     private readonly IEnviosApi _api;
     private readonly IDialogos _dialogos;
     private readonly ILectorCodigos _lector;
+    private readonly IBiometria _biometria;
+    private readonly ISeguimiento _seguimiento;
 
-    public CargaVehiculoViewModel(IEnviosApi api, IDialogos dialogos, ILectorCodigos lector)
+    public CargaVehiculoViewModel(
+        IEnviosApi api, IDialogos dialogos, ILectorCodigos lector, IBiometria biometria, ISeguimiento seguimiento)
     {
         _api = api;
         _dialogos = dialogos;
         _lector = lector;
+        _biometria = biometria;
+        _seguimiento = seguimiento;
     }
 
     /// <summary>En Windows no hay lector de cámara: se muestra solo el campo de texto.</summary>
@@ -217,6 +222,17 @@ public partial class CargaVehiculoViewModel : ObservableObject
         if (HojaElegida is not { } hoja)
             return;
 
+        // Operación sensible (6.11): una vez despachada, los envíos quedan En tránsito a nombre del repartidor.
+        var confirmacion = await _biometria.ConfirmarAsync("Vas a despachar la ruta y salir del depósito.");
+        if (confirmacion == ResultadoBiometria.NoConfigurada)
+        {
+            await _dialogos.AvisarAsync("Despachar",
+                "Para despachar, el teléfono necesita bloqueo de pantalla o huella configurados.");
+            return;
+        }
+        if (confirmacion != ResultadoBiometria.Confirmado)
+            return;
+
         EstaCargando = true;
         try
         {
@@ -230,7 +246,11 @@ public partial class CargaVehiculoViewModel : ObservableObject
                 return;
             }
 
-            await _dialogos.AvisarAsync("¡En camino!", texto);
+            // Empieza la jornada: se comparte la ubicación hasta "Terminar jornada" (RF 23).
+            var siguiendo = await _seguimiento.IniciarAsync();
+            await _dialogos.AvisarAsync("¡En camino!", siguiendo
+                ? texto
+                : $"{texto}\n\nNo se pudo compartir tu ubicación: revisá el permiso de ubicación de la app.");
 
             // Vuelve a la ruta y la recarga: los envíos ahora están En tránsito y se pueden entregar.
             await Shell.Current.GoToAsync("..", new Dictionary<string, object> { ["recargar"] = true });

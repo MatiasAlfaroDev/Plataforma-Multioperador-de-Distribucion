@@ -13,6 +13,9 @@ internal static class CanalesDeAvisos
     /// <summary>Mismo id que manda el servidor (FirebaseNotificadorPush) y que figura en AndroidManifest.xml.</summary>
     public const string Urgentes = "avisos_urgentes";
 
+    /// <summary>Aviso fijo mientras se comparte la ubicación (importancia baja: no suena).</summary>
+    public const string Seguimiento = "seguimiento_jornada";
+
     /// <summary>Se llama al arrancar la app (MainApplication). Crearlo dos veces no hace nada.</summary>
     public static void Crear(Context contexto)
     {
@@ -24,8 +27,14 @@ internal static class CanalesDeAvisos
             Description = "Reasignaciones de envíos y cambios en la ruta"
         };
 
+        var seguimiento = new NotificationChannel(Seguimiento, "Jornada en curso", NotificationImportance.Low)
+        {
+            Description = "Aviso fijo mientras se comparte la ubicación con el operador"
+        };
+
         var administrador = (NotificationManager?)contexto.GetSystemService(Context.NotificationService);
         administrador?.CreateNotificationChannel(canal);
+        administrador?.CreateNotificationChannel(seguimiento);
     }
 
     /// <summary>
