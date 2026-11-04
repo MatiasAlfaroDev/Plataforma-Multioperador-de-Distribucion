@@ -35,6 +35,12 @@ public sealed class EventoPendiente
     /// <summary>Referencia de la foto: prueba de entrega (Entregado) o evidencia (NoEntregado).</summary>
     public string? ReferenciaFoto { get; set; }
 
+    /// <summary>Documento de quien recibió, solo para "Entregado" (RF 20).</summary>
+    public string? DocumentoReceptor { get; set; }
+
+    /// <summary>Referencia de la firma en pantalla (archivo SVG), solo para "Entregado" (RF 20).</summary>
+    public string? ReferenciaFirma { get; set; }
+
     public int Intentos { get; set; }
     public string? UltimoError { get; set; }
 }

@@ -22,8 +22,8 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         var insertar = conexion.CreateCommand();
         insertar.Transaction = tx;
         insertar.CommandText = """
-            INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora, latitud, longitud, foto)
-            VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha, $lat, $lon, $foto)
+            INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora, latitud, longitud, foto, documento, firma)
+            VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha, $lat, $lon, $foto, $documento, $firma)
             """;
         insertar.Parameters.AddWithValue("$id", evento.Id.ToString());
         insertar.Parameters.AddWithValue("$envio", evento.EnvioId.ToString());
@@ -34,6 +34,8 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         insertar.Parameters.AddWithValue("$lat", (object?)evento.Latitud ?? DBNull.Value);
         insertar.Parameters.AddWithValue("$lon", (object?)evento.Longitud ?? DBNull.Value);
         insertar.Parameters.AddWithValue("$foto", (object?)evento.ReferenciaFoto ?? DBNull.Value);
+        insertar.Parameters.AddWithValue("$documento", (object?)evento.DocumentoReceptor ?? DBNull.Value);
+        insertar.Parameters.AddWithValue("$firma", (object?)evento.ReferenciaFirma ?? DBNull.Value);
         await insertar.ExecuteNonQueryAsync();
 
         var marcar = conexion.CreateCommand();
@@ -52,7 +54,7 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         await using var conexion = await db.AbrirAsync();
         var comando = conexion.CreateCommand();
         comando.CommandText = """
-            SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error, latitud, longitud, foto
+            SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error, latitud, longitud, foto, documento, firma
             FROM eventos_pendientes
             ORDER BY fecha_hora
             """;
@@ -73,7 +75,9 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
                 UltimoError = lector.IsDBNull(7) ? null : lector.GetString(7),
                 Latitud = lector.IsDBNull(8) ? null : (decimal)lector.GetDouble(8),
                 Longitud = lector.IsDBNull(9) ? null : (decimal)lector.GetDouble(9),
-                ReferenciaFoto = lector.IsDBNull(10) ? null : lector.GetString(10)
+                ReferenciaFoto = lector.IsDBNull(10) ? null : lector.GetString(10),
+                DocumentoReceptor = lector.IsDBNull(11) ? null : lector.GetString(11),
+                ReferenciaFirma = lector.IsDBNull(12) ? null : lector.GetString(12)
             });
         }
         return lista;

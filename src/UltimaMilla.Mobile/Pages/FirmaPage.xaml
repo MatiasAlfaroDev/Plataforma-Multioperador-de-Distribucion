@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:UltimaMilla.Mobile.Controls"
+             x:Class="UltimaMilla.Mobile.Pages.FirmaPage"
+             Title="Firma del receptor">
+
+    <!-- Se abre encima de la ruta (modal). En pantallas anchas queda centrada con 680 de ancho. -->
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16" RowSpacing="14"
+          WidthRequest="{OnIdiom Phone=-1, Default=680}"
+          HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
+
+        <VerticalStackLayout Spacing="4">
+            <Label Text="Firma del receptor" Style="{StaticResource Titulo}" />
+            <Label x:Name="Indicacion" Style="{StaticResource Secundario}" FontSize="15" />
+        </VerticalStackLayout>
+
+        <!-- Recuadro para firmar -->
+        <Border Grid.Row="1" Style="{StaticResource Tarjeta}" Padding="0" BackgroundColor="White">
+            <Grid>
+                <Label Text="Firmá acá con el dedo" TextColor="{StaticResource Gray300}" FontSize="16"
+                       HorizontalOptions="Center" VerticalOptions="End" Margin="0,0,0,24" InputTransparent="True" />
+                <BoxView HeightRequest="1" Color="{StaticResource Gray200}" VerticalOptions="End"
+                         Margin="32,0,32,56" InputTransparent="True" />
+                <controls:PanelFirma x:Name="Panel" BackgroundColor="Transparent" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" ColumnDefinitions="*,*,2*" ColumnSpacing="10">
+            <Button Text="Cancelar" Style="{StaticResource BotonTexto}" Clicked="AlCancelar" />
+            <Button Grid.Column="1" Text="Borrar" Style="{StaticResource BotonSecundario}" Clicked="AlBorrar" />
+            <Button Grid.Column="2" Text="Confirmar firma" Style="{StaticResource BotonPrimario}" Clicked="AlConfirmar" />
+        </Grid>
+    </Grid>
+</ContentPage>
