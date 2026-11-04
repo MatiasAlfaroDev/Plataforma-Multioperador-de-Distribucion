@@ -73,6 +73,14 @@
                                 </Border>
                             </Grid>
 
+                            <!-- Jornada en curso: se comparte la ubicación (RF 23) -->
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" IsVisible="{Binding SeguimientoActivo}">
+                                <Label Text="📍  Compartiendo tu ubicación" TextColor="White" FontSize="13"
+                                       FontFamily="OpenSansSemibold" VerticalOptions="Center" />
+                                <Button Grid.Column="1" Text="Terminar jornada" Style="{StaticResource BotonSobreHero}"
+                                        Command="{Binding TerminarJornadaCommand}" />
+                            </Grid>
+
                             <!-- Acción principal antes de salir: cargar el vehículo y despachar -->
                             <Button Text="📦  Cargar vehículo y despachar" Style="{StaticResource BotonSobreHero}"
                                     Command="{Binding IrACargaCommand}" />

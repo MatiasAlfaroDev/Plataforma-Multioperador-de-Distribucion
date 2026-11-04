@@ -132,6 +132,27 @@ public class EnviosApi : IEnviosApi
         }
     }
 
+    /// <summary>POST /api/repartidor/posiciones con un lote. Reenviar es seguro: el servidor ignora las repetidas.</summary>
+    public async Task<ResultadoEnvio> EnviarPosicionesAsync(IReadOnlyList<PosicionPendiente> posiciones, CancellationToken ct = default)
+    {
+        try
+        {
+            using var respuesta = await _http.PostAsJsonAsync("api/repartidor/posiciones", new { posiciones }, ct);
+            if (respuesta.IsSuccessStatusCode)
+                return ResultadoEnvio.Aceptado;
+
+            // 400 = el lote tiene datos inválidos: reintentarlo no sirve. Cualquier otra cosa
+            // (sesión vencida, servidor caído) se reintenta más tarde, así no se pierde el recorrido.
+            return respuesta.StatusCode == HttpStatusCode.BadRequest
+                ? ResultadoEnvio.Rechazado
+                : ResultadoEnvio.SinConexion;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return ResultadoEnvio.SinConexion;
+        }
+    }
+
     /// <summary>
     /// La API explica el rechazo en un ProblemDetails: { "title": "El envío debe estar en tránsito..." }.
     /// Se guarda solo ese texto, que es el que ve el repartidor.

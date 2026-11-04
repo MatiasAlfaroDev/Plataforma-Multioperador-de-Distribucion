@@ -83,6 +83,18 @@ public sealed class BaseDeDatosLocal
                 """;
             await comando.ExecuteNonQueryAsync();
 
+            // Posiciones de la jornada (RF 23) que todavía no llegaron al servidor.
+            var posiciones = conexion.CreateCommand();
+            posiciones.CommandText = """
+                CREATE TABLE IF NOT EXISTS posiciones_pendientes (
+                    id         TEXT PRIMARY KEY,
+                    latitud    REAL NOT NULL,
+                    longitud   REAL NOT NULL,
+                    fecha_hora TEXT NOT NULL
+                );
+                """;
+            await posiciones.ExecuteNonQueryAsync();
+
             // Migración local: teléfonos con la base de una versión anterior.
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "latitud", "REAL");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "longitud", "REAL");

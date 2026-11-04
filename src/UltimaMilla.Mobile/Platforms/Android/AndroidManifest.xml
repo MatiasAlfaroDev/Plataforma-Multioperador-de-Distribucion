@@ -11,6 +11,11 @@
 	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<!-- Seguimiento de la jornada (RF 23): servicio en primer plano de tipo ubicación -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+	<!-- Validación biométrica de operaciones sensibles (6.11) -->
+	<uses-permission android:name="android.permission.USE_BIOMETRIC" />
 	<queries>
 		<intent>
 			<action android:name="android.media.action.IMAGE_CAPTURE" />

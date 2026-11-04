@@ -15,16 +15,19 @@ public sealed class SincronizacionService
 {
     private readonly IEnviosApi _api;
     private readonly EventosPendientesRepository _eventos;
+    private readonly PosicionesRepository _posiciones;
     private readonly IConnectivity _conectividad;
     private readonly SemaphoreSlim _enCurso = new(1, 1);
 
     /// <summary>Avisa a quien esté mirando (el ViewModel) que terminó una sincronización.</summary>
     public event EventHandler<ResultadoSincronizacion>? Sincronizado;
 
-    public SincronizacionService(IEnviosApi api, EventosPendientesRepository eventos, IConnectivity conectividad)
+    public SincronizacionService(
+        IEnviosApi api, EventosPendientesRepository eventos, PosicionesRepository posiciones, IConnectivity conectividad)
     {
         _api = api;
         _eventos = eventos;
+        _posiciones = posiciones;
         _conectividad = conectividad;
         _conectividad.ConnectivityChanged += AlCambiarConectividad;
     }
@@ -42,6 +45,24 @@ public sealed class SincronizacionService
         catch
         {
             // Un error acá no debe tirar la app: el próximo cambio de conectividad o el botón reintentan.
+        }
+    }
+
+    /// <summary>Manda las posiciones guardadas. Devuelve false si se cortó la conexión.</summary>
+    private async Task<bool> SincronizarPosicionesAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var lote = await _posiciones.ListarLoteAsync(200);
+            if (lote.Count == 0)
+                return true;
+
+            var resultado = await _api.EnviarPosicionesAsync(lote, ct);
+            if (resultado == ResultadoEnvio.SinConexion)
+                return false;
+
+            // Aceptado, o rechazado por datos inválidos (reintentarlo no serviría): sale de la cola.
+            await _posiciones.ConfirmarAsync(lote.Select(p => p.Id));
         }
     }
 
@@ -77,6 +98,10 @@ public sealed class SincronizacionService
                     rechazados++;
                 }
             }
+
+            // Después de los eventos, las posiciones de la jornada (RF 23), de a lotes de 200.
+            if (!sinConexion)
+                sinConexion = !await SincronizarPosicionesAsync(ct);
         }
         finally
         {
