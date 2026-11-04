@@ -22,23 +22,39 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
         db.Envios.AnyAsync(e => e.CuentaComercialId == cuentaComercialId && e.ReferenciaExterna == referenciaExterna, ct);
 
     public async Task<IReadOnlyList<Envio>> ListarAsync(
-    Guid operadorId,
-    Guid? cuentaComercialId,
-    CancellationToken ct)
-{
-    var consulta = db.Envios
-        .AsNoTracking()
-        .Include(e => e.Bultos)
-        .Where(e => e.OperadorId == operadorId);
-
-    if (cuentaComercialId.HasValue)
+        Guid operadorId,
+        Guid? cuentaComercialId,
+        CancellationToken ct)
     {
-        consulta = consulta.Where(
-            e => e.CuentaComercialId == cuentaComercialId.Value);
+        var consulta = db.Envios
+            .AsNoTracking()
+            .Include(e => e.Bultos)
+            .Where(e => e.OperadorId == operadorId);
+
+        if (cuentaComercialId.HasValue)
+        {
+            consulta = consulta.Where(
+                e => e.CuentaComercialId == cuentaComercialId.Value);
+        }
+
+        return await consulta
+            .OrderByDescending(e => e.FechaAlta)
+            .ToListAsync(ct);
     }
 
-    return await consulta
-        .OrderByDescending(e => e.FechaAlta)
-        .ToListAsync(ct);
-}
+    public async Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
+        Guid operadorId,
+        CancellationToken ct)
+    {
+        return await db.Envios
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(e => e.Bultos)
+            .Include(e => e.Intentos)
+            .Where(e => e.OperadorId == operadorId &&
+                (e.Estado == EstadoEnvio.EnDeposito ||
+                e.Estado == EstadoEnvio.Reprogramado))
+            .OrderByDescending(e => e.FechaAlta)
+            .ToListAsync(ct);
+    }
 }

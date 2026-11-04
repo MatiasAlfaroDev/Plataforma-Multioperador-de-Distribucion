@@ -484,6 +484,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OperadorId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_reglas_operativas_una_vigente_por_operador")
+                        .HasFilter("\"VigenciaHasta\" IS NULL");
+
                     b.HasIndex("OperadorId", "VigenciaDesde");
 
                     b.ToTable("versiones_reglas_operativas", (string)null);
@@ -733,6 +738,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("Justificacion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<decimal?>("Latitud")
                         .HasPrecision(9, 6)
                         .HasColumnType("numeric(9,6)");
@@ -890,6 +899,40 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("pruebas_entrega", (string)null);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.SolicitudReprogramacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AtendidaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("SolicitadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId")
+                        .IsUnique()
+                        .HasFilter("\"Estado\" = 'Pendiente'");
+
+                    b.HasIndex("OperadorId", "Estado");
+
+                    b.ToTable("solicitudes_reprogramacion", (string)null);
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>
@@ -1128,6 +1171,14 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DespachadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<DateOnly>("Fecha")
                         .HasColumnType("date");
 
@@ -1196,7 +1247,8 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasFilter("\"liberada_en\" IS NULL");
 
                     b.HasIndex("HojaDeRutaId", "Orden")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"liberada_en\" IS NULL");
 
                     b.ToTable("paradas_ruta", (string)null);
                 });
@@ -1573,6 +1625,15 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .WithOne("PruebaEntrega")
                         .HasForeignKey("UltimaMilla.Domain.Envios.PruebaEntrega", "IntentoEntregaId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.SolicitudReprogramacion", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Envios.Envio", null)
+                        .WithMany()
+                        .HasForeignKey("EnvioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Notificaciones.DispositivoMovil", b =>

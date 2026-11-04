@@ -110,5 +110,12 @@ public class EditarZonaHandlerTests
             Guardados++;
             return Task.FromResult(1);
         }
+        public Task EjecutarEnTransaccionAsync(
+            Func<CancellationToken, Task> operacion,
+            CancellationToken ct)
+        {
+            ArgumentNullException.ThrowIfNull(operacion);
+            return operacion(ct);
+        }
     }
 }

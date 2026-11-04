@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
 using UltimaMilla.Api.Errores;
@@ -8,13 +9,18 @@ using UltimaMilla.Api.Salud;
 using UltimaMilla.Application;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
+using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
+using UltimaMilla.Application.Envios.Commands.Reprogramacion;
+using UltimaMilla.Application.Envios.Queries.ListarSolicitudesReprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
 using UltimaMilla.Infrastructure;
 using UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
+using UltimaMilla.Application.Configuracion.Commands.ActualizarReglasOperativas;
+using UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigentes;
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.CrearZona;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
@@ -22,8 +28,13 @@ using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
+using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
+using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
+using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using UltimaMilla.Infrastructure.Identidad;
@@ -227,6 +238,55 @@ api.MapPost("/envios", async (
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
     Perfiles.Comercio));
+
+
+api.MapPost("/envios/importar-csv", async (
+    HttpContext context,
+    IAntiforgery antiforgery,
+    IFormFile archivo,
+    [FromForm] Guid cuentaComercialId,
+    ImportarEnviosCsvHandler handler,
+    CancellationToken ct) =>
+{
+    if (!await antiforgery.IsRequestValidAsync(context))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Token de seguridad inválido",
+            detail: "La solicitud no contiene un token antifalsificación válido.");
+    }
+
+    const long maxBytes = 5 * 1024 * 1024;
+
+    if (archivo.Length == 0 || archivo.Length > maxBytes)
+    {
+        return Results.BadRequest(
+            "El archivo debe tener contenido y no superar los 5 MB.");
+    }
+
+    if (!Path.GetExtension(archivo.FileName)
+        .Equals(".csv", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(
+            "El archivo debe tener extensión .csv.");
+    }
+
+    await using var stream = archivo.OpenReadStream();
+    using var lector = new StreamReader(stream);
+
+    var resultado = await handler.Handle(
+        cuentaComercialId,
+        lector,
+        ct);
+
+    return Results.Ok(resultado);
+})
+.DisableAntiforgery()
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
+
 // GET /api/envios?operadorId=... → listado para el Backoffice.
 // GET /api/envios → listado según el operador y perfil autenticado.
 api.MapGet("/envios", async (
@@ -287,6 +347,144 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
     Perfiles.AdministradorOperador,
     Perfiles.Operador));
 
+api.MapPost("/envios/{envioId:guid}/retorno-deposito",
+    async (
+        Guid envioId,
+        RecibirEnDepositoRequest request,
+        RetornarADepositoHandler handler,
+        CancellationToken ct) =>
+    {
+        await handler.Handle(
+            new RetornarADepositoCommand(
+                envioId,
+                request.IdentificacionesEscaneadas,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    });
+
+// Declarar un envío como extraviado.
+api.MapPost("/envios/{envioId:guid}/extravio",
+    async (
+        Guid envioId,
+        DeclararExtravioRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        DeclararExtravioHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new DeclararExtravioCommand(
+                operadorId,
+                envioId,
+                request.Justificacion,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+
+// Registrar la reaparición de un envío extraviado.
+api.MapPost("/envios/{envioId:guid}/reaparicion",
+    async (
+        Guid envioId,
+        RegistrarReaparicionRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        RegistrarReaparicionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new RegistrarReaparicionCommand(
+                operadorId,
+                envioId,
+                request.IdentificacionesEscaneadas,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+// Solicitudes de reprogramación pendientes para Backoffice.
+api.MapGet("/solicitudes-reprogramacion/pendientes",
+    async (
+        ListarSolicitudesReprogramacionHandler handler,
+        CancellationToken ct) =>
+    {
+        var solicitudes = await handler.Handle(ct);
+        return Results.Ok(solicitudes);
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+api.MapPost("/solicitudes-reprogramacion/{solicitudId:guid}/confirmar",
+    async (
+        Guid solicitudId,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ConfirmarReprogramacionRequest request,
+        ConfirmarReprogramacionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido",
+                detail: "La solicitud no contiene un token antifalsificación válido.");
+        }
+
+        await handler.Handle(
+            new ConfirmarReprogramacionCommand(
+                solicitudId,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
 api.MapPost("/tarifas", async (ActualizarTarifaCommand command, ActualizarTarifaHandler handler, CancellationToken ct) =>
 {
     var id = await handler.Handle(command, ct);
@@ -302,6 +500,56 @@ api.MapGet("/tarifas/vigente", async (Guid operadorId, Guid zonaCoberturaId, Obt
         ? Results.NotFound()
         : Results.Ok(tarifa);
 });
+
+api.MapGet("/reglas-operativas/vigente", async (
+    Guid operadorId,
+    HttpContext context,
+    ObtenerReglasOperativasVigentesHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorSesion) ||
+        operadorSesion != operadorId)
+    {
+        return Results.Forbid();
+    }
+
+    var reglas = await handler.Handle(
+        new ObtenerReglasOperativasVigentesQuery(operadorSesion),
+        ct);
+
+    return reglas is null
+        ? Results.NotFound()
+        : Results.Ok(reglas);
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapPost("/reglas-operativas", async (
+    ActualizarReglasOperativasCommand command,
+    HttpContext context,
+    ActualizarReglasOperativasHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorSesion) ||
+        operadorSesion != command.OperadorId)
+    {
+        return Results.Forbid();
+    }
+
+    var id = await handler.Handle(command, ct);
+
+    return Results.Ok(new { id });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+    
 api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, CancellationToken ct) =>
 {
     var zonas = await handler.Handle(
@@ -367,11 +615,18 @@ api.MapPost("/hojas-de-ruta", async (
 
 api.MapGet("/hojas-de-ruta/opciones", async (
     Guid operadorId,
+    DateOnly? fecha,
+    TimeOnly? horaDesde,
+    TimeOnly? horaHasta,
     ConsultarHojasDeRutaHandler handler,
     CancellationToken ct) =>
 {
     var opciones = await handler.ObtenerOpcionesAsync(
-        operadorId, ct);
+        operadorId,
+        fecha,
+        horaDesde,
+        horaHasta,
+        ct);
 
     return Results.Ok(opciones);
 });
@@ -405,6 +660,90 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
             enviosActualizados = cantidad
         });
     });
+
+api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
+    async (
+        Guid hojaId,
+        Guid envioId,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        [FromBody] QuitarEnvioDeRutaRequest request,
+        QuitarEnvioDeRutaHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido",
+                detail: "La solicitud no contiene un token antifalsificación válido.");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado",
+                detail: "El usuario autenticado no tiene un operador asociado.");
+        }
+
+        await handler.Handle(
+            new QuitarEnvioDeRutaCommand(
+                operadorId,
+                hojaId,
+                envioId,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios",
+    async (
+        Guid hojaId,
+        AgregarEnvioARutaRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        AgregarEnvioARutaHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        var horarios = await handler.Handle(
+            new AgregarEnvioARutaCommand(
+                operadorId,
+                hojaId,
+                request.EnvioId,
+                request.HoraEntregaDesde,
+                request.HoraEntregaHasta),
+            ct);
+
+        return Results.Ok(new
+        {
+            hojaDeRutaId = hojaId,
+            horarios
+        });
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
 
 // GET /api/repartidor/hojas-de-ruta?fecha=2026-10-28 → las hojas de ruta del repartidor logueado en la app,
 // con sus paradas y los bultos a cargar. La fecha la manda el teléfono (es "hoy" en Uruguay, no en UTC).
@@ -465,6 +804,9 @@ public partial class Program { }
 
 public sealed record EventoMovilRequest( Guid IdEvento,  string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null);
 public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record ConfirmarReprogramacionRequest( string Responsable);
+public sealed record QuitarEnvioDeRutaRequest(string Responsable);
+public sealed record AgregarEnvioARutaRequest( Guid EnvioId, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta);
 
 /// <summary>Cuerpo de PUT /api/zonas/{id}; la zona viaja en la URL.</summary>
 public sealed record EditarZonaRequest(
@@ -477,3 +819,6 @@ public sealed record EditarZonaRequest(
 
 /// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/despachar; la hoja viaja en la URL.</summary>
 public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEscaneados);
+
+public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
+public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);

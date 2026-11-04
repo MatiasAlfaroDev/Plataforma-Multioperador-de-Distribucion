@@ -295,6 +295,9 @@ public class MisHojasDeRutaTests
 
         public Task<IReadOnlyList<HojaDeRuta>> ListarAsync(Guid operadorId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<HojaDeRuta>>(lista.Where(h => h.OperadorId == operadorId).ToList());
+
+        public Task<HojaDeRuta?> ObtenerPorEnvioActivoAsync( Guid operadorId, Guid envioId, CancellationToken ct) =>
+            Task.FromResult(lista.SingleOrDefault(h => h.OperadorId == operadorId && h.Paradas.Any(p => p.EnvioId == envioId && p.Activa)));
     }
 
     private sealed class ReglasEnMemoria(VersionReglasOperativas reglas) : IVersionReglasOperativasRepository
@@ -305,6 +308,21 @@ public class MisHojasDeRutaTests
         public Task<VersionReglasOperativas?> ObtenerPorIdAsync(Guid operadorId, Guid versionId, CancellationToken ct) =>
             Task.FromResult<VersionReglasOperativas?>(
                 reglas.OperadorId == operadorId && reglas.Id == versionId ? reglas : null);
+
+        public Task<VersionReglasOperativas?> ObtenerVigenteParaActualizarAsync(
+            Guid operadorId,
+            DateTimeOffset fecha,
+            CancellationToken ct) =>
+            Task.FromResult<VersionReglasOperativas?>(
+                reglas.OperadorId == operadorId && reglas.EstaVigente(fecha)
+                    ? reglas
+                    : null);
+
+        public Task AgregarAsync(
+            VersionReglasOperativas version,
+            CancellationToken ct) =>
+            throw new NotSupportedException(
+                "Este repositorio de prueba no permite agregar versiones.");
     }
 
     private sealed class UnidadDeTrabajoEnMemoria : IUnitOfWork
@@ -315,6 +333,14 @@ public class MisHojasDeRutaTests
         {
             Guardados++;
             return Task.FromResult(1);
+        }
+
+        public Task EjecutarEnTransaccionAsync(
+            Func<CancellationToken, Task> operacion,
+            CancellationToken ct)
+        {
+            ArgumentNullException.ThrowIfNull(operacion);
+            return operacion(ct);
         }
     }
 
@@ -339,5 +365,8 @@ public class MisHojasDeRutaTests
 
         public Task<IReadOnlyList<Envio>> ListarAsync(Guid operadorId, Guid? cuentaComercialId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<Envio>>(lista.Where(e => e.OperadorId == operadorId).ToList());
+
+        public Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync( Guid operadorId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Envio>>( lista.Where(e => e.OperadorId == operadorId).ToList());
     }
 }

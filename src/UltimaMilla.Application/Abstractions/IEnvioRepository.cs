@@ -17,4 +17,8 @@ public interface IEnvioRepository
         Guid operadorId,
         Guid? cuentaComercialId,
         CancellationToken ct);
+
+    Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
+        Guid operadorId,
+        CancellationToken ct);
 }

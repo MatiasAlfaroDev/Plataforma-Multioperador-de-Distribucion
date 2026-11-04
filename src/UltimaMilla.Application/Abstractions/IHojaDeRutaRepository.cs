@@ -24,4 +24,9 @@ public interface IHojaDeRutaRepository
     Task<IReadOnlyList<HojaDeRuta>> ListarAsync(
         Guid operadorId,
         CancellationToken ct);
+
+    Task<HojaDeRuta?> ObtenerPorEnvioActivoAsync(
+        Guid operadorId,
+        Guid envioId,
+        CancellationToken ct);
 }

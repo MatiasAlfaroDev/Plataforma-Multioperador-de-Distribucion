@@ -39,7 +39,8 @@ public class HojaDeRutaTests
     private static Envio CrearEnvio(
         Guid operadorId,
         bool recibirEnDeposito = true,
-        decimal peso = 2m)
+        decimal peso = 2m,
+        Action<VersionReglasOperativas>? capturarReglas = null)
     {
         var cuenta = CuentaComercial.Crear(
             Guid.NewGuid(),
@@ -68,6 +69,7 @@ public class HojaDeRutaTests
                 vigenciaDesde: ahora.AddDays(-1));
 
             envio.AsignarReglasOperativas(reglas.Id);
+            capturarReglas?.Invoke(reglas);
 
             envio.Aplicar(
                 DisparadorEnvio.RecibirEnDeposito,
@@ -270,6 +272,199 @@ public class HojaDeRutaTests
             HojaDeRuta.Crear(
                 operadorId, repartidor, vehiculo,
                 DateOnly.FromDateTime(DateTime.Today), 5));
+    }
+
+    [Fact]
+    public void ReordenarParadas_ActualizaOrdenDeLasActivas()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+
+        var primero = CrearEnvio(operadorId);
+        var segundo = CrearEnvio(operadorId);
+
+        ruta.AgregarEnvio(primero);
+        ruta.AgregarEnvio(segundo);
+
+        ruta.ActualizarOrdenParadas(
+        [
+            new HorarioParada(
+                segundo.Id,
+                new TimeOnly(10, 0),
+                new TimeOnly(10, 0)),
+            new HorarioParada(
+                primero.Id,
+                new TimeOnly(11, 0),
+                new TimeOnly(11, 0))
+        ]);
+
+        Assert.Equal(
+            segundo.Id,
+            ruta.Paradas.Single(p => p.Orden == 1).EnvioId);
+
+        Assert.Equal(
+            primero.Id,
+            ruta.Paradas.Single(p => p.Orden == 2).EnvioId);
+    }
+
+    [Fact]
+    public void ReordenarParadas_RechazaSeleccionIncompleta()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+
+        var primero = CrearEnvio(operadorId);
+        var segundo = CrearEnvio(operadorId);
+
+        ruta.AgregarEnvio(primero);
+        ruta.AgregarEnvio(segundo);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ruta.ActualizarOrdenParadas(
+            [
+                new HorarioParada(
+                    primero.Id,
+                    new TimeOnly(10, 0),
+                    new TimeOnly(10, 0))
+            ]));
+
+        Assert.Equal(1, ruta.Paradas.Single(p => p.EnvioId == primero.Id).Orden);
+        Assert.Equal(2, ruta.Paradas.Single(p => p.EnvioId == segundo.Id).Orden);
+    }
+
+    [Fact]
+    public void HojaDespachada_NoPermiteAgregarNiQuitar()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+
+        var primero = CrearEnvio(operadorId);
+        var segundo = CrearEnvio(operadorId);
+
+        ruta.AgregarEnvio(primero);
+        ruta.MarcarDespachada(DateTimeOffset.UtcNow);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ruta.AgregarEnvio(segundo));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ruta.QuitarEnvio(primero, DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void ExtravioEnPreparacion_LiberaParadaYActualizaCapacidad()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var ahora = DateTimeOffset.UtcNow;
+
+        VersionReglasOperativas? reglasPrimero = null;
+
+        var primero = CrearEnvio(
+            operadorId,
+            capturarReglas: reglas => reglasPrimero = reglas);
+
+        var segundo = CrearEnvio(operadorId);
+
+        ruta.AgregarEnvio(primero);
+        ruta.AgregarEnvio(segundo);
+
+        primero.Aplicar(
+            DisparadorEnvio.AsignarARuta,
+            reglasPrimero!,
+            ahora,
+            "Prueba",
+            "OperarioTest");
+
+        var pesoInicial = ruta.PesoAsignadoKg;
+        var volumenInicial = ruta.VolumenAsignadoM3;
+
+        ruta.LiberarParadaPorExtravio(primero, ahora);
+        ruta.PrepararRenumeracionParadas();
+        ruta.RenumerarParadasActivas();
+
+        var paradaLiberada = ruta.Paradas.Single(
+            p => p.EnvioId == primero.Id);
+
+        var paradaActiva = ruta.Paradas.Single(
+            p => p.EnvioId == segundo.Id);
+
+        Assert.False(paradaLiberada.Activa);
+        Assert.True(paradaActiva.Activa);
+        Assert.Equal(1, paradaActiva.Orden);
+
+        Assert.Equal(
+            pesoInicial - primero.PesoTotalKg,
+            ruta.PesoAsignadoKg);
+
+        Assert.Equal(
+            volumenInicial - primero.VolumenTotalMetrosCubicos,
+            ruta.VolumenAsignadoM3);
+
+        Assert.Equal(EstadoHojaDeRuta.EnPreparacion, ruta.Estado);
+    }
+
+    [Fact]
+    public void ExtravioEnHojaDespachada_LiberaParadaSinRenumerar()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var ahora = DateTimeOffset.UtcNow;
+
+        VersionReglasOperativas? reglasPrimero = null;
+
+        var primero = CrearEnvio(
+            operadorId,
+            capturarReglas: reglas => reglasPrimero = reglas);
+
+        var segundo = CrearEnvio(operadorId);
+
+        ruta.AgregarEnvio(primero);
+        ruta.AgregarEnvio(segundo);
+
+        primero.Aplicar(
+            DisparadorEnvio.AsignarARuta,
+            reglasPrimero!,
+            ahora,
+            "Prueba",
+            "OperarioTest");
+
+        ruta.MarcarDespachada(ahora);
+
+        primero.Aplicar(
+            DisparadorEnvio.Despachar,
+            reglasPrimero!,
+            ahora,
+            "Prueba",
+            "OperarioTest");
+
+        var ordenSegundo = ruta.Paradas.Single(
+            p => p.EnvioId == segundo.Id).Orden;
+
+        var pesoInicial = ruta.PesoAsignadoKg;
+        var volumenInicial = ruta.VolumenAsignadoM3;
+
+        ruta.LiberarParadaPorExtravio(primero, ahora);
+
+        var paradaLiberada = ruta.Paradas.Single(
+            p => p.EnvioId == primero.Id);
+
+        var paradaActiva = ruta.Paradas.Single(
+            p => p.EnvioId == segundo.Id);
+
+        Assert.False(paradaLiberada.Activa);
+        Assert.True(paradaActiva.Activa);
+
+        Assert.Equal(ordenSegundo, paradaActiva.Orden);
+        Assert.Equal(EstadoHojaDeRuta.Despachada, ruta.Estado);
+
+        Assert.Equal(
+            pesoInicial - primero.PesoTotalKg,
+            ruta.PesoAsignadoKg);
+
+        Assert.Equal(
+            volumenInicial - primero.VolumenTotalMetrosCubicos,
+            ruta.VolumenAsignadoM3);
     }
 
 }

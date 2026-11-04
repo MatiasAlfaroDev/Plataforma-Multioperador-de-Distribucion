@@ -1,6 +1,7 @@
 
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Configuracion;
 
 namespace UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 
@@ -50,10 +51,14 @@ public sealed class ConsultarHojasDeRutaHandler(
     IVehiculoRepository vehiculos,
     IEnvioRepository envios,
     IHojaDeRutaRepository hojas,
-    IZonaCoberturaRepository zonas)
+    IZonaCoberturaRepository zonas,
+    IVersionReglasOperativasRepository reglasRepository)
 {
     public async Task<OpcionesHojaDeRutaDto> ObtenerOpcionesAsync(
         Guid operadorId,
+        DateOnly? fecha,
+        TimeOnly? horaDesde,
+        TimeOnly? horaHasta,
         CancellationToken ct)
     {
         if (operadorId == Guid.Empty)
@@ -66,10 +71,8 @@ public sealed class ConsultarHojasDeRutaHandler(
         var listaVehiculos = await vehiculos.ListarActivosAsync(
             operadorId, ct);
 
-        var listaEnvios = await envios.ListarAsync(
-            operadorId,
-            null,
-            ct);
+        var listaEnvios = await envios.ListarParaPlanificacionAsync(
+            operadorId, ct);
 
         var zonasOperador = await zonas.ListarPorOperadorAsync(
             operadorId, ct);
@@ -85,10 +88,99 @@ public sealed class ConsultarHojasDeRutaHandler(
             .OrderBy(f => f.HoraDesde)
             .ThenBy(f => f.HoraHasta)
             .ToList();
+        var hayFiltros = fecha.HasValue ||
+                 horaDesde.HasValue ||
+                 horaHasta.HasValue;
 
+        if (hayFiltros && (!fecha.HasValue || !horaDesde.HasValue || !horaHasta.HasValue)){
+            throw new ArgumentException(
+                "Para filtrar envíos deben indicarse fecha, hora de inicio y hora de fin.");
+        }
+
+        if (hayFiltros && horaDesde >= horaHasta){
+            throw new ArgumentException(
+                "La franja horaria no es válida.");
+        }
+
+        DateTimeOffset? inicioEntrega = null;
+
+        if (hayFiltros){
+            var zonaHoraria = TimeZoneInfo.FindSystemTimeZoneById(
+                "America/Montevideo");
+
+            var fechaHoraLocal = DateTime.SpecifyKind(
+                fecha!.Value.ToDateTime(horaDesde!.Value),
+                DateTimeKind.Unspecified);
+
+            inicioEntrega = new DateTimeOffset(
+                fechaHoraLocal,
+                zonaHoraria.GetUtcOffset(fechaHoraLocal));
+        }
+
+        var elegibles = new List<Envio>();
+
+        foreach (var envio in listaEnvios){
+            if (!hayFiltros){
+                elegibles.Add(envio);
+                continue;
+            }
+
+            var zonasCompatibles = zonasOperador
+                .Where(z => z.Activa &&
+                            z.CubreDireccion(
+                                envio.Direccion.Localidad, null))
+                .ToList();
+
+            if (zonasCompatibles.Count != 1 || !zonasCompatibles[0].OfreceFranja( horaDesde!.Value, horaHasta!.Value)){
+                continue;
+            }
+
+            if (envio.Estado == EstadoEnvio.EnDeposito){
+                if (envio.IntentosRealizados > 0)
+                    continue;
+
+                if (envio.FechaEntregaComprometida.HasValue &&
+                    (envio.FechaEntregaComprometida != fecha ||
+                    envio.HoraEntregaDesde != horaDesde ||
+                    envio.HoraEntregaHasta != horaHasta)){
+                    continue;
+                }
+            }
+            else if (envio.Estado == EstadoEnvio.Reprogramado){
+                if (envio.VersionReglasOperativasId is not Guid versionId)
+                    continue;
+
+                var reglas = await reglasRepository.ObtenerPorIdAsync(
+                    operadorId, versionId, ct);
+
+                if (reglas is null ||
+                    envio.IntentosRealizados >= reglas.MaximoIntentosEntrega ||
+                    envio.UltimoMotivoRequiereDevolucion){
+                    continue;
+                }
+
+                var ultimoFallo = envio.Intentos
+                    .Where(i => !i.Entregado)
+                    .OrderByDescending(i => i.OcurridoEn)
+                    .FirstOrDefault();
+
+                if (ultimoFallo is null ||
+                    inicioEntrega!.Value <
+                    ultimoFallo.OcurridoEn.AddHours(
+                        reglas.HorasMinimasEntreIntentos)){
+                    continue;
+                }
+            }
+            else
+            {
+                continue;
+            }
+
+            elegibles.Add(envio);
+        }
         // Envíos disponibles para asignar a una ruta.
-        var enviosDisponibles = listaEnvios
-            .Where(x => x.Estado == EstadoEnvio.EnDeposito)
+        var enviosDisponibles = elegibles
+            .Where(x => x.Estado == EstadoEnvio.EnDeposito || x.Estado == EstadoEnvio.Reprogramado)
             .OrderBy(x => x.FechaEntregaComprometida)
             .ThenBy(x => x.HoraEntregaHasta)
             .Select(x => new EnvioRutaDto(

@@ -10,3 +10,5 @@ TestResults/
 docker/secretos/*
 !docker/secretos/LEEME.md
 src/UltimaMilla.Mobile/Platforms/Android/google-services.json
+
+cookies.txt

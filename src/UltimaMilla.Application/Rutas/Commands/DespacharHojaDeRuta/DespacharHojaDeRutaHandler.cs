@@ -101,6 +101,7 @@ public sealed class DespacharHojaDeRutaHandler(
                 "Mobile",
                 hoja.RepartidorId.ToString());
         }
+        hoja.MarcarDespachada(ahora);
 
         // Una sola operación de persistencia para todos los envíos.
         await unitOfWork.GuardarCambiosAsync(ct);

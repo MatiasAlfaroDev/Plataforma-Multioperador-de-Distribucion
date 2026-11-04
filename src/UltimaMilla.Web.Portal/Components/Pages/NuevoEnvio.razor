@@ -137,6 +137,81 @@ else
             <button type="submit" class="primario" disabled="@guardando">@(guardando ? "Guardando…" : "Dar de alta")</button>
         </div>
     </EditForm>
+    
+    <hr />
+    <section aria-labelledby="titulo-importacion">
+        <h2 id="titulo-importacion">Importar envíos por CSV</h2>
+
+        <p>
+            Cargá varios envíos utilizando la cuenta comercial
+            seleccionada arriba. Cada fila del archivo representa un bulto.
+        </p>
+
+        <p>
+            Los bultos con la misma referencia externa
+            se agrupan en un único envío.
+        </p>
+
+        <div>
+            <label for="archivoCsv">Archivo CSV</label>
+            <input id="archivoCsv"
+                   type="file"
+                   accept=".csv,text/csv"
+                   disabled="@importando" />
+        </div>
+
+        <div class="acciones">
+            <button type="button"
+                    class="primario"
+                    disabled="@importando"
+                    @onclick="ImportarCsvAsync">
+                @(importando ? "Importando..." : "Importar CSV")
+            </button>
+        </div>
+
+        @if (mensajeImportacion is not null)
+        {
+            <p class="aviso @(importacionExitosa ? "ok" : "error")"
+               role="status">
+                @mensajeImportacion
+            </p>
+        }
+
+        @if (resultadoImportacion is not null)
+        {
+            <h3>Resultado de la importación</h3>
+
+            <p>
+                Total: @resultadoImportacion.TotalEnvios |
+                Creados: @resultadoImportacion.Creados |
+                Ya existentes: @resultadoImportacion.YaExistentes |
+                Con errores: @resultadoImportacion.ConErrores
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Referencia</th>
+                        <th>Fila inicial</th>
+                        <th>Estado</th>
+                        <th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in resultadoImportacion.Resultados)
+                    {
+                        <tr>
+                            <td>@item.ReferenciaExterna</td>
+                            <td>@item.FilaInicial</td>
+                            <td>@EstadoImportacionTexto(item.Estado)</td>
+                            <td>@item.Mensaje</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
 
     @if (mensaje is not null)
     {
@@ -153,6 +228,83 @@ else
     private bool guardando;
     private IReadOnlyList<string>? departamentos;
     private EditForm? formulario;
+    private bool importando;
+    private bool importacionExitosa;
+    private string? mensajeImportacion;
+    private ResultadoImportacionPortal? resultadoImportacion;
+
+    private async Task ImportarCsvAsync()
+    {
+        if (importando)
+            return;
+
+        mensajeImportacion = null;
+        resultadoImportacion = null;
+        importacionExitosa = false;
+
+        if (!Guid.TryParse(modelo.CuentaComercialId, out var cuentaId))
+        {
+            mensajeImportacion = "Seleccioná una cuenta comercial válida.";
+            return;
+        }
+
+        importando = true;
+
+        try
+        {
+            var respuesta = await JS.InvokeAsync<RespuestaImportacionPortal>(
+                "autenticacionPortal.importarEnviosCsv",
+                cuentaId.ToString());
+
+            importacionExitosa = respuesta.Exito;
+            mensajeImportacion = respuesta.Mensaje;
+            resultadoImportacion = respuesta.Resultado;
+
+            if (resultadoImportacion is { ConErrores: > 0 })
+            {
+                mensajeImportacion =
+                    "Importación procesada. Algunos envíos tuvieron errores.";
+            }
+        }
+        catch (JSException)
+        {
+            mensajeImportacion =
+                "No se pudo completar la importación. Revisá la conexión con la API.";
+        }
+        finally
+        {
+            importando = false;
+        }
+    }
+
+    private static string EstadoImportacionTexto(int estado) =>
+        estado switch
+        {
+            0 => "Creado",
+            1 => "Ya existente",
+            2 => "Error",
+            _ => "Desconocido"
+        };
+
+    private sealed record RespuestaImportacionPortal(
+        bool Exito,
+        string Mensaje,
+        ResultadoImportacionPortal? Resultado);
+
+    private sealed record ResultadoImportacionPortal(
+        int TotalEnvios,
+        int Creados,
+        int YaExistentes,
+        int ConErrores,
+        List<DetalleImportacionPortal> Resultados);
+
+    private sealed record DetalleImportacionPortal(
+        string ReferenciaExterna,
+        int FilaInicial,
+        int Estado,
+        Guid? EnvioId,
+        string? Mensaje);
+
 
    protected override async Task OnAfterRenderAsync(bool firstRender)
 {
