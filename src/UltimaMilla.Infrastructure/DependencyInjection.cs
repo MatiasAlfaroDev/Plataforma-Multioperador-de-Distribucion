@@ -25,7 +25,7 @@ public static class DependencyInjection
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AuditableEntityInterceptor>();
-        services.AddSingleton<TenantSaveChangesInterceptor>();
+        services.AddScoped<TenantSaveChangesInterceptor>();
         services.AddDbContext<AppDbContext>((sp, options) => options
             .UseNpgsql(connectionString)
             .AddInterceptors(

@@ -1,18 +1,19 @@
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Common;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Infrastructure.Persistence.Interceptors;
 
-public sealed class TenantSaveChangesInterceptor : SaveChangesInterceptor
+public sealed class TenantSaveChangesInterceptor(
+    ITenantContext tenant) : SaveChangesInterceptor
 {
-    private static void Validar(DbContext? context)
+    private void Validar(DbContext? context)
     {
         if (context is not AppDbContext db)
             return;
 
-        // El inicializador tiene un contexto interno explícito.
         if (db.AccesoInicializacion)
             return;
 
@@ -30,13 +31,28 @@ public sealed class TenantSaveChangesInterceptor : SaveChangesInterceptor
 
         var operadorId = db.OperadorActualId;
 
-        if (!operadorId.HasValue)
-            throw new UnauthorizedAccessException(
-                "Debe seleccionar un operador antes de guardar datos.");
-
         foreach (var entry in entidades)
         {
             var entidad = (ITenantEntity)entry.Entity;
+
+            // Única excepción: crear una solicitud pendiente
+            // del comercio autenticado.
+            if (entry.State == EntityState.Added &&
+                entry.Entity is CuentaComercial cuenta &&
+                tenant.EstaAutenticado &&
+                tenant.ComercioId.HasValue &&
+                tenant.Perfil == Perfiles.AdministradorComercio &&
+                cuenta.ComercioId == tenant.ComercioId.Value &&
+                cuenta.Estado == EstadoCuentaComercial.Pendiente &&
+                !cuenta.Activa)
+            {
+                continue;
+            }
+
+            // Todas las demás operaciones requieren operador.
+            if (!operadorId.HasValue)
+                throw new UnauthorizedAccessException(
+                    "Debe seleccionar un operador antes de guardar datos.");
 
             if (entidad.OperadorId != operadorId.Value)
                 throw new UnauthorizedAccessException(
@@ -63,6 +79,7 @@ public sealed class TenantSaveChangesInterceptor : SaveChangesInterceptor
         CancellationToken cancellationToken = default)
     {
         Validar(eventData.Context);
+
         return base.SavingChangesAsync(
             eventData, result, cancellationToken);
     }

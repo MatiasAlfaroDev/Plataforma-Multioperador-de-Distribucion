@@ -1,4 +1,48 @@
 window.autenticacionPortal = {
+async registrar(
+    nombreCompleto,
+    email,
+    password,
+    confirmarPassword,
+    nombreComercio,
+    rut
+) {
+    const respuesta = await fetch("/api/auth/registro-comercio", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+            nombreCompleto,
+            email,
+            password,
+            confirmarPassword,
+            nombreComercio,
+            rut
+        })
+    });
+
+    if (!respuesta.ok) {
+        let mensaje = "No se pudo completar el registro.";
+
+        try {
+            const error = await respuesta.json();
+
+            if (error.errores && error.errores.length > 0) {
+                mensaje = error.errores.join(" ");
+            } else if (error.mensaje) {
+                mensaje = error.mensaje;
+            }
+        } catch {
+            // Conservamos el mensaje predeterminado.
+        }
+
+        throw new Error(mensaje);
+    }
+
+    return await respuesta.json();
+},
     async login(email, password) {
         const respuesta = await fetch("/api/auth/login", {
             method: "POST",
@@ -6,16 +50,26 @@ window.autenticacionPortal = {
                 "Content-Type": "application/json"
             },
             credentials: "same-origin",
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({
+                email,
+                password,
+                aplicacion: "portal"
+            })        
         });
 
         if (!respuesta.ok) {
-            if (respuesta.status === 401) {
-                throw new Error("Correo o contraseña incorrectos.");
-            }
-
-            throw new Error("No se pudo iniciar sesión.");
+        if (respuesta.status === 401) {
+            throw new Error("Correo o contraseña incorrectos.");
         }
+
+        if (respuesta.status === 403) {
+            throw new Error(
+                "No tenés permisos para acceder al Portal de comercios."
+            );
+        }
+
+        throw new Error("No se pudo iniciar sesión.");
+    }
 
         return await respuesta.json();
     },
@@ -232,5 +286,59 @@ async importarEnviosCsv(cuentaComercialId) {
         exito: false,
         mensaje
     };
+},
+
+
+async listarOperadores() {
+    const respuesta = await fetch("/api/operadores", {
+        method: "GET",
+        credentials: "same-origin"
+    });
+
+    if (!respuesta.ok) {
+        throw new Error("No se pudieron cargar los operadores.");
+    }
+
+    return await respuesta.json();
+},
+
+async solicitarVinculacion(operadorId) {
+    const respuestaToken = await fetch("/api/antiforgery/token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!respuestaToken.ok) {
+        throw new Error("No se pudo obtener el token de seguridad.");
+    }
+
+    const { token } = await respuestaToken.json();
+
+    const respuesta = await fetch("/api/vinculaciones/solicitar", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": token
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ operadorId })
+    });
+
+    if (!respuesta.ok) {
+        let mensaje = `No se pudo enviar la solicitud (HTTP ${respuesta.status}).`;
+
+        try {
+            const error = await respuesta.json();
+            mensaje = error.mensaje ?? error.title ?? mensaje;
+        } catch {
+            // Mantener el mensaje HTTP.
+        }
+
+        throw new Error(mensaje);
+    }
+
+    return await respuesta.json();
 }
+
 };

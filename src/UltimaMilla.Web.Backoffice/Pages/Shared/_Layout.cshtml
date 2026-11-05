@@ -50,22 +50,75 @@
         nav a { color: var(--acento); margin-right: 1rem; }
     </style>
 </head>
+
 <body>
     <header>
         <strong>Backoffice del operador</strong> · Plataforma de última milla
-        @if (User.IsInRole("AdministradorOperador") ||
-     User.IsInRole("Operador"))
-      {
-          <nav>
-              <a asp-page="/Index">Envíos</a>
-              <a asp-page="/Tarifas">Tarifas</a>
-              <a asp-page="/ReglasOperativas">Reglas operativas</a>
-              <a asp-page="/Zonas">Zonas de cobertura</a>
-              <a asp-page="/HojasDeRuta">Hojas de ruta</a>
-              <a asp-page="/SeleccionarOperador">Cambiar operador</a>
-          </nav>
+              @{
+          var esPaginaPublica =
+              ViewContext.RouteData.Values["page"]?.ToString() is
+                  "/Login" or "/Registro";
+
+          var mostrarMenu =
+              !esPaginaPublica &&
+              User.Identity?.IsAuthenticated == true &&
+              (User.IsInRole("AdministradorOperador") ||
+              User.IsInRole("Operador"));
       }
+
+      @if (mostrarMenu)
+{
+    <nav>
+        <a asp-page="/Index">Envíos</a>
+        <a asp-page="/Tarifas">Tarifas</a>
+        <a asp-page="/ReglasOperativas">Reglas operativas</a>
+        <a asp-page="/Zonas">Zonas de cobertura</a>
+        <a asp-page="/HojasDeRuta">Hojas de ruta</a>
+        <a asp-page="/SeleccionarOperador">Cambiar operador</a>
+        @if (User.IsInRole("AdministradorOperador"))
+        {
+            <a asp-page="/SolicitudesComerciales">
+                Solicitudes de comercios
+            </a>
+        }
+
+        <button type="button" id="btnCerrarSesion" class="peligro">
+            Cerrar sesión
+        </button>
+    </nav>
+}
     </header>
     <main>@RenderBody()</main>
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const btnCerrarSesion = document.getElementById("btnCerrarSesion");
+
+        if (!btnCerrarSesion) return;
+
+        btnCerrarSesion.addEventListener("click", async () => {
+            btnCerrarSesion.disabled = true;
+
+            try {
+                const respuesta = await fetch("/api/auth/logout", {
+                    method: "POST",
+                    credentials: "same-origin"
+                });
+
+                if (!respuesta.ok) {
+                    throw new Error(
+                        `No se pudo cerrar sesión. Código: ${respuesta.status}`
+                    );
+                }
+
+                window.location.replace("/Login");
+
+            } catch (error) {
+                console.error("Error al cerrar sesión:", error);
+                alert(error.message);
+                btnCerrarSesion.disabled = false;
+            }
+        });
+    });
+</script>
 </body>
 </html>

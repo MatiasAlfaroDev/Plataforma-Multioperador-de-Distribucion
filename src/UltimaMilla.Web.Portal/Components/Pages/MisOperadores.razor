@@ -1,0 +1,185 @@
+
+@page "/mis-operadores"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "ComercioPortal")]
+@inject IJSRuntime JS
+
+<PageTitle>Mis operadores - Última Milla</PageTitle>
+
+<h1>Mis operadores</h1>
+
+<p>
+    Consultá los operadores logísticos disponibles y
+    gestioná tus vinculaciones.
+</p>
+
+@if (cargando)
+{
+    <p>Cargando operadores...</p>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <p class="aviso error" role="alert">@error</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(mensaje))
+    {
+        <p class="aviso ok" role="status">@mensaje</p>
+    }
+
+    @if (operadores.Count == 0 && error is null)
+    {
+        <p>No hay operadores disponibles.</p>
+    }
+
+    @foreach (var operador in operadores)
+    {
+        var cuenta = cuentas.FirstOrDefault(
+            c => c.OperadorId == operador.Id);
+
+        <div style="border: 1px solid #ccc;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-bottom: 12px;">
+
+            <h3>@operador.Nombre</h3>
+
+            @if (cuenta is null)
+            {
+                <p>Estado: Sin vinculación</p>
+
+                <button type="button"
+                        disabled="@enviando"
+                        @onclick="() => SolicitarAsync(operador.Id)">
+                    Solicitar vinculación
+                </button>
+            }
+           else if (cuenta.Estado == EstadoVinculacion.Confirmada
+                    && cuenta.Activa)
+            {
+                <p style="color: green;">
+                    ✓ Vinculado
+                </p>
+
+                <p>Ya podés crear envíos con este operador.</p>
+
+                <a class="btn btn-primary"
+                href="@($"/?cuentaComercialId={cuenta.Id}")">
+                    Crear envío
+                </a>
+            }
+            else if (cuenta.Estado == EstadoVinculacion.Pendiente)
+            {
+                <p>Estado: Pendiente de aprobación</p>
+            }
+            else if (cuenta.Estado == EstadoVinculacion.Rechazada)
+            {
+                <p>Estado: Solicitud rechazada</p>
+            }
+            else
+            {
+                <p>Estado: Vinculación inactiva</p>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<OperadorDto> operadores = new();
+    private List<CuentaComercialDto> cuentas = new();
+
+    private bool cargando = true;
+    private bool enviando;
+    private string? error;
+    private string? mensaje;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        cargando = true;
+        error = null;
+
+        try
+        {
+            operadores = await JS.InvokeAsync<List<OperadorDto>>(
+                "autenticacionPortal.listarOperadores") ?? new();
+
+            cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
+                "autenticacionPortal.obtenerCuentasComerciales") ?? new();
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SolicitarAsync(Guid operadorId)
+    {
+        if (enviando)
+            return;
+
+        enviando = true;
+        error = null;
+        mensaje = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "autenticacionPortal.solicitarVinculacion",
+                operadorId);
+
+            mensaje = "Solicitud enviada correctamente.";
+
+            cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
+                "autenticacionPortal.obtenerCuentasComerciales");
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+
+    private sealed class OperadorDto
+    {
+        public Guid Id { get; set; }
+        public string Nombre { get; set; } = "";
+        public string ColorPrimario { get; set; } = "";
+    }
+
+    private sealed class CuentaComercialDto
+    {
+        public Guid Id { get; set; }
+        public Guid OperadorId { get; set; }
+        public string OperadorNombre { get; set; } = "";
+        public Guid ComercioId { get; set; }
+        public string ComercioNombre { get; set; } = "";
+        public bool Activa { get; set; }
+        public EstadoVinculacion Estado { get; set; }
+    }
+
+    private enum EstadoVinculacion
+    {
+        Pendiente = 0,
+        Confirmada = 1,
+        Rechazada = 2
+    }
+}

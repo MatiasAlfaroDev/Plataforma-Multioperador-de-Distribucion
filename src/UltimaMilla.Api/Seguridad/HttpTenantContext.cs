@@ -1,12 +1,13 @@
-
 using System.Security.Claims;
 using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Api.Seguridad;
 
-public sealed class HttpTenantContext : ITenantContext
+public sealed class HttpTenantContext : ITenantContext,  IOperadorActivo
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
+
+    private Guid? _operadorSeleccionado;
 
     public HttpTenantContext(IHttpContextAccessor httpContextAccessor)
     {
@@ -23,10 +24,24 @@ public sealed class HttpTenantContext : ITenantContext
         ObtenerGuid(ClaimTypes.NameIdentifier);
 
     public Guid? OperadorId =>
-        ObtenerGuid("operador_id");
+        ObtenerGuid("operador_id") ?? _operadorSeleccionado;
 
     public Guid? ComercioId =>
-        ObtenerGuid("cuenta_comercial_id");
+        ObtenerGuid("comercio_id");
+
+    public string? Perfil =>
+        EstaAutenticado
+            ? Usuario?.FindFirstValue("perfil")
+                ?? Usuario?.FindFirstValue("perfil_comercio")
+            : null;
+
+    public void SeleccionarOperador(Guid operadorId)
+    {
+        if (!EstaAutenticado || !ComercioId.HasValue)
+            throw new UnauthorizedAccessException();
+
+        _operadorSeleccionado = operadorId;
+    }
 
     private Guid? ObtenerGuid(string tipoClaim)
     {
@@ -39,9 +54,4 @@ public sealed class HttpTenantContext : ITenantContext
             ? id
             : null;
     }
-
-    public string? Perfil =>
-    EstaAutenticado
-        ? Usuario?.FindFirstValue("perfil")
-        : null; 
 }

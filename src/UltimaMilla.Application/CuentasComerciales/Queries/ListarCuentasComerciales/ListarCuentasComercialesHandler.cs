@@ -8,34 +8,34 @@ public sealed class ListarCuentasComercialesHandler(
     ITenantContext tenant)
 {
     public Task<IReadOnlyList<CuentaComercialDto>> Handle(
-        ListarCuentasComercialesQuery query,
-        CancellationToken ct)
+    ListarCuentasComercialesQuery query,
+    CancellationToken ct)
+{
+    if (!tenant.EstaAutenticado)
+        throw new UnauthorizedAccessException(
+            "Debe iniciar sesión.");
+
+    if (tenant.Perfil is Perfiles.AdministradorComercio or "Comercio")
     {
-        if (!tenant.EstaAutenticado ||
-            !tenant.OperadorId.HasValue)
-        {
+        if (!tenant.ComercioId.HasValue)
             throw new UnauthorizedAccessException(
-                "Debe seleccionar un operador.");
-        }
+                "El usuario no tiene un comercio asociado.");
 
-        var operadorId = tenant.OperadorId.Value;
-
-        Guid? cuentaComercialId = null;
-
-        if (tenant.Perfil == "Comercio")
-        {
-            if (!tenant.ComercioId.HasValue)
-            {
-                throw new UnauthorizedAccessException(
-                    "El usuario no tiene una cuenta comercial activa.");
-            }
-
-            cuentaComercialId = tenant.ComercioId.Value;
-        }
-
-        return cuentas.ListarResumenAsync(
-            operadorId,
-            cuentaComercialId,
+        return cuentas.ListarPorComercioAsync(
+            tenant.ComercioId.Value,
             ct);
     }
+
+    if (tenant.OperadorId.HasValue &&
+        tenant.Perfil is Perfiles.AdministradorOperador or "Operador")
+    {
+        return cuentas.ListarResumenAsync(
+            tenant.OperadorId.Value,
+            null,
+            ct);
+    }
+
+    throw new UnauthorizedAccessException(
+        "No tiene permisos para consultar cuentas comerciales.");
+}
 }
