@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IHojaDeRutaRepository, HojaDeRutaRepository>();
         services.AddScoped<IPublicadorDeEventos, PublicadorDeEventos>();
         services.AddScoped<IDispositivoMovilRepository, DispositivoMovilRepository>();
+        services.AddScoped<IPosicionRepartidorRepository, PosicionRepartidorRepository>();
 
         // Push con Firebase: una sola instancia, porque la conexión con Firebase se crea una vez y se reutiliza.
         services.AddSingleton<INotificadorPush, FirebaseNotificadorPush>();

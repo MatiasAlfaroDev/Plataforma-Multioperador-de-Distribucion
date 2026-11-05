@@ -31,6 +31,9 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     private readonly IConnectivity _conectividad;
     private readonly IDialogos _dialogos;
     private readonly ICaptura _captura;
+    private readonly IFirma _firma;
+    private readonly IBiometria _biometria;
+    private readonly ISeguimiento _seguimiento;
 
     public EnviosViewModel(
         IEnviosApi api,
@@ -39,7 +42,10 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         SincronizacionService sincronizacion,
         IConnectivity conectividad,
         IDialogos dialogos,
-        ICaptura captura)
+        ICaptura captura,
+        IFirma firma,
+        IBiometria biometria,
+        ISeguimiento seguimiento)
     {
         _api = api;
         _ruta = ruta;
@@ -48,6 +54,25 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         _conectividad = conectividad;
         _dialogos = dialogos;
         _captura = captura;
+        _firma = firma;
+        _biometria = biometria;
+        _seguimiento = seguimiento;
+    }
+
+    /// <summary>Se está compartiendo la ubicación (desde el despacho hasta "Terminar jornada").</summary>
+    public bool SeguimientoActivo => _seguimiento.Activo;
+
+    [RelayCommand]
+    private async Task TerminarJornadaAsync()
+    {
+        var opcion = await _dialogos.ElegirAsync(
+            "¿Terminaste la jornada? Se deja de compartir tu ubicación.", ["Terminar jornada"]);
+        if (opcion is null)
+            return;
+
+        _seguimiento.Detener();
+        OnPropertyChanged(nameof(SeguimientoActivo));
+        Aviso = "Jornada terminada: ya no se comparte tu ubicación.";
     }
 
     public ObservableCollection<EnvioRuta> Envios { get; } = new();
@@ -160,6 +185,12 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
 
         EstaCargando = true;
         Error = null;
+
+        // Si la jornada estaba en curso (por ejemplo, se reinició el teléfono), el seguimiento se vuelve a encender.
+        if (_seguimiento.Activo)
+            await _seguimiento.IniciarAsync();
+        OnPropertyChanged(nameof(SeguimientoActivo));
+
         try
         {
             SinConexion = _conectividad.NetworkAccess != NetworkAccess.Internet;
@@ -215,8 +246,19 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         if (receptor is null)
             return;
 
-        // Prueba de entrega (RF 20): foto + posición y hora del dispositivo.
+        // Prueba de entrega (RF 20): nombre, documento, firma en pantalla, foto, y posición y hora del dispositivo.
+        var documento = await _dialogos.PedirTextoAsync("Entrega", $"Documento de {receptor}:");
+        if (documento is null)
+            return;
+
         var id = Guid.NewGuid();
+        var firma = await _firma.PedirFirmaAsync(id, receptor);
+        if (firma is null)
+        {
+            await _dialogos.AvisarAsync("Entrega", "La entrega necesita la firma del receptor.");
+            return;
+        }
+
         var foto = await _captura.SacarFotoAsync(id);
         if (foto is null)
         {
@@ -237,6 +279,8 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             EnvioId = envio.Id,
             Tipo = "Entregado",
             Receptor = receptor,
+            DocumentoReceptor = documento,
+            ReferenciaFirma = firma,
             FechaHora = DateTimeOffset.UtcNow,
             Latitud = ubicacion.Value.Latitud,
             Longitud = ubicacion.Value.Longitud,
@@ -311,6 +355,16 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             $"{envio.ReferenciaExterna}: {envio.UltimoError}",
             ["Descartar y volver a registrar"]);
         if (opcion is null)
+            return;
+
+        // Operación sensible (6.11): descartar borra del teléfono lo que el repartidor registró.
+        var confirmacion = await _biometria.ConfirmarAsync($"Vas a descartar lo registrado para {envio.ReferenciaExterna}.");
+        if (confirmacion == ResultadoBiometria.NoConfigurada)
+        {
+            await _dialogos.AvisarAsync("Descartar", "Para descartar, el teléfono necesita bloqueo de pantalla o huella configurados.");
+            return;
+        }
+        if (confirmacion != ResultadoBiometria.Confirmado)
             return;
 
         await _eventos.DescartarAsync(envio.Id);

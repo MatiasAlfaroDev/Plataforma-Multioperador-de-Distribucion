@@ -15,11 +15,45 @@ public partial class CargaVehiculoViewModel : ObservableObject
 {
     private readonly IEnviosApi _api;
     private readonly IDialogos _dialogos;
+    private readonly ILectorCodigos _lector;
+    private readonly IBiometria _biometria;
+    private readonly ISeguimiento _seguimiento;
 
-    public CargaVehiculoViewModel(IEnviosApi api, IDialogos dialogos)
+    public CargaVehiculoViewModel(
+        IEnviosApi api, IDialogos dialogos, ILectorCodigos lector, IBiometria biometria, ISeguimiento seguimiento)
     {
         _api = api;
         _dialogos = dialogos;
+        _lector = lector;
+        _biometria = biometria;
+        _seguimiento = seguimiento;
+    }
+
+    /// <summary>En Windows no hay lector de cámara: se muestra solo el campo de texto.</summary>
+    public bool HayLectorCamara => _lector.Disponible;
+
+    /// <summary>Saca una foto del código del bulto y lo agrega como si se hubiera escrito.</summary>
+    [RelayCommand]
+    private Task EscanearAsync() => LeerCodigoAsync(desdeGaleria: false);
+
+    /// <summary>Lee el código de una imagen guardada (sirve para probar en el emulador, que no ve etiquetas reales).</summary>
+    [RelayCommand]
+    private Task EscanearDesdeImagenAsync() => LeerCodigoAsync(desdeGaleria: true);
+
+    private async Task LeerCodigoAsync(bool desdeGaleria)
+    {
+        if (HojaElegida is null)
+            return;
+
+        var leido = await _lector.LeerAsync(desdeGaleria);
+        if (leido is null)
+        {
+            MostrarMensaje("No se encontró ningún código en la imagen. Probá de nuevo, más cerca y con buena luz.", alerta: true);
+            return;
+        }
+
+        Codigo = leido;
+        AgregarCodigo();
     }
 
     /// <summary>Las hojas de ruta de hoy del repartidor.</summary>
@@ -188,6 +222,17 @@ public partial class CargaVehiculoViewModel : ObservableObject
         if (HojaElegida is not { } hoja)
             return;
 
+        // Operación sensible (6.11): una vez despachada, los envíos quedan En tránsito a nombre del repartidor.
+        var confirmacion = await _biometria.ConfirmarAsync("Vas a despachar la ruta y salir del depósito.");
+        if (confirmacion == ResultadoBiometria.NoConfigurada)
+        {
+            await _dialogos.AvisarAsync("Despachar",
+                "Para despachar, el teléfono necesita bloqueo de pantalla o huella configurados.");
+            return;
+        }
+        if (confirmacion != ResultadoBiometria.Confirmado)
+            return;
+
         EstaCargando = true;
         try
         {
@@ -201,7 +246,11 @@ public partial class CargaVehiculoViewModel : ObservableObject
                 return;
             }
 
-            await _dialogos.AvisarAsync("¡En camino!", texto);
+            // Empieza la jornada: se comparte la ubicación hasta "Terminar jornada" (RF 23).
+            var siguiendo = await _seguimiento.IniciarAsync();
+            await _dialogos.AvisarAsync("¡En camino!", siguiendo
+                ? texto
+                : $"{texto}\n\nNo se pudo compartir tu ubicación: revisá el permiso de ubicación de la app.");
 
             // Vuelve a la ruta y la recarga: los envíos ahora están En tránsito y se pueden entregar.
             await Shell.Current.GoToAsync("..", new Dictionary<string, object> { ["recargar"] = true });

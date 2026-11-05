@@ -75,16 +75,32 @@ public sealed class BaseDeDatosLocal
                     ultimo_error TEXT,
                     latitud      REAL,
                     longitud     REAL,
-                    foto         TEXT
+                    foto         TEXT,
+                    documento    TEXT,
+                    firma        TEXT
 
                 );
                 """;
             await comando.ExecuteNonQueryAsync();
 
+            // Posiciones de la jornada (RF 23) que todavía no llegaron al servidor.
+            var posiciones = conexion.CreateCommand();
+            posiciones.CommandText = """
+                CREATE TABLE IF NOT EXISTS posiciones_pendientes (
+                    id         TEXT PRIMARY KEY,
+                    latitud    REAL NOT NULL,
+                    longitud   REAL NOT NULL,
+                    fecha_hora TEXT NOT NULL
+                );
+                """;
+            await posiciones.ExecuteNonQueryAsync();
+
             // Migración local: teléfonos con la base de una versión anterior.
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "latitud", "REAL");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "longitud", "REAL");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "foto", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "documento", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "firma", "TEXT");
 
             _cadenaDeConexion = cadena;
         }

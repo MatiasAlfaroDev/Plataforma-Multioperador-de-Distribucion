@@ -72,10 +72,21 @@ public static class MauiProgram
         builder.Services.AddSingleton<BaseDeDatosLocal>();
         builder.Services.AddSingleton<RutaRepository>();
         builder.Services.AddSingleton<EventosPendientesRepository>();
+        builder.Services.AddSingleton<PosicionesRepository>();
         builder.Services.AddSingleton<IConnectivity>(Connectivity.Current);
         builder.Services.AddSingleton<SincronizacionService>();
         builder.Services.AddSingleton<IDialogos, DialogosShell>();
         builder.Services.AddSingleton<ICaptura, Captura>();
+        builder.Services.AddSingleton<IFirma, Firma>();
+#if ANDROID
+        builder.Services.AddSingleton<ILectorCodigos, LectorCodigosAndroid>();
+        builder.Services.AddSingleton<ISeguimiento, SeguimientoAndroid>();
+        builder.Services.AddSingleton<IBiometria, BiometriaAndroid>();
+#else
+        builder.Services.AddSingleton<ILectorCodigos, LectorCodigosNulo>();
+        builder.Services.AddSingleton<ISeguimiento, SeguimientoNulo>();
+        builder.Services.AddSingleton<IBiometria, BiometriaNula>();
+#endif
 
         // MVVM: cada página recibe su ViewModel por constructor.
         builder.Services.AddTransient<LoginViewModel>();

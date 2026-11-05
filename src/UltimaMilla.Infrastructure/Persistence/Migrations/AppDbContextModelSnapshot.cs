@@ -1258,6 +1258,43 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.ToTable("paradas_ruta", (string)null);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Rutas.PosicionRepartidor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Latitud")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
+                    b.Property<decimal>("Longitud")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RegistradaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RepartidorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RepartidorId");
+
+                    b.HasIndex("OperadorId", "RepartidorId", "RegistradaEn");
+
+                    b.ToTable("posiciones_repartidor", (string)null);
+                });
+
             modelBuilder.Entity("UltimaMilla.Infrastructure.Identidad.MembresiaUsuario", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1750,6 +1787,15 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.HasOne("UltimaMilla.Domain.Rutas.HojaDeRuta", null)
                         .WithMany("Paradas")
                         .HasForeignKey("HojaDeRutaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Rutas.PosicionRepartidor", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Organizacion.Repartidor", null)
+                        .WithMany()
+                        .HasForeignKey("RepartidorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

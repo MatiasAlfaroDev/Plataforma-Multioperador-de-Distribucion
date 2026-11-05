@@ -33,6 +33,7 @@ using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
+using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -770,6 +771,15 @@ api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/despachar", async (
 
     return Results.Ok(new { hojaDeRutaId = hojaId, enviosEnTransito = cantidad });
 })
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
+// POST /api/repartidor/posiciones → lote de posiciones que la app tomó durante la jornada (RF 23),
+// muchas veces con la pantalla apagada o sin señal. Idempotente: reenviar un lote no duplica nada.
+api.MapPost("/repartidor/posiciones", async (
+    RegistrarPosicionesCommand command,
+    RegistrarPosicionesHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(new { guardadas = await handler.Handle(command, ct) }))
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
 
 // POST /api/dispositivos → la app registra el token de Firebase del teléfono al iniciar sesión.

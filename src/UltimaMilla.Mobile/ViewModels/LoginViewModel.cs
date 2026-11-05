@@ -11,11 +11,14 @@ public partial class LoginViewModel : ObservableObject
     private readonly IEnviosApi _api;
     private readonly RegistroDePush _push;
 
-    public LoginViewModel(IAuthApi auth, IEnviosApi api, RegistroDePush push)
+    private readonly IBiometria _biometria;
+
+    public LoginViewModel(IAuthApi auth, IEnviosApi api, RegistroDePush push, IBiometria biometria)
     {
         _auth = auth;
         _api = api;
         _push = push;
+        _biometria = biometria;
     }
 
     [ObservableProperty]
@@ -88,6 +91,22 @@ public partial class LoginViewModel : ObservableObject
     }
 
     /// <summary>Sin señal no se puede iniciar sesión: se trabaja con la ruta guardada en el teléfono.</summary>
+    /// <remarks>
+    /// Sin conexión no hay contraseña que verificar contra el servidor: la ruta guardada queda
+    /// protegida con la biometría del teléfono (operación sensible, 6.11).
+    /// </remarks>
     [RelayCommand]
-    private Task TrabajarSinConexionAsync() => Shell.Current.GoToAsync("//operador");
+    private async Task TrabajarSinConexionAsync()
+    {
+        var confirmacion = await _biometria.ConfirmarAsync("Vas a abrir la ruta guardada en el teléfono.");
+        if (confirmacion == ResultadoBiometria.NoConfigurada)
+        {
+            Error = "Para trabajar sin conexión, el teléfono necesita bloqueo de pantalla o huella configurados.";
+            return;
+        }
+        if (confirmacion != ResultadoBiometria.Confirmado)
+            return;
+
+        await Shell.Current.GoToAsync("//operador");
+    }
 }

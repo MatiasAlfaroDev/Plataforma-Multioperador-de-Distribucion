@@ -111,6 +111,8 @@ public class EnviosApi : IEnviosApi
             longitud = evento.Longitud,
             // La misma foto es prueba de entrega o evidencia del intento fallido, según el tipo.
             referenciaFotografia = esEntrega ? evento.ReferenciaFoto : null,
+            documentoReceptor = esEntrega ? evento.DocumentoReceptor : null,
+            referenciaFirma = esEntrega ? evento.ReferenciaFirma : null,
             evidenciaFallo = esEntrega ? null : evento.ReferenciaFoto
         };
 
@@ -127,6 +129,27 @@ public class EnviosApi : IEnviosApi
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             return (ResultadoEnvio.SinConexion, ex.Message);
+        }
+    }
+
+    /// <summary>POST /api/repartidor/posiciones con un lote. Reenviar es seguro: el servidor ignora las repetidas.</summary>
+    public async Task<ResultadoEnvio> EnviarPosicionesAsync(IReadOnlyList<PosicionPendiente> posiciones, CancellationToken ct = default)
+    {
+        try
+        {
+            using var respuesta = await _http.PostAsJsonAsync("api/repartidor/posiciones", new { posiciones }, ct);
+            if (respuesta.IsSuccessStatusCode)
+                return ResultadoEnvio.Aceptado;
+
+            // 400 = el lote tiene datos inválidos: reintentarlo no sirve. Cualquier otra cosa
+            // (sesión vencida, servidor caído) se reintenta más tarde, así no se pierde el recorrido.
+            return respuesta.StatusCode == HttpStatusCode.BadRequest
+                ? ResultadoEnvio.Rechazado
+                : ResultadoEnvio.SinConexion;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return ResultadoEnvio.SinConexion;
         }
     }
 
