@@ -438,6 +438,26 @@ grupo.MapPost("/registro-operador", async (
                     requiereSeleccion = true;
                 }
             }
+            else if (aplicacion == "movil")
+            {
+                // La app del repartidor elige el operador después, con /seleccionar-operador.
+                var esRepartidor = await db.MembresiasUsuarios
+                    .AsNoTracking()
+                    .AnyAsync(m =>
+                        m.UsuarioId == usuario.Id &&
+                        m.Activa &&
+                        m.Perfil == Perfiles.Repartidor);
+
+                if (!esRepartidor)
+                {
+                    return Results.Json(new
+                    {
+                        mensaje = "No tenés permisos para acceder a la app de repartidores."
+                    }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                requiereSeleccion = true;
+            }
             else
             {
                 return Results.BadRequest(new
