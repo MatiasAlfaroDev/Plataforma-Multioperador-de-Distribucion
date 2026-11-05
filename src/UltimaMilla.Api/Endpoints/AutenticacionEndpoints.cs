@@ -405,7 +405,9 @@ grupo.MapPost("/registro-operador", async (
                         m.UsuarioId == usuario.Id &&
                         m.Activa &&
                         (m.Perfil == Perfiles.AdministradorOperador ||
-                         m.Perfil == Perfiles.Operador))
+                         m.Perfil == Perfiles.Operador ||
+                         // Entra solo a Mensajes fallidos (RNF 6.8).
+                         m.Perfil == Perfiles.AdministradorPlataforma))
                     .ToListAsync();
 
                 if (membresias.Count == 0)
