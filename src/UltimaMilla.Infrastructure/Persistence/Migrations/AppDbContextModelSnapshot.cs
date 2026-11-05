@@ -683,6 +683,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<string>("TokenSeguimientoHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid?>("UltimoMotivoNoEntregaId")
                         .HasColumnType("uuid");
 
@@ -702,6 +706,9 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TokenSeguimientoHash")
+                        .IsUnique();
 
                     b.HasIndex("VersionReglasOperativasId");
 

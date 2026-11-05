@@ -57,4 +57,18 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
             .OrderByDescending(e => e.FechaAlta)
             .ToListAsync(ct);
     }
+
+    public Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct)
+{
+    return db.Envios
+        .IgnoreQueryFilters()
+        .AsNoTracking()
+        .Include(e => e.Eventos)
+        .AsSplitQuery()
+        .FirstOrDefaultAsync(
+            e => e.TokenSeguimientoHash == tokenHash,
+            ct);
+}
 }

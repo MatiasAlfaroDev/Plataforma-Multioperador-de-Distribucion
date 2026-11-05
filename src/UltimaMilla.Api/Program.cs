@@ -51,6 +51,7 @@ using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Infrastructure.Caching;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
 using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
+using UltimaMilla.Application.Envios.Queries.ConsultarSeguimientoPublico;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -126,6 +127,7 @@ builder.Services.AddOpenTelemetry()
     })
     .UseOtlpExporter();
 builder.Services.AddScoped<CrearZonaHandler>();
+builder.Services.AddScoped<ConsultarSeguimientoPublicoHandler>();
 var soloInicializar = builder.Configuration.GetValue<bool>(
     "Inicializacion:SoloInicializar");
 
@@ -205,6 +207,21 @@ app.MapGet("/api/antiforgery/token", (
 
 var api = app.MapGroup("/api");
 
+// GET /api/seguimiento/{token}
+// Consulta pública de seguimiento para destinatarios.
+api.MapGet("/seguimiento/{token}", async (
+    string token,
+    ConsultarSeguimientoPublicoHandler handler,
+    CancellationToken ct) =>
+{
+    var seguimiento = await handler.Handle(token, ct);
+
+    return seguimiento is null
+        ? Results.NotFound()
+        : Results.Ok(seguimiento);
+})
+.AllowAnonymous();
+
 api.MapGet("/operadores", async (ListarOperadoresHandler handler, CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ListarOperadoresQuery(), ct)));
 
@@ -238,11 +255,15 @@ api.MapPost("/envios", async (
             detail: "La solicitud no contiene un token antifalsificación válido.");
     }
 
-    var id = await handler.Handle(command, ct);
+    var resultado = await handler.Handle(command, ct);
 
     return Results.Created(
-        $"/api/envios/{id}",
-        new { id });
+        $"/api/envios/{resultado.EnvioId}",
+        new
+        {
+            id = resultado.EnvioId,
+            tokenSeguimiento = resultado.TokenSeguimiento
+        });
 })
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,

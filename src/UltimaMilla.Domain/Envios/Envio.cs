@@ -15,7 +15,8 @@ public class Envio : AuditableEntity, ITenantEntity
     public Guid OperadorId { get; private set; }
     public Guid CuentaComercialId { get; private set; }
     public string ReferenciaExterna { get; private set; } = string.Empty;
-    public string TokenSeguimientoHash { get; private set; } = string.Empty;
+    public string? TokenSeguimientoHash { get; private set; }
+    public string? TokenSeguimientoOriginal { get; private set; }
     public Modalidad Modalidad { get; private set; }
     public EstadoEnvio Estado { get; private set; }
     public Destinatario Destinatario { get; private set; } = null!;
@@ -86,6 +87,7 @@ public class Envio : AuditableEntity, ITenantEntity
             TokenSeguimientoHash = Convert.ToHexString(
                 SHA256.HashData(
                     Convert.FromHexString(tokenSeguimiento))),
+            TokenSeguimientoOriginal = tokenSeguimiento,        
             Modalidad = modalidad,
             Estado = EstadoEnvio.Admitido,
             Destinatario = destinatario,

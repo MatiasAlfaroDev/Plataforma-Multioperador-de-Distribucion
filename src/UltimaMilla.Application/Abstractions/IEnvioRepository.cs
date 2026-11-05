@@ -21,4 +21,8 @@ public interface IEnvioRepository
     Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
         Guid operadorId,
         CancellationToken ct);
+
+    Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct);
 }

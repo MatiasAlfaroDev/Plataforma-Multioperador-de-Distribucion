@@ -13,11 +13,13 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
     {
         builder.ToTable("envios");
         builder.HasKey(e => e.Id);
+        builder.Ignore(e => e.TokenSeguimientoOriginal);
+
 
         builder.Property(e => e.ReferenciaExterna).HasMaxLength(64).IsRequired();
         builder.Property(e => e.TokenSeguimientoHash)
             .HasMaxLength(64)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.HasIndex(e => e.TokenSeguimientoHash)
             .IsUnique();
