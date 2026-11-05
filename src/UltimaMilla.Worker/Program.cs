@@ -38,6 +38,9 @@ builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantDel
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redis));
 builder.Services.AddHostedService<ReintentoDeAvisos>();
 
+// Apagado controlado: los mensajes en curso terminan antes de cerrar; los que no llegan, RabbitMQ los reentrega.
+builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
+
 // Telemetría (RNF 6.12): la traza que empieza en la API sigue por MassTransit hasta el consumidor y el POST al comercio.
 builder.Logging.AddOpenTelemetry(o => o.IncludeFormattedMessage = true);
 

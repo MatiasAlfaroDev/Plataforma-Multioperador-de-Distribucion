@@ -104,7 +104,12 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ManejadorDeErrores>();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks()
-    .AddCheck<BaseDeDatosHealthCheck>("base-de-datos", tags: ["ready"]);
+    .AddCheck<BaseDeDatosHealthCheck>("base-de-datos", tags: ["ready"])
+    .AddCheck<DrenajeAlApagar>("apagado", tags: ["ready"]);
+
+// Apagado controlado (RNF 6.13): primero el drenaje de DrenajeAlApagar y después hasta 30 s para lo que esté en curso.
+builder.Services.AddHostedService<DrenajeAlApagar>();
+builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
 // Telemetría (RNF 6.12): logs, métricas y trazas salen por OTLP al Collector, y es él el que
 // decide el backend (docker/otel-collector-config.yaml). El destino y el nombre del servicio

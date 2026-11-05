@@ -135,6 +135,8 @@ services:
     # Dos réplicas balanceadas por Traefik
     deploy:
       replicas: 2
+    # Más que el drenaje (10 s) más el ShutdownTimeout (30 s) de Program.cs; si no, Docker la mata antes.
+    stop_grace_period: 45s
 
     environment:
       ConnectionStrings__Redis: "redis:6379"
@@ -166,6 +168,10 @@ services:
       - "traefik.http.services.api.loadbalancer.server.port=8080"
       - "traefik.http.services.api.loadbalancer.healthcheck.path=/ready"
       - "traefik.http.services.api.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.api.loadbalancer.healthcheck.timeout=2s"
+      # Si la réplica elegida corta la conexión (se cayó entre dos chequeos), Traefik reintenta en la otra.
+      - "traefik.http.middlewares.api-reintento.retry.attempts=2"
+      - "traefik.http.routers.api.middlewares=api-reintento"
 
   # Worker independiente (informe 1.3): consume la cola y entrega los avisos a comercios (RNF 6.8 y 6.9).
   # Una sola réplica: no expone HTTP, así que Traefik no lo ve.
@@ -173,6 +179,7 @@ services:
     build:
       context: .
       dockerfile: src/UltimaMilla.Worker/Dockerfile
+    stop_grace_period: 40s
     environment:
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=ultimamilla;Username=ultimamilla;Password=${POSTGRES_PASSWORD:-ultimamilla_dev}"
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-ultimamilla}:${RABBITMQ_PASSWORD:-ultimamilla_dev}@rabbitmq:5672"
@@ -226,6 +233,9 @@ services:
       - "traefik.http.routers.portal.rule=Host(`portal.localhost`)"
       - "traefik.http.routers.portal.entrypoints=web"
       - "traefik.http.services.portal.loadbalancer.server.port=8080"
+      # Afinidad: el circuito de Blazor Server vive en una instancia (sirve el día que el Portal tenga réplicas).
+      - "traefik.http.services.portal.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.portal.loadbalancer.sticky.cookie.name=UltimaMilla.Afinidad"
 
   backoffice:
     build:
