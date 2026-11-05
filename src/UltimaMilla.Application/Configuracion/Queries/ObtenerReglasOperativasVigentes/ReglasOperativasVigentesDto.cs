@@ -6,4 +6,10 @@ public sealed record ReglasOperativasVigentesDto(
     int HorasMinimasEntreIntentos,
     bool RequierePruebaEntrega,
     int DiasMaximosParaDevolucion,
-    DateTimeOffset VigenciaDesde);
+    DateTimeOffset VigenciaDesde,
+    IReadOnlyList<MotivoNoEntregaDto> Motivos);
+
+public sealed record MotivoNoEntregaDto(
+    string Codigo,
+    string Descripcion,
+    bool RequiereDevolucion);

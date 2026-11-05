@@ -22,12 +22,15 @@
     <p class="aviso error" role="alert">@Model.Error</p>
 }
 
-@if (Model.OperadorIdSesion != Guid.Empty && Model.Error is null)
+<div asp-validation-summary="All" class="error"></div>
+
+@if (Model.OperadorIdSesion != Guid.Empty &&
+     Model.PuedeMostrarFormulario)
 {
     <h2>
         @(Model.ReglasEncontradas
             ? "Reglas operativas vigentes"
-            : "Crear reglas operativas")
+            : "Configuración de reglas operativas")
     </h2>
 
     @if (Model.VigenciaDesde.HasValue)
@@ -37,16 +40,14 @@
         </p>
     }
 
-    <form method="post">
+    <form method="post" id="form-reglas">
         <div class="campos">
             <div>
                 <label asp-for="MaximoIntentosEntrega">
                     Máximo de intentos de entrega
                 </label>
                 <input asp-for="MaximoIntentosEntrega"
-                       type="number"
-                       min="1"
-                       required />
+                       type="number" min="1" required />
             </div>
 
             <div>
@@ -54,9 +55,7 @@
                     Horas mínimas entre intentos
                 </label>
                 <input asp-for="HorasMinimasEntreIntentos"
-                       type="number"
-                       min="0"
-                       required />
+                       type="number" min="0" required />
             </div>
 
             <div>
@@ -64,9 +63,7 @@
                     Días máximos para devolución
                 </label>
                 <input asp-for="DiasMaximosParaDevolucion"
-                       type="number"
-                       min="1"
-                       required />
+                       type="number" min="1" required />
             </div>
 
             <div>
@@ -74,16 +71,158 @@
                     Requiere prueba de entrega
                 </label>
                 <input asp-for="RequierePruebaEntrega"
-                       type="checkbox" />
+                       type="checkbox"
+                       style="width:auto" />
             </div>
         </div>
 
+        <h2>Motivos de no entrega</h2>
+
+        <p class="nota">
+            Administrá los motivos que podrá seleccionar el repartidor
+            cuando una entrega no se complete.
+            Los cambios se aplicarán al guardar la nueva versión.
+        </p>
+
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Descripción</th>
+                        <th>Requiere devolución</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-motivos">
+                    @for (var i = 0; i < Model.Motivos.Count; i++)
+                    {
+                        <tr>
+                            <td>
+                                <input data-campo="Codigo"
+                                       name="Motivos[@i].Codigo"
+                                       value="@Model.Motivos[i].Codigo"
+                                       maxlength="100"
+                                       required />
+                            </td>
+                            <td>
+                                <input data-campo="Descripcion"
+                                       name="Motivos[@i].Descripcion"
+                                       value="@Model.Motivos[i].Descripcion"
+                                       maxlength="300"
+                                       required />
+                            </td>
+                            <td>
+                                <input data-campo="RequiereDevolucion"
+                                       name="Motivos[@i].RequiereDevolucion"
+                                       type="checkbox"
+                                       value="true"
+                                       checked="@Model.Motivos[i].RequiereDevolucion"
+                                       style="width:auto" />
+                                <input data-campo="RequiereDevolucion"
+                                       name="Motivos[@i].RequiereDevolucion"
+                                       type="hidden"
+                                       value="false" />
+                            </td>
+                            <td>
+                                <button type="button"
+                                        class="quitar-motivo">
+                                    Quitar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="acciones">
+            <button type="button" id="agregar-motivo">
+                + Agregar motivo
+            </button>
+        </div>
+
+        <p class="nota">
+            Podés editar los motivos directamente en la tabla.
+            Quitar un motivo no elimina los registros históricos.
+        </p>
+
         <div class="acciones">
             <button type="submit" class="primario">
-                @(Model.ReglasEncontradas
-                    ? "Guardar nueva versión"
-                    : "Crear reglas operativas")
+                Guardar nueva versión
             </button>
         </div>
     </form>
 }
+
+<script>
+    (() => {
+        const lista = document.getElementById("lista-motivos");
+        const agregar = document.getElementById("agregar-motivo");
+
+        if (!lista || !agregar)
+            return;
+
+        function actualizarIndices() {
+            const filas = lista.querySelectorAll("tr");
+
+            filas.forEach((fila, indice) => {
+                fila.querySelectorAll("[data-campo]")
+                    .forEach(campo => {
+                        campo.name =
+                            `Motivos[${indice}].${campo.dataset.campo}`;
+                    });
+            });
+        }
+
+        agregar.addEventListener("click", () => {
+            const fila = document.createElement("tr");
+
+            fila.innerHTML = `
+                <td>
+                    <input data-campo="Codigo"
+                           maxlength="100"
+                           placeholder="Código"
+                           required />
+                </td>
+                <td>
+                    <input data-campo="Descripcion"
+                           maxlength="300"
+                           placeholder="Descripción del motivo"
+                           required />
+                </td>
+                <td>
+                    <input data-campo="RequiereDevolucion"
+                           type="checkbox"
+                           value="true"
+                           style="width:auto" />
+                    <input data-campo="RequiereDevolucion"
+                           type="hidden"
+                           value="false" />
+                </td>
+                <td>
+                    <button type="button" class="quitar-motivo">
+                        Quitar
+                    </button>
+                </td>
+            `;
+
+            lista.appendChild(fila);
+            actualizarIndices();
+
+            fila.querySelector('[data-campo="Codigo"]').focus();
+        });
+
+        lista.addEventListener("click", evento => {
+            const boton = evento.target.closest(".quitar-motivo");
+
+            if (!boton)
+                return;
+
+            boton.closest("tr").remove();
+            actualizarIndices();
+        });
+
+        actualizarIndices();
+    })();
+</script>

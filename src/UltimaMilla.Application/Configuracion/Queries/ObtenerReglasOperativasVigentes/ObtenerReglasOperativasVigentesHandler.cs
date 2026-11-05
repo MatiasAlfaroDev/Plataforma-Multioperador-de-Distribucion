@@ -4,6 +4,7 @@ namespace UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasV
 
 public sealed class ObtenerReglasOperativasVigentesHandler(
     IVersionReglasOperativasRepository reglas,
+    IMotivoNoEntregaRepository motivosRepository,
     TimeProvider reloj)
 {
     public async Task<ReglasOperativasVigentesDto?> Handle(
@@ -20,12 +21,21 @@ public sealed class ObtenerReglasOperativasVigentesHandler(
         if (version is null)
             return null;
 
+        var motivos = await motivosRepository.ListarPorVersionAsync(
+            query.OperadorId,
+            version.Id,
+            ct);
+
         return new ReglasOperativasVigentesDto(
             version.Id,
             version.MaximoIntentosEntrega,
             version.HorasMinimasEntreIntentos,
             version.RequierePruebaEntrega,
             version.DiasMaximosParaDevolucion,
-            version.VigenciaDesde);
+            version.VigenciaDesde,
+            motivos.Select(m => new MotivoNoEntregaDto(
+                m.Codigo,
+                m.Descripcion,
+                m.RequiereDevolucion)).ToList());
     }
 }
