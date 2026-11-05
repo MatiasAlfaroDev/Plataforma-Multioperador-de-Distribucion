@@ -443,6 +443,13 @@ public class RegistrarEventoMovilHandlerTests
             throw new NotSupportedException(
                 "Esta prueba no utiliza la consulta de planificación.");
         }
+
+        public Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct)
+{
+    return Task.FromResult<Envio?>(null);
+}
     }
 
     private sealed class EventosEnMemoria : IEventoMovilRepository

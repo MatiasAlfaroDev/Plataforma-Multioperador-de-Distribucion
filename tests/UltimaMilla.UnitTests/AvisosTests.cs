@@ -317,6 +317,13 @@ public class AvisosTests
             Task.FromResult<IReadOnlyList<Envio>>([envio]);
 
         public Task AgregarAsync(Envio envio, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct)
+{
+    return Task.FromResult<Envio?>(null);
+}
     }
 
     private sealed class SuscripcionesEnMemoria : ISuscripcionAvisoRepository

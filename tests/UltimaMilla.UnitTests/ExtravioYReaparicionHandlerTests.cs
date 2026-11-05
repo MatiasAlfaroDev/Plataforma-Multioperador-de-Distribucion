@@ -371,6 +371,13 @@ public class ExtravioYReaparicionHandlerTests
             CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<Envio>>(
                 lista.Where(e => e.OperadorId == operadorId).ToList());
+
+                public Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct)
+{
+    return Task.FromResult<Envio?>(null);
+}
     }
 
     private sealed class HojasEnMemoria : IHojaDeRutaRepository

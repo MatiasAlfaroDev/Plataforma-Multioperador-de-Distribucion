@@ -368,5 +368,12 @@ public class MisHojasDeRutaTests
 
         public Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync( Guid operadorId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<Envio>>( lista.Where(e => e.OperadorId == operadorId).ToList());
+
+            public Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct)
+{
+    return Task.FromResult<Envio?>(null);
+}
     }
 }
