@@ -1,0 +1,94 @@
+# Perfil de nube (RNF 6.14): se superpone al compose base en la VM que crea OpenTofu (infra/).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.nube.yml up -d --build
+#
+# Lo corre el job `desplegar` de .github/workflows/ci.yml, que también escribe el .env con DOMINIO
+# y los secretos. Diferencias con local: HTTPS con Let's Encrypt, 80 redirige a 443, nada publicado
+# salvo 80 y 443, Grafana con usuario y reinicio automático si la VM se reinicia.
+x-reinicio: &reinicio
+  restart: unless-stopped
+
+services:
+  traefik:
+    <<: *reinicio
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      # Todo router en websecure sale con certificado de Let's Encrypt, sin etiquetas tls por servicio.
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=le
+      # Interno, sin publicar: Portal y Backoffice llegan a la API por acá, en HTTP y sin la redirección.
+      - --entrypoints.interno.address=:81
+      - --certificatesresolvers.le.acme.email=${CORREO_ACME:-admin@ultimamilla.uy}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes:
+      - letsencrypt:/letsencrypt
+
+  postgres:
+    <<: *reinicio
+    ports: !reset []
+
+  redis:
+    <<: *reinicio
+
+  rabbitmq:
+    <<: *reinicio
+    labels:
+      - "traefik.http.routers.rabbitmq.entrypoints=websecure"
+
+  otel-collector:
+    <<: *reinicio
+
+  lgtm:
+    <<: *reinicio
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:?Falta GRAFANA_PASSWORD}"
+    labels:
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+
+  api:
+    <<: *reinicio
+    environment:
+      # Toma el esquema https de X-Forwarded-Proto de Traefik: redirecciones y cookies Secure correctas.
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    labels:
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api-interno.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.api-interno.entrypoints=interno"
+      - "traefik.http.routers.api-interno.service=api"
+      - "traefik.http.routers.api-interno.middlewares=api-reintento"
+
+  worker:
+    <<: *reinicio
+
+  receptor-avisos:
+    <<: *reinicio
+    labels:
+      - "traefik.http.routers.receptor.entrypoints=websecure"
+
+  portal:
+    <<: *reinicio
+    environment:
+      Api__BaseUrl: "http://traefik:81/"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    labels:
+      - "traefik.http.routers.portal.entrypoints=websecure"
+
+  backoffice:
+    <<: *reinicio
+    environment:
+      Api__BaseUrl: "http://traefik:81/"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    labels:
+      - "traefik.http.routers.backoffice.entrypoints=websecure"
+
+volumes:
+  letsencrypt:

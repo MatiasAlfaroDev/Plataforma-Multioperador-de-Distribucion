@@ -1,4 +1,4 @@
-# Levanta todo el entorno del 8/10:  docker compose up --build
+# Levanta todo el entorno local:  docker compose up --build
 #
 # Todo entra por Traefik (único proxy inverso, informe 6.3):
 #   Portal del comercio:     http://portal.localhost:8000
@@ -10,7 +10,8 @@
 #   Grafana (observabilidad): http://grafana.localhost:8000
 #   Receptor de avisos:      http://receptor.localhost:8000   (modo de falla: POST /modo/{ok|falla|intermitente|lento})
 #
-# Monitoreos siguientes: seguimiento y TLS con Let's Encrypt (solo en la nube).
+# En la nube se le superpone docker-compose.nube.yml (HTTPS con Let's Encrypt, hosts <servicio>.${DOMINIO});
+# lo crea y despliega infra/ con OpenTofu y GitHub Actions. Ver infra/LEEME.md.
 services:
   traefik:
     image: traefik:v3
@@ -71,7 +72,7 @@ services:
       retries: 10
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.rabbitmq.rule=Host(`rabbit.localhost`)"
+      - "traefik.http.routers.rabbitmq.rule=Host(`rabbit.${DOMINIO:-localhost}`)"
       - "traefik.http.routers.rabbitmq.entrypoints=web"
       # Prioridad sobre el PathPrefix(/api) de la API, que si no se queda con /api/* de este host.
       - "traefik.http.routers.rabbitmq.priority=100"
@@ -99,7 +100,7 @@ services:
       - ./docker/grafana/tablero-tecnico.json:/otel-lgtm/tablero-tecnico.json:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMINIO:-localhost}`)"
       - "traefik.http.routers.grafana.entrypoints=web"
       # Prioridad sobre el PathPrefix(/api) de la API, que si no se queda con /api/* de este host.
       - "traefik.http.routers.grafana.priority=100"
@@ -163,7 +164,7 @@ services:
 
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api.localhost`) || PathPrefix(`/api`)"
+      - "traefik.http.routers.api.rule=Host(`api.${DOMINIO:-localhost}`) || PathPrefix(`/api`)"
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.services.api.loadbalancer.server.port=8080"
       - "traefik.http.services.api.loadbalancer.healthcheck.path=/ready"
@@ -208,7 +209,7 @@ services:
       Receptor__Modo: "ok"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.receptor.rule=Host(`receptor.localhost`)"
+      - "traefik.http.routers.receptor.rule=Host(`receptor.${DOMINIO:-localhost}`)"
       - "traefik.http.routers.receptor.entrypoints=web"
       - "traefik.http.services.receptor.loadbalancer.server.port=8080"
 
@@ -230,7 +231,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portal.rule=Host(`portal.localhost`)"
+      - "traefik.http.routers.portal.rule=Host(`portal.${DOMINIO:-localhost}`)"
       - "traefik.http.routers.portal.entrypoints=web"
       - "traefik.http.services.portal.loadbalancer.server.port=8080"
       # Afinidad: el circuito de Blazor Server vive en una instancia (sirve el día que el Portal tenga réplicas).
@@ -253,7 +254,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backoffice.rule=Host(`backoffice.localhost`)"
+      - "traefik.http.routers.backoffice.rule=Host(`backoffice.${DOMINIO:-localhost}`)"
       - "traefik.http.routers.backoffice.entrypoints=web"
       - "traefik.http.services.backoffice.loadbalancer.server.port=8080"
 

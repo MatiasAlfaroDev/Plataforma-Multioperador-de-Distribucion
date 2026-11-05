@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Deploy a mano (infra/reconstruir.sh lo dispara después de un tofu apply).
+  workflow_dispatch:
 
 jobs:
   build-y-pruebas:
@@ -34,3 +36,63 @@ jobs:
         env:
           DEMO_PASSWORD: "ci-build-placeholder-not-a-real-password"
         run: docker compose build
+
+  # Deploy continuo (RNF 6.14): entra por SSH a la VM que crea OpenTofu (infra/) y levanta el perfil de
+  # nube. Apagado hasta que exista la VM: se habilita con la variable DESPLIEGUE_HABILITADO=true.
+  desplegar:
+    runs-on: ubuntu-latest
+    needs: [build-y-pruebas, imagenes-docker]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DESPLIEGUE_HABILITADO == 'true'
+    environment: produccion
+    concurrency:
+      group: despliegue-produccion
+      cancel-in-progress: false
+    env:
+      VM_HOST: ${{ secrets.VM_HOST }}
+      DOMINIO_PROPIO: ${{ vars.DOMINIO }}
+    steps:
+      - name: Calcular el dominio
+        # Sin dominio propio, el mismo que arma OpenTofu: la IP con guiones bajo sslip.io.
+        run: echo "DOMINIO=${DOMINIO_PROPIO:-$(echo "$VM_HOST" | tr . -).sslip.io}" >> "$GITHUB_ENV"
+
+      - name: Desplegar en la VM
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+          GRAFANA_PASSWORD: ${{ secrets.GRAFANA_PASSWORD }}
+          FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USUARIO }}
+          key: ${{ secrets.VM_CLAVE_SSH }}
+          envs: DOMINIO,DEMO_PASSWORD,POSTGRES_PASSWORD,RABBITMQ_PASSWORD,GRAFANA_PASSWORD,FIREBASE_JSON
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            # En una VM recién creada, cloud-init todavía puede estar instalando Docker y clonando el repo.
+            cloud-init status --wait > /dev/null
+            cd /opt/ultimamilla
+            git fetch origin main
+            git reset --hard origin/main
+            umask 077
+            cat > .env <<EOF
+            DOMINIO=$DOMINIO
+            DEMO_PASSWORD=$DEMO_PASSWORD
+            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+            RABBITMQ_PASSWORD=$RABBITMQ_PASSWORD
+            GRAFANA_PASSWORD=$GRAFANA_PASSWORD
+            EOF
+            if [ -n "$FIREBASE_JSON" ]; then printf '%s' "$FIREBASE_JSON" > docker/secretos/firebase-cuenta-servicio.json; fi
+            docker compose -f docker-compose.yml -f docker-compose.nube.yml up -d --build --remove-orphans
+            docker image prune -f > /dev/null
+
+      - name: Verificar que la API responde por HTTPS
+        # El primer deploy espera además el certificado de Let's Encrypt.
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS "https://api.$DOMINIO/ready" && exit 0
+            sleep 10
+          done
+          exit 1
