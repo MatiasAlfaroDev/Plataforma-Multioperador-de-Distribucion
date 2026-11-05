@@ -39,3 +39,12 @@ fieldset button { margin-top: 1rem; }
 .acciones { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
 .validation-message { font-size: .9rem; margin-top: .2rem; }
 .validation-errors { padding-left: 1.2rem; }
+
+/* Avisos: tablas y navegación, con los mismos valores que el Backoffice. */
+nav { margin-top: .75rem; }
+nav a { color: var(--acento); margin-right: 1rem; }
+.tabla { overflow-x: auto; margin: 1rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { text-align: left; padding: .5rem; border-bottom: 1px solid var(--borde); vertical-align: top; }
+fieldset label { font-weight: 400; }
+input[type="checkbox"] { width: auto; margin-right: .4rem; }

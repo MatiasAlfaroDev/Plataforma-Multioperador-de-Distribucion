@@ -51,6 +51,11 @@ using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Infrastructure.Caching;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
 using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
+using UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
+using UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
+using UltimaMilla.Application.Avisos.Queries.ListarAvisos;
+using UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
+using UltimaMilla.Domain.Avisos;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -799,6 +804,54 @@ api.MapPost("/notificaciones/prueba", async (
     CancellationToken ct) =>
     Results.Ok(await handler.Handle(command, ct)))
 .RequireAuthorization();
+
+// GET /api/avisos?estado=Fallida → historial de avisos a comercios (RNF 6.9). El comercio ve solo
+// los de su cuenta; el operador, todos los suyos (consulta de fallidos, RNF 6.8).
+api.MapGet("/avisos", async (
+    EstadoEntregaAviso? estado,
+    ListarAvisosHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ListarAvisosQuery(estado), ct)))
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
+
+// POST /api/avisos/{id}/reenviar → vuelve a encolar un aviso fallido; lo entrega el Worker.
+api.MapPost("/avisos/{entregaId:guid}/reenviar", async (
+    Guid entregaId,
+    ReenviarAvisoHandler handler,
+    CancellationToken ct) =>
+{
+    await handler.Handle(new ReenviarAvisoCommand(entregaId), ct);
+    return Results.NoContent();
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
+
+// GET /api/suscripciones-aviso → a qué URL y tipos de evento avisa la plataforma, con el secreto de la firma.
+api.MapGet("/suscripciones-aviso", async (
+    ListarSuscripcionesHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ListarSuscripcionesQuery(), ct)))
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Comercio));
+
+// POST /api/suscripciones-aviso → alta de una suscripción; el secreto lo genera la plataforma.
+api.MapPost("/suscripciones-aviso", async (
+    CrearSuscripcionCommand command,
+    CrearSuscripcionHandler handler,
+    CancellationToken ct) =>
+{
+    var id = await handler.Handle(command, ct);
+    return Results.Created($"/api/suscripciones-aviso/{id}", new { id });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Comercio));
 
 app.Run();
 

@@ -319,12 +319,66 @@
       "drawStyle": "bars"
     },
     {
+      "type": "stat",
+      "title": "Avisos a comercios fallidos",
+      "id": 21,
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 6,
+        "h": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Intentos de aviso HTTP al sistema de un comercio que no respondieron 2xx (RNF 6.9). Cada reintento del Worker cuenta.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(avisos_fallidos_total[$__range]))",
+          "legendFormat": ""
+        }
+      ],
+      "unit": "none",
+      "noValue": "0"
+    },
+    {
+      "type": "timeseries",
+      "title": "Avisos a comercios: entregados y fallidos",
+      "id": 22,
+      "gridPos": {
+        "x": 6,
+        "y": 28,
+        "w": 18,
+        "h": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(avisos_entregados_total[$__rate_interval]))",
+          "legendFormat": "entregados"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(avisos_fallidos_total[$__rate_interval]))",
+          "legendFormat": "fallidos"
+        }
+      ],
+      "unit": "none",
+      "drawStyle": "bars"
+    },
+    {
       "type": "row",
       "title": "Runtime .NET",
       "id": 13,
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 34,
         "w": 24,
         "h": 1
       }
@@ -335,7 +389,7 @@
       "id": 14,
       "gridPos": {
         "x": 0,
-        "y": 29,
+        "y": 35,
         "w": 8,
         "h": 7
       },
@@ -358,7 +412,7 @@
       "id": 15,
       "gridPos": {
         "x": 8,
-        "y": 29,
+        "y": 35,
         "w": 8,
         "h": 7
       },
@@ -381,7 +435,7 @@
       "id": 16,
       "gridPos": {
         "x": 16,
-        "y": 29,
+        "y": 35,
         "w": 8,
         "h": 7
       },
@@ -404,7 +458,7 @@
       "id": 17,
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 42,
         "w": 24,
         "h": 1
       }
@@ -415,7 +469,7 @@
       "id": 18,
       "gridPos": {
         "x": 0,
-        "y": 37,
+        "y": 43,
         "w": 8,
         "h": 6
       },
@@ -449,7 +503,7 @@
       "id": 19,
       "gridPos": {
         "x": 8,
-        "y": 37,
+        "y": 43,
         "w": 8,
         "h": 6
       },
@@ -483,7 +537,7 @@
       "id": 20,
       "gridPos": {
         "x": 16,
-        "y": 37,
+        "y": 43,
         "w": 8,
         "h": 6
       },

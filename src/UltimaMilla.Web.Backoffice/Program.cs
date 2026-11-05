@@ -95,6 +95,12 @@ builder.Services.AddHttpClient<HojasDeRutaApiClient>(c =>
         ?? "http://localhost:5080/"))
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
+builder.Services.AddHttpClient<AvisosApiClient>(c =>
+    c.BaseAddress = new Uri(
+        builder.Configuration["Api:BaseUrl"]
+        ?? "http://localhost:5080/"))
+    .AddHttpMessageHandler<CookieAutenticacionHandler>();
+
 // Observabilidad.
 builder.Logging.AddOpenTelemetry(
     o => o.IncludeFormattedMessage = true);

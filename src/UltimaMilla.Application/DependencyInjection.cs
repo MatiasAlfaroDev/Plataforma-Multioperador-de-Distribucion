@@ -29,6 +29,12 @@ using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
 using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
+using UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
+using UltimaMilla.Application.Avisos.Commands.EntregarAviso;
+using UltimaMilla.Application.Avisos.Commands.RegistrarAvisos;
+using UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
+using UltimaMilla.Application.Avisos.Queries.ListarAvisos;
+using UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
 
 namespace UltimaMilla.Application;
 
@@ -69,6 +75,14 @@ public static class DependencyInjection
         services.AddScoped<RegistrarPosicionesHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();
         services.AddScoped<EnviarNotificacionDePruebaHandler>();
+
+        // Avisos a comercios (RNF 6.9): RegistrarAvisos y EntregarAviso los invoca el Worker.
+        services.AddScoped<RegistrarAvisosHandler>();
+        services.AddScoped<EntregarAvisoHandler>();
+        services.AddScoped<ReenviarAvisoHandler>();
+        services.AddScoped<ListarAvisosHandler>();
+        services.AddScoped<CrearSuscripcionHandler>();
+        services.AddScoped<ListarSuscripcionesHandler>();
         return services;
     }
 }

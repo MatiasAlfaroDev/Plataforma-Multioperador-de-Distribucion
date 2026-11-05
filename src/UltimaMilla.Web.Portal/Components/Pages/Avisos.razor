@@ -1,0 +1,250 @@
+@page "/avisos"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize]
+@inject IJSRuntime JS
+
+<PageTitle>Avisos</PageTitle>
+
+<h1>Avisos a mi sistema</h1>
+
+<p class="nota">
+    La plataforma avisa a tu sistema por HTTP con cada novedad del envío; cada aviso lleva la cabecera
+    <code>X-UltimaMilla-Firma</code> (HMAC-SHA256 del cuerpo con el secreto) para que verifiques que viene de la plataforma.
+</p>
+
+@if (mensaje is not null)
+{
+    <p role="status" class="aviso @(exito ? "ok" : "error")">@mensaje</p>
+}
+
+@if (errorDeCarga is not null)
+{
+    <p role="alert" class="aviso error">@errorDeCarga</p>
+}
+
+<h2>Suscripciones</h2>
+
+@if (cargando)
+{
+    <p>Cargando…</p>
+}
+else if (suscripciones.Count == 0)
+{
+    <p>Todavía no hay suscripciones.</p>
+}
+else
+{
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th>Eventos</th>
+                    <th>Secreto</th>
+                    <th>Activa</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var suscripcion in suscripciones)
+                {
+                    <tr>
+                        <td>@suscripcion.Url</td>
+                        <td>@string.Join(", ", suscripcion.TiposEvento)</td>
+                        <td><code>@suscripcion.Secreto</code></td>
+                        <td>@(suscripcion.Activa ? "Sí" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<h3>Nueva suscripción</h3>
+
+<form @onsubmit="SuscribirAsync">
+    <label for="url">URL de tu sistema</label>
+    <input type="url" id="url" @bind="nuevaUrl" placeholder="https://mi-tienda.uy/avisos" required />
+
+    <fieldset>
+        <legend>Eventos</legend>
+        @foreach (var (tipo, nombre) in Tipos)
+        {
+            <label>
+                <input type="checkbox" checked="@tiposElegidos.Contains(tipo)" @onchange="() => AlternarTipo(tipo)" />
+                @nombre <code>@tipo</code>
+            </label>
+        }
+    </fieldset>
+
+    <div class="acciones">
+        <button type="submit" class="primario" disabled="@(guardando || tiposElegidos.Count == 0)">Suscribirme</button>
+    </div>
+</form>
+
+<h2>Historial</h2>
+
+<button @onclick="CargarAsync" disabled="@cargando">Actualizar</button>
+
+@if (cargando)
+{
+    <p>Cargando…</p>
+}
+else if (avisos.Count == 0)
+{
+    <p>Todavía no se generaron avisos.</p>
+}
+else
+{
+
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Evento</th>
+                    <th>Estado</th>
+                    <th>Intentos</th>
+                    <th>Último error</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var aviso in avisos)
+                {
+                    <tr>
+                        <td>@aviso.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
+                        <td>@aviso.TipoEvento</td>
+                        <td>@aviso.Estado</td>
+                        <td>@aviso.Intentos</td>
+                        <td>@aviso.UltimoError</td>
+                        <td>
+                            @if (aviso.Estado == "Fallida")
+                            {
+                                <button @onclick="() => ReenviarAsync(aviso.Id)">Reenviar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private static readonly (string Tipo, string Nombre)[] Tipos =
+    [
+        ("envio.creado", "Alta del envío"),
+        ("envio.entregado", "Entregado"),
+        ("envio.no_entregado", "Intento fallido")
+    ];
+
+    private List<AvisoItem> avisos = [];
+    private List<SuscripcionItem> suscripciones = [];
+    private readonly HashSet<string> tiposElegidos = [.. Tipos.Select(t => t.Tipo)];
+    private string nuevaUrl = "";
+    private bool cargando = true;
+    private bool guardando;
+    private string? errorDeCarga;
+    private string? mensaje;
+    private bool exito;
+
+    // El JS solo está disponible después del primer render (igual que en NuevoEnvio).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        cargando = true;
+        errorDeCarga = null;
+
+        try
+        {
+            avisos = await JS.InvokeAsync<List<AvisoItem>>("avisosPortal.listarAvisos");
+            suscripciones = await JS.InvokeAsync<List<SuscripcionItem>>("avisosPortal.listarSuscripciones");
+        }
+        catch (JSException)
+        {
+            errorDeCarga = "No se pudieron cargar los avisos.";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReenviarAsync(Guid id)
+    {
+        await EjecutarAsync(() => JS.InvokeAsync<ResultadoOperacion>("avisosPortal.reenviar", id).AsTask(),
+            "No se pudo reenviar el aviso.");
+    }
+
+    private async Task SuscribirAsync()
+    {
+        if (guardando)
+            return;
+
+        guardando = true;
+
+        try
+        {
+            if (await EjecutarAsync(() => JS.InvokeAsync<ResultadoOperacion>(
+                    "avisosPortal.crearSuscripcion",
+                    new { url = nuevaUrl, tiposEvento = tiposElegidos.ToArray() }).AsTask(),
+                "No se pudo crear la suscripción."))
+            {
+                nuevaUrl = "";
+            }
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    /// <summary>Corre una operación contra la API, muestra su resultado y recarga las tablas.</summary>
+    private async Task<bool> EjecutarAsync(Func<Task<ResultadoOperacion>> operacion, string mensajeDeError)
+    {
+        try
+        {
+            var resultado = await operacion();
+            exito = resultado.Exito;
+            mensaje = resultado.Mensaje;
+        }
+        catch (JSException)
+        {
+            exito = false;
+            mensaje = mensajeDeError;
+        }
+
+        await CargarAsync();
+        return exito;
+    }
+
+    private void AlternarTipo(string tipo)
+    {
+        if (!tiposElegidos.Remove(tipo))
+            tiposElegidos.Add(tipo);
+    }
+
+    private sealed record AvisoItem(
+        Guid Id,
+        string TipoEvento,
+        string Estado,
+        int Intentos,
+        string? UltimoError,
+        DateTimeOffset CreadoEn);
+
+    private sealed record SuscripcionItem(
+        Guid Id,
+        string Url,
+        string Secreto,
+        List<string> TiposEvento,
+        bool Activa);
+
+    private sealed record ResultadoOperacion(bool Exito, string Mensaje);
+}

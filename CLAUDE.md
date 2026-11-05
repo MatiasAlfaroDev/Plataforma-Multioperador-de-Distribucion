@@ -20,8 +20,9 @@ docker compose down -v                             # borra también el volumen d
 ```
 
 Entrypoints detrás de Traefik: `portal.localhost:8000`, `backoffice.localhost:8000`,
-`api.localhost:8000`, `grafana.localhost:8000` (Grafana: tablero técnico, trazas y logs)
-y `rabbit.localhost:8000` (panel de RabbitMQ). El panel de Traefik va en `localhost:8081`.
+`api.localhost:8000`, `grafana.localhost:8000` (Grafana: tablero técnico, trazas y logs),
+`rabbit.localhost:8000` (panel de RabbitMQ) y `receptor.localhost:8000` (receptor de prueba de
+los avisos; `POST /modo/{ok|falla|intermitente|lento}` cambia su modo de falla). El panel de Traefik va en `localhost:8081`.
 Los navegadores resuelven `*.localhost` solos.
 
 ### App móvil (solución aparte)
@@ -66,6 +67,12 @@ externa. No agregues esas dependencias a esos dos proyectos.
   `IEntityTypeConfiguration` en `Persistence/Configurations/`.
 - **Api** — Minimal API. Todos los endpoints se declaran inline en `Program.cs` sobre el grupo
   `/api`; no hay controladores.
+- **Worker** — Worker Service sin HTTP. Los consumidores de MassTransit viven acá (Application no
+  puede depender de MassTransit), se registran con el parámetro `consumidores` de `AddInfrastructure`
+  y llaman a Handlers. Cada mensaje trae su `OperadorId` y el consumidor lo fija en
+  `TenantDelMensaje` (el `ITenantContext` del Worker) **antes** de llamar al Handler; sin eso los
+  filtros por operador no devuelven nada y `TenantSaveChangesInterceptor` rechaza el guardado.
+  Reintentos exponenciales y cola `*_error` se configuran en la `ConsumerDefinition`.
 - **Web.Portal** (Blazor InteractiveServer) y **Web.Backoffice** (Razor Pages) **no** referencian
   Application ni Infrastructure: hablan con la API por HTTP a través de su propio
   `Services/EnviosApiClient`, configurado con `Api:BaseUrl`.
@@ -110,15 +117,16 @@ es el caso que demuestra el aislamiento entre tenants.
 
 ## Docker
 
-Los tres `Dockerfile` se construyen **desde la raíz del repo** (`context: .` en el compose) y
+Los cinco `Dockerfile` se construyen **desde la raíz del repo** (`context: .` en el compose) y
 copian todo el árbol, así que las rutas dentro son `src/<Proyecto>/...`. Los contenedores
 escuchan en 8080 (`ASPNETCORE_HTTP_PORTS`); solo Traefik publica puertos. El router de la API
 responde a `Host(api.localhost)` **y** a `PathPrefix(/api)`, esto último para que entre la app
 móvil (emulador Android: `10.0.2.2:8000`, ver `Mobile/Data/Constants.cs`).
 
-Once contenedores: `traefik`, `postgres`, `redis`, `rabbitmq`, `otel-collector`,
-`lgtm`, `inicializador`, **dos réplicas de `api`**, `portal` y `backoffice`.
-`redis` está declarado pero ningún código lo usa todavía (caché 22/10); `rabbitmq` recibe los eventos del outbox de la API, y el Worker que los consume entra el 29/10. `api` e `inicializador` comparten `image: ultimamilla-api:local`, así que la imagen se construye una sola vez; `api` no lleva `container_name` a propósito, porque con uno fijo Docker no puede crear la segunda réplica. El Portal y el Backoffice salen por
+Trece contenedores: `traefik`, `postgres`, `redis`, `rabbitmq`, `otel-collector`,
+`lgtm`, `inicializador`, **dos réplicas de `api`**, `worker`, `receptor-avisos`, `portal` y `backoffice`.
+`rabbitmq` recibe los eventos del outbox y el `worker` los consume; `receptor-avisos` es el sistema
+de comercio de prueba al que apunta la suscripción sembrada para Tienda Norte en RapiEnvíos. `api` e `inicializador` comparten `image: ultimamilla-api:local`, así que la imagen se construye una sola vez; `api` no lleva `container_name` a propósito, porque con uno fijo Docker no puede crear la segunda réplica. El Portal y el Backoffice salen por
 `Api__BaseUrl: http://traefik/` y no por `api:8080`, para usar el balanceador con health
 checks activos en lugar del round-robin del DNS de Docker.
 

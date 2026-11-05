@@ -20,8 +20,13 @@ public static class DependencyInjection
     /// <summary>
     /// Registra EF Core con PostgreSQL, MassTransit con RabbitMQ y las implementaciones de los contratos de Application.
     /// rabbitMq: cadena amqp://usuario:clave@host:5672
+    /// consumidores: el Worker registra acá los suyos; la API no consume nada y no lo pasa.
     /// </summary>
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString, string rabbitMq)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        string connectionString,
+        string rabbitMq,
+        Action<IBusRegistrationConfigurator>? consumidores = null)
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AuditableEntityInterceptor>();
@@ -61,6 +66,11 @@ public static class DependencyInjection
         services.AddScoped<IPublicadorDeEventos, PublicadorDeEventos>();
         services.AddScoped<IDispositivoMovilRepository, DispositivoMovilRepository>();
         services.AddScoped<IPosicionRepartidorRepository, PosicionRepartidorRepository>();
+        services.AddScoped<ISuscripcionAvisoRepository, SuscripcionAvisoRepository>();
+        services.AddScoped<IEntregaAvisoRepository, EntregaAvisoRepository>();
+
+        // Avisos a comercios (RNF 6.9): un solo intento por llamada; reintenta MassTransit en el Worker.
+        services.AddHttpClient<IClienteAvisos, ClienteAvisos>(c => c.Timeout = TimeSpan.FromSeconds(10));
 
         // Push con Firebase: una sola instancia, porque la conexión con Firebase se crea una vez y se reutiliza.
         services.AddSingleton<INotificadorPush, FirebaseNotificadorPush>();
@@ -74,6 +84,8 @@ public static class DependencyInjection
                 o.UsePostgres();
                 o.UseBusOutbox();
             });
+
+            consumidores?.Invoke(x);
             
             // Sin RabbitMQ la API sigue sirviendo y acumula en el outbox, así que el bus no entra en /ready (Traefik la sacaría del pool); queda en /health.
             x.ConfigureHealthCheckOptions(o => o.Tags.Remove("ready"));

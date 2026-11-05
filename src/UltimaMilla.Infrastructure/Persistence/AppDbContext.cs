@@ -10,6 +10,7 @@ using UltimaMilla.Infrastructure.Identidad;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Common;
 using UltimaMilla.Domain.Notificaciones;
+using UltimaMilla.Domain.Avisos;
 
 namespace UltimaMilla.Infrastructure.Persistence;
 
@@ -49,6 +50,8 @@ public sealed class AppDbContext(
     public DbSet<VersionReglasOperativas> VersionesReglasOperativas => Set<VersionReglasOperativas>();
     public DbSet<MembresiaUsuario> MembresiasUsuarios=> Set<MembresiaUsuario>();
     public DbSet<DispositivoMovil> DispositivosMoviles => Set<DispositivoMovil>();
+    public DbSet<SuscripcionAviso> SuscripcionesAviso => Set<SuscripcionAviso>();
+    public DbSet<EntregaAviso> EntregasAviso => Set<EntregaAviso>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configuración de las tablas de ASP.NET Core Identity.
@@ -129,6 +132,18 @@ public sealed class AppDbContext(
             .HasQueryFilter(s =>
                 AccesoInicializacion ||
                 s.OperadorId == OperadorActualId);
+
+        // Avisos a comercios: en el Worker el operador sale del mensaje (TenantDelMensaje).
+        modelBuilder.Entity<SuscripcionAviso>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<EntregaAviso>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
         // Tablas del outbox de MassTransit.
         modelBuilder.AddInboxStateEntity();
         modelBuilder.AddOutboxMessageEntity();
