@@ -10,7 +10,7 @@ namespace UltimaMilla.Worker.Consumidores;
 /// Consumer que convierte eventos de envío en avisos a comercios suscriptos (RF 28).
 /// Es idempotente: usa el inbox de MassTransit y un índice único en entregas_aviso.
 /// </summary>
-public sealed class GenerarAvisosConsumer(TenantDelMensaje tenant, RegistrarAvisosHandler handler) : IConsumer<EnvioCreado>, IConsumer<EventoMovilRegistrado>
+public sealed class GenerarAvisosConsumer(TenantDelMensaje tenant, RegistrarAvisosHandler handler) : IConsumer<EnvioCreado>, IConsumer<EstadoEnvioCambiado>
 {
     public async Task Consume(ConsumeContext<EnvioCreado> context)
     {
@@ -19,15 +19,11 @@ public sealed class GenerarAvisosConsumer(TenantDelMensaje tenant, RegistrarAvis
         await handler.Handle(new RegistrarAvisosCommand(m.EnvioId, TiposAviso.EnvioCreado, $"{TiposAviso.EnvioCreado}:{m.EnvioId}", m.FechaAlta), context.CancellationToken);
     }
 
-    public async Task Consume(ConsumeContext<EventoMovilRegistrado> context)
+    // Cubre todas las transiciones, también las de la app (EventoMovilRegistrado ya no genera avisos: serían dobles).
+    public async Task Consume(ConsumeContext<EstadoEnvioCambiado> context)
     {
         var m = context.Message;
-        var tipo = m.Tipo switch
-        {
-            "Entregado" => TiposAviso.EnvioEntregado,
-            "NoEntregado" => TiposAviso.EnvioNoEntregado,
-            _ => null
-        };
+        var tipo = TiposAviso.DeEstado(m.EstadoNuevo);
 
         if (tipo is null)
             return;

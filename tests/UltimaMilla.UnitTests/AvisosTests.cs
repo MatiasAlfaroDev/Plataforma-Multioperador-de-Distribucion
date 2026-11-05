@@ -39,6 +39,16 @@ public class AvisosTests
     private readonly UnidadDeTrabajoEnMemoria _unidad = new();
     private readonly ClienteFalso _cliente = new();
 
+    [Fact]
+    public void Cada_estado_salvo_Admitido_tiene_un_tipo_de_aviso_suscribible()
+    {
+        foreach (var estado in Enum.GetValues<EstadoEnvio>().Where(e => e != EstadoEnvio.Admitido))
+            Assert.Contains(TiposAviso.DeEstado(estado), TiposAviso.Todos);
+
+        // El alta se avisa por EnvioCreado; sin esto llegarían dos avisos por cada envío nuevo.
+        Assert.Null(TiposAviso.DeEstado(EstadoEnvio.Admitido));
+    }
+
     private RegistrarAvisosHandler Registrar() =>
         new(new EnviosEnMemoria(_envio), _suscripciones, _entregas, _publicador, _unidad);
 

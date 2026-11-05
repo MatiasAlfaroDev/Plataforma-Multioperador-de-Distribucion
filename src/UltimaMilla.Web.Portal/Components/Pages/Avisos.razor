@@ -135,8 +135,15 @@ else
     private static readonly (string Tipo, string Nombre)[] Tipos =
     [
         ("envio.creado", "Alta del envío"),
+        ("envio.en_deposito", "En depósito"),
+        ("envio.asignado_a_ruta", "Asignado a ruta"),
+        ("envio.en_transito", "En tránsito"),
         ("envio.entregado", "Entregado"),
-        ("envio.no_entregado", "Intento fallido")
+        ("envio.no_entregado", "Intento fallido"),
+        ("envio.reprogramado", "Reprogramado"),
+        ("envio.en_devolucion", "En devolución"),
+        ("envio.devuelto", "Devuelto"),
+        ("envio.extraviado", "Extraviado")
     ];
 
     private List<AvisoItem> avisos = [];
