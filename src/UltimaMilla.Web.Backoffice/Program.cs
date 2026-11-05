@@ -47,7 +47,9 @@ builder.Services.AddAuthorization(options =>
         policy.RequireAuthenticatedUser()
               .RequireRole(
                   "AdministradorOperador",
-                  "Operador"));
+                  "Operador",
+                  // Entra solo a Mensajes fallidos: el menú no le muestra el resto y la API se lo negaría.
+                  "AdministradorPlataforma"));
 });
 
 builder.Services.AddRazorPages(options =>
@@ -96,6 +98,11 @@ builder.Services.AddHttpClient<HojasDeRutaApiClient>(c =>
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
 builder.Services.AddHttpClient<AvisosApiClient>(c =>
+    c.BaseAddress = new Uri(
+        builder.Configuration["Api:BaseUrl"]
+        ?? "http://localhost:5080/"))
+    .AddHttpMessageHandler<CookieAutenticacionHandler>();
+builder.Services.AddHttpClient<MensajesFallidosApiClient>(c =>
     c.BaseAddress = new Uri(
         builder.Configuration["Api:BaseUrl"]
         ?? "http://localhost:5080/"))

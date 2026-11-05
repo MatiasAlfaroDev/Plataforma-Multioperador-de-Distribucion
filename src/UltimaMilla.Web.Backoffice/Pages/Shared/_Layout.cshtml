@@ -66,6 +66,13 @@
               <a asp-page="/SeleccionarOperador">Cambiar operador</a>
           </nav>
       }
+        @if (User.IsInRole("AdministradorPlataforma"))
+        {
+            <nav>
+                <a asp-page="/MensajesFallidos">Mensajes fallidos</a>
+                <a asp-page="/SeleccionarOperador">Cambiar operador</a>
+            </nav>
+        }
     </header>
     <main>@RenderBody()</main>
 </body>

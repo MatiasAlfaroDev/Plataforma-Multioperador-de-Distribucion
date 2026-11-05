@@ -40,7 +40,8 @@
 
             const operadores = membresias.filter(m =>
                 m.perfil === "AdministradorOperador" ||
-                m.perfil === "Operador"
+                m.perfil === "Operador" ||
+                m.perfil === "AdministradorPlataforma"
             );
 
             if (operadores.length === 0) {
@@ -83,7 +84,9 @@
                             );
                         }
 
-                        window.location.assign("/");
+                        // El administrador de plataforma solo tiene la pantalla de mensajes fallidos.
+                        window.location.assign(
+                            m.perfil === "AdministradorPlataforma" ? "/MensajesFallidos" : "/");
                     } catch (ex) {
                         error.textContent = ex.message;
                         boton.disabled = false;

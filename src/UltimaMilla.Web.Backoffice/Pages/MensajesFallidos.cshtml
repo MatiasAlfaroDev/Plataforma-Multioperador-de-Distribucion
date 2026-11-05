@@ -1,0 +1,77 @@
+@page
+@model MensajesFallidosModel
+@using UltimaMilla.Web.Backoffice.Services
+
+@{
+    ViewData["Title"] = "Mensajes fallidos";
+}
+
+<h1>Mensajes fallidos</h1>
+
+<p class="nota">
+    Cuando un mensaje agota sus reintentos, MassTransit lo deja en la cola &lt;cola&gt;_error con el motivo del último error.
+    Reintentar lo devuelve a su cola original; es seguro porque los consumidores son idempotentes.
+    Las colas mezclan mensajes de todos los operadores: esta pantalla es solo del administrador de plataforma.
+</p>
+
+@if (Model.Mensaje is not null)
+{
+    <p class="aviso @(Model.Reintentado ? "ok" : "error")" role="status">
+        @Model.Mensaje
+    </p>
+}
+
+@if (Model.Error is not null)
+{
+    <p class="error" role="alert">
+        @Model.Error
+    </p>
+}
+
+@if (Model.Colas.Count == 0)
+{
+    <p>No hay mensajes fallidos.</p>
+}
+else
+{
+    foreach (var c in Model.Colas)
+    {
+        <h2>@c.Cola (@c.Cantidad)</h2>
+
+        <form method="post" asp-page-handler="Reintentar" asp-route-cola="@c.Cola">
+            <button type="submit" class="primario">Reintentar todos</button>
+        </form>
+
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tipo de mensaje</th>
+                        <th>Error</th>
+                        <th>Cuerpo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in c.Muestra)
+                    {
+                        <tr>
+                            <td>@m.TipoMensaje</td>
+                            <td>@m.Error</td>
+                            <td>
+                                <details>
+                                    <summary>Ver</summary>
+                                    <pre>@m.Cuerpo</pre>
+                                </details>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (c.Muestra.Count < c.Cantidad)
+        {
+            <p class="nota">Se muestran los primeros @c.Muestra.Count.</p>
+        }
+    }
+}

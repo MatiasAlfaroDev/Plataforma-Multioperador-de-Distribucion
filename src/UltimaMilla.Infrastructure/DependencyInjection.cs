@@ -75,6 +75,15 @@ public static class DependencyInjection
         // Avisos a comercios (RNF 6.9): un solo intento por llamada; reintenta MassTransit en el Worker.
         services.AddHttpClient<IClienteAvisos, ClienteAvisos>(c => c.Timeout = TimeSpan.FromSeconds(10));
 
+        // Cola de fallidos (RNF 6.8): API de administración de RabbitMQ, mismo host y credenciales que la cadena amqp.
+        var amqp = new Uri(rabbitMq);
+        services.AddHttpClient<IColaDeFallidos, ColaDeFallidos>(c =>
+        {
+            c.BaseAddress = new UriBuilder(Uri.UriSchemeHttp, amqp.Host, 15672).Uri;
+            c.DefaultRequestHeaders.Authorization = new("Basic",
+                Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(Uri.UnescapeDataString(amqp.UserInfo))));
+        });
+
         // Push con Firebase: una sola instancia, porque la conexión con Firebase se crea una vez y se reutiliza.
         services.AddSingleton<INotificadorPush, FirebaseNotificadorPush>();
 

@@ -55,6 +55,8 @@ using UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
 using UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
 using UltimaMilla.Application.Avisos.Queries.ListarAvisos;
 using UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
+using UltimaMilla.Application.Mensajeria.Commands.ReintentarMensajesFallidos;
+using UltimaMilla.Application.Mensajeria.Queries.ListarMensajesFallidos;
 using UltimaMilla.Domain.Avisos;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -852,6 +854,22 @@ api.MapPost("/suscripciones-aviso", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Comercio));
+
+// GET /api/mensajes-fallidos → colas *_error del broker con una muestra de sus mensajes (RNF 6.8).
+// Solo el administrador de plataforma: las colas mezclan mensajes de todos los operadores.
+api.MapGet("/mensajes-fallidos", async (
+    ListarMensajesFallidosHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ListarMensajesFallidosQuery(), ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorPlataforma));
+
+// POST /api/mensajes-fallidos/{cola}/reintentar → devuelve los mensajes a su cola original; los procesa el Worker.
+api.MapPost("/mensajes-fallidos/{cola}/reintentar", async (
+    string cola,
+    ReintentarMensajesFallidosHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(new { reintentados = await handler.Handle(new ReintentarMensajesFallidosCommand(cola), ct) }))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorPlataforma));
 
 app.Run();
 
