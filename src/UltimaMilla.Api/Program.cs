@@ -179,6 +179,8 @@ app.MapHealthChecks("/health");
 app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapAutenticacionEndpoints();
+app.MapVinculacionesComercialesEndpoints();
+
 
 app.MapGet("/api/antiforgery/token", (
     HttpContext context,

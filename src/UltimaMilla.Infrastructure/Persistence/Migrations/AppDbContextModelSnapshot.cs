@@ -1026,6 +1026,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<Guid>("OperadorId")
                         .HasColumnType("uuid");
 

@@ -71,9 +71,9 @@
             // Recarga completa para que Blazor reconozca la cookie.
             Navegacion.NavigateTo("/seleccionar-operador", forceLoad: true);
         }
-        catch (JSException)
+        catch (JSException ex)
         {
-            error = "No se pudo iniciar sesión. Verificá tus credenciales.";
+            error = ex.Message; 
         }
         finally
         {

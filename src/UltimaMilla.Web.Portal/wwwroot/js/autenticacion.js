@@ -1,6 +1,13 @@
 window.autenticacionPortal = {
-    async registrar(nombreCompleto, email, password) {
-    const respuesta = await fetch("/api/auth/registro", {
+async registrar(
+    nombreCompleto,
+    email,
+    password,
+    confirmarPassword,
+    nombreComercio,
+    rut
+) {
+    const respuesta = await fetch("/api/auth/registro-comercio", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -9,7 +16,10 @@ window.autenticacionPortal = {
         body: JSON.stringify({
             nombreCompleto,
             email,
-            password
+            password,
+            confirmarPassword,
+            nombreComercio,
+            rut
         })
     });
 
@@ -40,16 +50,26 @@ window.autenticacionPortal = {
                 "Content-Type": "application/json"
             },
             credentials: "same-origin",
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({
+                email,
+                password,
+                aplicacion: "portal"
+            })        
         });
 
         if (!respuesta.ok) {
-            if (respuesta.status === 401) {
-                throw new Error("Correo o contraseña incorrectos.");
-            }
-
-            throw new Error("No se pudo iniciar sesión.");
+        if (respuesta.status === 401) {
+            throw new Error("Correo o contraseña incorrectos.");
         }
+
+        if (respuesta.status === 403) {
+            throw new Error(
+                "No tenés permisos para acceder al Portal de comercios."
+            );
+        }
+
+        throw new Error("No se pudo iniciar sesión.");
+    }
 
         return await respuesta.json();
     },

@@ -33,13 +33,21 @@ public static class AutenticacionEndpoints
     // Validar los datos ingresados.
     if (string.IsNullOrWhiteSpace(request.NombreCompleto) ||
         string.IsNullOrWhiteSpace(request.Email) ||
-        string.IsNullOrWhiteSpace(request.Password))
+        string.IsNullOrWhiteSpace(request.Password) ||
+        string.IsNullOrWhiteSpace(request.ConfirmarPassword))
     {
         return Results.BadRequest(new
         {
             mensaje = "Todos los campos son obligatorios."
         });
     }
+    if (request.Password != request.ConfirmarPassword)
+{
+    return Results.BadRequest(new
+    {
+        mensaje = "Las contraseñas no coinciden."
+    });
+}
 
     var nombre = request.NombreCompleto.Trim();
     var email = request.Email.Trim();
@@ -104,6 +112,7 @@ grupo.MapPost("/registro-comercio", async (
     if (string.IsNullOrWhiteSpace(request.NombreCompleto) ||
         string.IsNullOrWhiteSpace(request.Email) ||
         string.IsNullOrWhiteSpace(request.Password) ||
+        string.IsNullOrWhiteSpace(request.ConfirmarPassword) ||
         string.IsNullOrWhiteSpace(request.NombreComercio) ||
         string.IsNullOrWhiteSpace(request.Rut))
     {
@@ -113,6 +122,13 @@ grupo.MapPost("/registro-comercio", async (
         });
     }
 
+   if (request.Password != request.ConfirmarPassword)
+{
+    return Results.BadRequest(new
+    {
+        mensaje = "Las contraseñas no coinciden."
+    });
+}
     var nombre = request.NombreCompleto.Trim();
     var email = request.Email.Trim();
     var nombreComercio = request.NombreComercio.Trim();
@@ -210,6 +226,7 @@ grupo.MapPost("/registro-operador", async (
     if (string.IsNullOrWhiteSpace(request.NombreCompleto) ||
         string.IsNullOrWhiteSpace(request.Email) ||
         string.IsNullOrWhiteSpace(request.Password) ||
+        string.IsNullOrWhiteSpace(request.ConfirmarPassword) ||
         string.IsNullOrWhiteSpace(request.NombreOperador) ||
         string.IsNullOrWhiteSpace(request.ColorPrimario) ||
         string.IsNullOrWhiteSpace(request.EmailContacto))
@@ -220,6 +237,13 @@ grupo.MapPost("/registro-operador", async (
         });
     }
 
+    if (request.Password != request.ConfirmarPassword)
+{
+    return Results.BadRequest(new
+    {
+        mensaje = "Las contraseñas no coinciden."
+    });
+}
     var nombre = request.NombreCompleto.Trim();
     var email = request.Email.Trim();
     var nombreOperador = request.NombreOperador.Trim();
@@ -312,27 +336,113 @@ grupo.MapPost("/registro-operador", async (
         grupo.MapPost("/login", async (
             LoginRequest request,
             UserManager<Usuario> userManager,
+            AppDbContext db,
             HttpContext httpContext) =>
         {
-            var usuario = await userManager.FindByEmailAsync(request.Email);
+            if (string.IsNullOrWhiteSpace(request.Email) ||
+                string.IsNullOrWhiteSpace(request.Password) ||
+                string.IsNullOrWhiteSpace(request.Aplicacion))
+            {
+                return Results.BadRequest(new
+                {
+                    mensaje = "Todos los campos son obligatorios."
+                });
+            }
 
+            var usuario = await userManager.FindByEmailAsync(request.Email.Trim());
             if (usuario is null || !usuario.Activo)
                 return Results.Unauthorized();
 
-            var passwordValida = await userManager.CheckPasswordAsync(
-                usuario,
-                request.Password);
-
+            var passwordValida = await userManager.CheckPasswordAsync(usuario, request.Password);
             if (!passwordValida)
                 return Results.Unauthorized();
 
+            var aplicacion = request.Aplicacion.Trim().ToLowerInvariant();
             var claims = new List<Claim>
             {
                 new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
-                new(
-                    ClaimTypes.Name,
-                    usuario.UserName ?? usuario.Email ?? string.Empty)
+                new(ClaimTypes.Name, usuario.UserName ?? usuario.Email ?? string.Empty)
             };
+
+            var requiereSeleccion = false;
+
+            if (aplicacion == "portal")
+            {
+                var comercios = await db.UsuariosComercios
+                    .AsNoTracking()
+                    .Where(uc =>
+                        uc.UsuarioId == usuario.Id &&
+                        uc.Activa &&
+                        (uc.Perfil == Perfiles.AdministradorComercio ||
+                         uc.Perfil == Perfiles.Comercio))
+                    .ToListAsync();
+
+                if (comercios.Count == 0)
+                {
+                    return Results.Json(new
+                    {
+                        mensaje = "No tenés permisos para acceder al Portal de comercios."
+                    }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                if (comercios.Count == 1)
+                {
+                    var comercio = comercios[0];
+                    claims.Add(new Claim(ComercioClaim, comercio.ComercioId.ToString()));
+                    claims.Add(new Claim(PerfilComercioClaim, comercio.Perfil));
+                    claims.Add(new Claim(ClaimTypes.Role, comercio.Perfil));
+                }
+                else
+                {
+                    requiereSeleccion = true;
+                }
+            }
+            else if (aplicacion == "backoffice")
+            {
+                var membresias = await db.MembresiasUsuarios
+                    .AsNoTracking()
+                    .Where(m =>
+                        m.UsuarioId == usuario.Id &&
+                        m.Activa &&
+                        (m.Perfil == Perfiles.AdministradorOperador ||
+                         m.Perfil == Perfiles.Operador))
+                    .ToListAsync();
+
+                if (membresias.Count == 0)
+                {
+                    return Results.Json(new
+                    {
+                        mensaje = "No tenés permisos para acceder al Backoffice."
+                    }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                if (membresias.Count == 1)
+                {
+                    var membresia = membresias[0];
+                    claims.Add(new Claim(MembresiaClaim, membresia.Id.ToString()));
+                    claims.Add(new Claim(OperadorClaim, membresia.OperadorId.ToString()));
+                    claims.Add(new Claim(PerfilClaim, membresia.Perfil));
+                    claims.Add(new Claim(ClaimTypes.Role, membresia.Perfil));
+
+                    if (membresia.CuentaComercialId.HasValue)
+                    {
+                        claims.Add(new Claim(
+                            CuentaComercialClaim,
+                            membresia.CuentaComercialId.Value.ToString()));
+                    }
+                }
+                else
+                {
+                    requiereSeleccion = true;
+                }
+            }
+            else
+            {
+                return Results.BadRequest(new
+                {
+                    mensaje = "Aplicación no válida."
+                });
+            }
 
             await IniciarSesionAsync(httpContext, claims);
 
@@ -340,7 +450,10 @@ grupo.MapPost("/registro-operador", async (
             {
                 usuario.Id,
                 usuario.Email,
-                usuario.NombreCompleto
+                usuario.NombreCompleto,
+                requiereSeleccion,
+                comercioId = claims.FirstOrDefault(c => c.Type == ComercioClaim)?.Value,
+                operadorId = claims.FirstOrDefault(c => c.Type == OperadorClaim)?.Value
             });
         });
 
@@ -543,14 +656,36 @@ grupo.MapPost("/seleccionar-comercio", async (
     }
 }
 
-public sealed record RegistroUsuarioRequest(string NombreCompleto, string Email, string Password);
+public sealed record RegistroUsuarioRequest(
+    string NombreCompleto,
+    string Email,
+    string Password,
+    string ConfirmarPassword
+);
 
-public sealed record RegistroComercioRequest(string NombreCompleto, string Email, string Password, string NombreComercio, string Rut);
+public sealed record RegistroComercioRequest(
+    string NombreCompleto,
+    string Email,
+    string Password,
+    string ConfirmarPassword,
+    string NombreComercio,
+    string Rut
+);
 
-public sealed record RegistroOperadorRequest(string NombreCompleto, string Email, string Password, string NombreOperador, string ColorPrimario, string EmailContacto);
-
-public sealed record LoginRequest(string Email, string Password);
-
+public sealed record RegistroOperadorRequest(
+    string NombreCompleto,
+    string Email,
+    string Password,
+    string ConfirmarPassword,
+    string NombreOperador,
+    string ColorPrimario,
+    string EmailContacto
+);
+public sealed record LoginRequest(
+    string Email,
+    string Password,
+    string Aplicacion
+);
 public sealed record SeleccionarOperadorRequest(Guid MembresiaId);
 
 public sealed record SeleccionarComercioRequest(Guid ComercioId);

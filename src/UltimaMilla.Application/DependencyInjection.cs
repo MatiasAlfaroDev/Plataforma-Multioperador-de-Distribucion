@@ -28,6 +28,10 @@ using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
 using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
+using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
+using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
 
 namespace UltimaMilla.Application;
 
@@ -48,6 +52,10 @@ public static class DependencyInjection
         services.AddScoped<ConfirmarReprogramacionHandler>();
         services.AddScoped<ListarSolicitudesReprogramacionHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
+        services.AddScoped<SolicitarVinculacionHandler>();
+        services.AddScoped<AceptarVinculacionHandler>();
+        services.AddScoped<RechazarVinculacionHandler>();
+        services.AddScoped<ListarSolicitudesPendientesHandler>();
         services.AddScoped<ListarOperadoresHandler>();
         services.AddScoped<ActualizarTarifaHandler>();
         services.AddScoped<ObtenerTarifaVigenteHandler>();

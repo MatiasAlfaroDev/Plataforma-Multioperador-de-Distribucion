@@ -40,7 +40,15 @@ builder.Services
         options.AccessDeniedPath = "/acceso-denegado";
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("ComercioPortal", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireClaim(
+                  "perfil_comercio",
+                  "AdministradorComercio",
+                  "Comercio"));
+});
 builder.Services.AddCascadingAuthenticationState();
 
 

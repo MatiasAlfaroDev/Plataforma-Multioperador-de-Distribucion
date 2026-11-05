@@ -26,7 +26,7 @@ public sealed class HttpTenantContext : ITenantContext
         ObtenerGuid("operador_id");
 
     public Guid? ComercioId =>
-        ObtenerGuid("cuenta_comercial_id");
+        ObtenerGuid("comercio_id");
 
     private Guid? ObtenerGuid(string tipoClaim)
     {
@@ -43,5 +43,6 @@ public sealed class HttpTenantContext : ITenantContext
     public string? Perfil =>
     EstaAutenticado
         ? Usuario?.FindFirstValue("perfil")
-        : null; 
+            ?? Usuario?.FindFirstValue("perfil_comercio")
+        : null;
 }

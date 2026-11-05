@@ -34,7 +34,7 @@ public sealed class CuentaComercialConfiguration : IEntityTypeConfiguration<Cuen
     {
         builder.ToTable("cuentas_comerciales");
         builder.HasKey(c => c.Id);
-
+        builder.Property(c => c.Estado).HasConversion<string>().HasMaxLength(30).IsRequired();        
         builder.HasOne<Operador>().WithMany().HasForeignKey(c => c.OperadorId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Comercio>().WithMany().HasForeignKey(c => c.ComercioId).OnDelete(DeleteBehavior.Restrict);
 

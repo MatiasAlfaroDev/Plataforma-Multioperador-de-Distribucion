@@ -48,7 +48,25 @@
                    autocomplete="new-password"
                    @bind="confirmarPassword"
                    required />
+        </div><h3>Datos del comercio</h3>
+
+        <div>
+            <label for="nombreComercio">Nombre del comercio</label>
+            <input id="nombreComercio"
+                type="text"
+                @bind="nombreComercio"
+                required />
         </div>
+
+        <div>
+            <label for="rut">RUT del comercio</label>
+            <input id="rut"
+                type="text"
+                @bind="rut"
+                required />
+        </div>
+
+
 
         @if (!string.IsNullOrWhiteSpace(error))
         {
@@ -76,6 +94,8 @@
     private string email = "";
     private string password = "";
     private string confirmarPassword = "";
+    private string nombreComercio = "";
+    private string rut = "";
 
     private string? error;
     private string? exito;
@@ -103,7 +123,10 @@
                 "autenticacionPortal.registrar",
                 nombreCompleto,
                 email,
-                password);
+                password,
+                confirmarPassword,
+                nombreComercio,
+                rut);
 
             exito = "Tu cuenta fue creada correctamente. Ya podés iniciar sesión.";
 
@@ -111,6 +134,8 @@
             email = "";
             password = "";
             confirmarPassword = "";
+            nombreComercio = "";
+            rut = "";
         }
         catch (JSException ex)
         {

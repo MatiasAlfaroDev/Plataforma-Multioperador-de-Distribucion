@@ -55,17 +55,25 @@
                 credentials: "same-origin",
                 body: JSON.stringify({
                     email: document.getElementById("email").value,
-                    password: document.getElementById("password").value
+                    password: document.getElementById("password").value,
+                    aplicacion: "backoffice"
+
                 })
             });
 
             if (!respuesta.ok) {
+            if (respuesta.status === 401) {
+                throw new Error("Correo o contraseña incorrectos.");
+            }
+
+            if (respuesta.status === 403) {
                 throw new Error(
-                    respuesta.status === 401
-                        ? "Correo o contraseña incorrectos."
-                        : "No se pudo iniciar sesión."
+                    "No tenés permisos para acceder al Backoffice."
                 );
             }
+
+            throw new Error("No se pudo iniciar sesión.");
+        }
 
             window.location.assign("/SeleccionarOperador");
         } catch (ex) {
