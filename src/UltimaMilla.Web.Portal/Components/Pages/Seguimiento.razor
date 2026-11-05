@@ -1,0 +1,141 @@
+@page "/seguimiento/{Token}"
+@using UltimaMilla.Web.Portal.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject SeguimientoApiClient SeguimientoApi
+
+<PageTitle>Seguimiento de envío</PageTitle>
+
+<div class="container py-5" style="max-width: 850px;">
+
+    <h1 class="mb-2">Seguimiento de envío</h1>
+    <p class="text-muted mb-4">
+        Consultá el estado y los movimientos de tu paquete.
+    </p>
+
+    @if (cargando)
+    {
+        <div class="alert alert-info">
+            Consultando información del envío...
+        </div>
+    }
+    else if (error is not null)
+    {
+        <div class="alert alert-danger">
+            @error
+        </div>
+    }
+    else if (seguimiento is null)
+    {
+        <div class="alert alert-warning">
+            No encontramos un envío asociado a este enlace.
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+
+                <h5 class="card-title">
+                    Envío @seguimiento.Referencia
+                </h5>
+
+                <p>
+                    <strong>Estado actual:</strong>
+                    <span class="badge bg-primary">
+                        @seguimiento.Estado
+                    </span>
+                </p>
+
+                <p>
+                    <strong>Fecha de creación:</strong>
+                    @seguimiento.FechaAlta.ToString("dd/MM/yyyy HH:mm")
+                </p>
+
+                @if (seguimiento.FechaEntregaComprometida.HasValue)
+                {
+                    <p>
+                        <strong>Fecha prevista de entrega:</strong>
+                        @seguimiento.FechaEntregaComprometida.Value.ToString("dd/MM/yyyy")
+                    </p>
+                }
+
+                @if (seguimiento.HoraEntregaDesde.HasValue &&
+                     seguimiento.HoraEntregaHasta.HasValue)
+                {
+                    <p>
+                        <strong>Horario previsto:</strong>
+                        @seguimiento.HoraEntregaDesde.Value.ToString("HH:mm")
+                        -
+                        @seguimiento.HoraEntregaHasta.Value.ToString("HH:mm")
+                    </p>
+                }
+
+                @if (seguimiento.FechaReprogramada.HasValue)
+                {
+                    <p>
+                        <strong>Fecha de reprogramación:</strong>
+                        @seguimiento.FechaReprogramada.Value.ToString("dd/MM/yyyy")
+                    </p>
+                }
+            </div>
+        </div>
+
+        <h4 class="mb-3">Historial del envío</h4>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+
+                @if (seguimiento.Historial.Count == 0)
+                {
+                    <p class="text-muted">
+                        Todavía no hay movimientos registrados.
+                    </p>
+                }
+                else
+                {
+                    @foreach (var movimiento in seguimiento.Historial)
+                    {
+                        <div class="border-start border-primary border-3 ps-3 mb-4">
+                            <strong>@movimiento.Estado</strong>
+
+                            <div class="text-muted small">
+                                @movimiento.Fecha.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                        </div>
+                    }
+                }
+
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    private SeguimientoPublicoDto? seguimiento;
+    private bool cargando = true;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cargando = true;
+        error = null;
+        seguimiento = null;
+
+        try
+        {
+            seguimiento = await SeguimientoApi.ConsultarAsync(Token);
+        }
+        catch (HttpRequestException)
+        {
+            error = "No pudimos consultar el seguimiento. Intentá nuevamente más tarde.";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+}
