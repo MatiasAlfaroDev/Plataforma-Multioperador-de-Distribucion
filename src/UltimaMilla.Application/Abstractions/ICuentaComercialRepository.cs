@@ -25,9 +25,12 @@ public interface ICuentaComercialRepository
     Task AgregarAsync(
         CuentaComercial cuenta,
         CancellationToken ct);
-
-    Task<IReadOnlyList<SolicitudPendienteDto>>
-    ListarSolicitudesPendientesAsync(
+        
+    Task<IReadOnlyList<SolicitudPendienteDto>>ListarSolicitudesPendientesAsync(
         Guid operadorId,
         CancellationToken ct);
+
+    Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(
+    Guid comercioId,
+    CancellationToken ct);
 }

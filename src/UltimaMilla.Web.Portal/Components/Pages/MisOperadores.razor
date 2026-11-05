@@ -1,0 +1,116 @@
+
+@page "/mis-operadores"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "ComercioPortal")]
+@inject IJSRuntime JS
+
+<PageTitle>Mis operadores - Última Milla</PageTitle>
+
+<h1>Mis operadores</h1>
+
+<p>
+    Consultá los operadores logísticos disponibles y
+    solicitá trabajar con ellos.
+</p>
+
+@if (cargando)
+{
+    <p>Cargando operadores...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <p class="error" role="alert">@error</p>
+}
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <p class="aviso ok" role="status">@mensaje</p>
+}
+
+@if (!cargando && operadores.Count == 0 && error is null)
+{
+    <p>No hay operadores disponibles.</p>
+}
+else if (!cargando)
+{
+    @foreach (var operador in operadores)
+    {
+        <div style="border: 1px solid #ccc;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-bottom: 12px;">
+
+            <h3>@operador.Nombre</h3>
+
+            <button type="button"
+                    disabled="@enviando"
+                    @onclick="() => SolicitarAsync(operador.Id)">
+                Solicitar vinculación
+            </button>
+        </div>
+    }
+}
+
+@code {
+    private List<OperadorDto> operadores = new();
+    private bool cargando = true;
+    private bool enviando;
+    private string? error;
+    private string? mensaje;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            operadores = await JS.InvokeAsync<List<OperadorDto>>(
+                "autenticacionPortal.listarOperadores") ?? new();
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SolicitarAsync(Guid operadorId)
+    {
+        if (enviando)
+            return;
+
+        enviando = true;
+        error = null;
+        mensaje = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "autenticacionPortal.solicitarVinculacion",
+                operadorId);
+
+            mensaje = "Solicitud enviada correctamente.";
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+
+    private sealed class OperadorDto
+    {
+        public Guid Id { get; set; }
+        public string Nombre { get; set; } = "";
+        public string ColorPrimario { get; set; } = "";
+    }
+}

@@ -61,6 +61,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/SeleccionarOperador");
 });
 
+
 // Clientes HTTP existentes.
 builder.Services.AddHttpContextAccessor();
 
@@ -91,6 +92,12 @@ builder.Services.AddHttpClient<ZonasApiClient>(c =>
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
 builder.Services.AddHttpClient<HojasDeRutaApiClient>(c =>
+    c.BaseAddress = new Uri(
+        builder.Configuration["Api:BaseUrl"]
+        ?? "http://localhost:5080/"))
+    .AddHttpMessageHandler<CookieAutenticacionHandler>();
+
+builder.Services.AddHttpClient<VinculacionesApiClient>(c =>
     c.BaseAddress = new Uri(
         builder.Configuration["Api:BaseUrl"]
         ?? "http://localhost:5080/"))

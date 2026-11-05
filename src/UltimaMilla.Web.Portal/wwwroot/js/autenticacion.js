@@ -286,5 +286,59 @@ async importarEnviosCsv(cuentaComercialId) {
         exito: false,
         mensaje
     };
+},
+
+
+async listarOperadores() {
+    const respuesta = await fetch("/api/operadores", {
+        method: "GET",
+        credentials: "same-origin"
+    });
+
+    if (!respuesta.ok) {
+        throw new Error("No se pudieron cargar los operadores.");
+    }
+
+    return await respuesta.json();
+},
+
+async solicitarVinculacion(operadorId) {
+    const respuestaToken = await fetch("/api/antiforgery/token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!respuestaToken.ok) {
+        throw new Error("No se pudo obtener el token de seguridad.");
+    }
+
+    const { token } = await respuestaToken.json();
+
+    const respuesta = await fetch("/api/vinculaciones/solicitar", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": token
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ operadorId })
+    });
+
+    if (!respuesta.ok) {
+        let mensaje = `No se pudo enviar la solicitud (HTTP ${respuesta.status}).`;
+
+        try {
+            const error = await respuesta.json();
+            mensaje = error.mensaje ?? error.title ?? mensaje;
+        } catch {
+            // Mantener el mensaje HTTP.
+        }
+
+        throw new Error(mensaje);
+    }
+
+    return await respuesta.json();
 }
+
 };

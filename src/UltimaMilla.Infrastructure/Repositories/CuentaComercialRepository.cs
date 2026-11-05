@@ -87,4 +87,29 @@ public sealed class CuentaComercialRepository(AppDbContext db)
             cuenta.CreadoEn)
     ).ToListAsync(ct);
 }
+
+public async Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(
+    Guid comercioId,
+    CancellationToken ct)
+{
+    return await (
+        from c in db.CuentasComerciales
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+        where c.ComercioId == comercioId
+        join o in db.Operadores.AsNoTracking()
+            on c.OperadorId equals o.Id
+        join m in db.Comercios.AsNoTracking()
+            on c.ComercioId equals m.Id
+        orderby o.Nombre
+        select new CuentaComercialDto(
+            c.Id,
+            c.OperadorId,
+            o.Nombre,
+            c.ComercioId,
+            m.Nombre,
+            c.Activa
+        )
+    ).ToListAsync(ct);
+}
 }

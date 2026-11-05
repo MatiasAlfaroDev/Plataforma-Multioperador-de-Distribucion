@@ -210,10 +210,12 @@ api.MapGet("/cuentas-comerciales", async (
     Results.Ok(await handler.Handle(
         new ListarCuentasComercialesQuery(), ct)))
     .RequireAuthorization(policy =>
-        policy.RequireRole(
-            "Comercio",
-            "AdministradorOperador",
-            "Operador"));
+    policy.RequireAuthenticatedUser()
+          .RequireAssertion(context =>
+              context.User.HasClaim("perfil_comercio", "AdministradorComercio") ||
+              context.User.HasClaim("perfil_comercio", "Comercio") ||
+              context.User.IsInRole("AdministradorOperador") ||
+              context.User.IsInRole("Operador")));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
 api.MapPost("/envios", async (

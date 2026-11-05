@@ -1,8 +1,25 @@
+
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 
 <header>
     <strong>Portal del comercio</strong> · Plataforma de última milla
+
+    <AuthorizeView Policy="ComercioPortal">
+        <Authorized>
+            <nav style="margin-top: 12px;">
+                <a href="/" style="margin-right: 16px;">
+                    Nuevo envío
+                </a>
+
+                <a href="/mis-operadores">
+                    Mis operadores
+                </a>
+            </nav>
+        </Authorized>
+    </AuthorizeView>
 </header>
+
 <main>
     @Body
 </main>

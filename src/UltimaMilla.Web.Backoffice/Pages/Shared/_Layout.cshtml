@@ -75,6 +75,12 @@
         <a asp-page="/Zonas">Zonas de cobertura</a>
         <a asp-page="/HojasDeRuta">Hojas de ruta</a>
         <a asp-page="/SeleccionarOperador">Cambiar operador</a>
+        @if (User.IsInRole("AdministradorOperador"))
+        {
+            <a asp-page="/SolicitudesComerciales">
+                Solicitudes de comercios
+            </a>
+        }
 
         <button type="button" id="btnCerrarSesion" class="peligro">
             Cerrar sesión
