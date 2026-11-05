@@ -15,6 +15,12 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.ReferenciaExterna).HasMaxLength(64).IsRequired();
+        builder.Property(e => e.TokenSeguimientoHash)
+            .HasMaxLength(64)
+            .IsRequired();
+
+        builder.HasIndex(e => e.TokenSeguimientoHash)
+            .IsUnique();
         builder.Property(e => e.Modalidad).HasConversion<string>().HasMaxLength(16);
         builder.Property(e => e.Estado).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.TarifaCalculada).HasPrecision(12, 2);

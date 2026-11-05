@@ -2,6 +2,7 @@
 using UltimaMilla.Domain.Common;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Organizacion;
+using System.Security.Cryptography;
 
 namespace UltimaMilla.Domain.Envios;
 
@@ -14,6 +15,7 @@ public class Envio : AuditableEntity, ITenantEntity
     public Guid OperadorId { get; private set; }
     public Guid CuentaComercialId { get; private set; }
     public string ReferenciaExterna { get; private set; } = string.Empty;
+    public string TokenSeguimientoHash { get; private set; } = string.Empty;
     public Modalidad Modalidad { get; private set; }
     public EstadoEnvio Estado { get; private set; }
     public Destinatario Destinatario { get; private set; } = null!;
@@ -73,12 +75,17 @@ public class Envio : AuditableEntity, ITenantEntity
 
         var referencia = referenciaExterna.Trim();
 
+        var tokenSeguimiento = Convert.ToHexString(
+            RandomNumberGenerator.GetBytes(32));
         var envio = new Envio
         {
             Id = Guid.NewGuid(),
             OperadorId = cuenta.OperadorId,
             CuentaComercialId = cuenta.Id,
             ReferenciaExterna = referencia,
+            TokenSeguimientoHash = Convert.ToHexString(
+                SHA256.HashData(
+                    Convert.FromHexString(tokenSeguimiento))),
             Modalidad = modalidad,
             Estado = EstadoEnvio.Admitido,
             Destinatario = destinatario,
