@@ -151,8 +151,13 @@ if (!soloInicializar)
 
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddScoped<HttpTenantContext>();
 
+builder.Services.AddScoped<ITenantContext>(
+    sp => sp.GetRequiredService<HttpTenantContext>());
+
+builder.Services.AddScoped<IOperadorActivo>(
+    sp => sp.GetRequiredService<HttpTenantContext>());
 // Caché distribuida con Redis
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
@@ -242,6 +247,7 @@ api.MapPost("/envios", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
+    Perfiles.AdministradorComercio,
     Perfiles.Comercio));
 
 

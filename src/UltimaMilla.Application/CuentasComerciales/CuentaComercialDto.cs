@@ -1,3 +1,5 @@
+using UltimaMilla.Domain.Organizacion;
+
 namespace UltimaMilla.Application.CuentasComerciales;
 
 public sealed record CuentaComercialDto(
@@ -6,4 +8,5 @@ public sealed record CuentaComercialDto(
     string OperadorNombre,
     Guid ComercioId,
     string ComercioNombre,
-    bool Activa);
+    bool Activa,
+    EstadoCuentaComercial Estado);

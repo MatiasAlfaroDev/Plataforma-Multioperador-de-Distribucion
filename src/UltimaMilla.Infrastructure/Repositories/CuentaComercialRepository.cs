@@ -44,7 +44,8 @@ public sealed class CuentaComercialRepository(AppDbContext db)
                 o.Nombre,
                 m.Id,
                 m.Nombre,
-                c.Activa)
+                c.Activa,
+                c.Estado)
         ).ToListAsync(ct);
     }
 
@@ -108,7 +109,8 @@ public async Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(
             o.Nombre,
             c.ComercioId,
             m.Nombre,
-            c.Activa
+            c.Activa,
+            c.Estado
         )
     ).ToListAsync(ct);
 }

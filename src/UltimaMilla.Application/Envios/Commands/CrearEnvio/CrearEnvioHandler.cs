@@ -5,6 +5,7 @@ using UltimaMilla.Domain.Envios;
 using UltimaMilla.Application.Envios.Eventos;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Application.Abstractions.Caching;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Application.Envios.Commands.CrearEnvio;
 
@@ -22,6 +23,7 @@ public sealed class CrearEnvioHandler(
     IPublicadorDeEventos eventos,
     IValidator<CrearEnvioCommand> validator,
     ITenantContext tenantContext,
+    IOperadorActivo operadorActivo,
     TimeProvider reloj,
     ICacheService cache)
 {
@@ -30,40 +32,83 @@ public sealed class CrearEnvioHandler(
     CancellationToken ct)
 {
     if (!tenantContext.EstaAutenticado ||
-        !tenantContext.OperadorId.HasValue ||
-        !tenantContext.UsuarioId.HasValue)
-    {
-        throw new UnauthorizedAccessException(
-            "Debe iniciar sesión y seleccionar un operador.");
-    }
+    !tenantContext.UsuarioId.HasValue)
+{
+    throw new UnauthorizedAccessException(
+        "Debe iniciar sesión para crear envíos.");
+}
 
-    await validator.ValidateAndThrowAsync(command, ct);
+await validator.ValidateAndThrowAsync(command, ct);
 
-    var cuenta = await cuentas.ObtenerAsync(
-        command.CuentaComercialId, ct)
-        ?? throw new NoEncontradoException(
-            "La cuenta comercial no existe.");
-
-    if (cuenta.OperadorId != tenantContext.OperadorId.Value)
-    {
-        throw new UnauthorizedAccessException(
-            "La cuenta comercial no pertenece al operador seleccionado.");
-    }
-
-    if (tenantContext.Perfil is not (
+if (tenantContext.Perfil is not (
     Perfiles.AdministradorOperador or
     Perfiles.Operador or
+    Perfiles.AdministradorComercio or
     Perfiles.Comercio))
 {
     throw new UnauthorizedAccessException(
         "Su perfil no tiene permisos para crear envíos.");
 }
 
-if (tenantContext.Perfil == Perfiles.Comercio &&
-    tenantContext.ComercioId != cuenta.Id)
+CuentaComercial cuenta;
+
+if (tenantContext.ComercioId.HasValue)
+{
+    // Primero identificamos la cuenta solicitada dentro de las
+    // vinculaciones del comercio autenticado.
+    var vinculaciones = await cuentas.ListarPorComercioAsync(
+        tenantContext.ComercioId.Value, ct);
+
+    var vinculacion = vinculaciones.FirstOrDefault(
+        c => c.Id == command.CuentaComercialId);
+
+    if (vinculacion is null ||
+        !vinculacion.Activa ||
+        vinculacion.Estado != EstadoCuentaComercial.Confirmada)
+    {
+        throw new UnauthorizedAccessException(
+            "No tiene una vinculación activa para esta cuenta comercial.");
+    }
+
+    // La vinculación ya fue validada: establecemos el operador
+    // activo para esta solicitud HTTP.
+    operadorActivo.SeleccionarOperador(vinculacion.OperadorId);
+
+    // Ahora el filtro global de EF Core permite obtener la cuenta.
+    cuenta = await cuentas.ObtenerAsync(command.CuentaComercialId, ct)
+        ?? throw new NoEncontradoException(
+            "La cuenta comercial no existe.");
+
+    if (cuenta.ComercioId != tenantContext.ComercioId.Value)
+    {
+        throw new UnauthorizedAccessException(
+            "La cuenta comercial no pertenece a este comercio.");
+    }
+}
+else
+{
+    if (!tenantContext.OperadorId.HasValue)
+    {
+        throw new UnauthorizedAccessException(
+            "No tiene un operador asignado.");
+    }
+
+    cuenta = await cuentas.ObtenerAsync(command.CuentaComercialId, ct)
+        ?? throw new NoEncontradoException(
+            "La cuenta comercial no existe.");
+
+    if (cuenta.OperadorId != tenantContext.OperadorId.Value)
+    {
+        throw new UnauthorizedAccessException(
+            "La cuenta comercial no pertenece a su operador.");
+    }
+}
+
+if (!cuenta.Activa ||
+    cuenta.Estado != EstadoCuentaComercial.Confirmada)
 {
     throw new UnauthorizedAccessException(
-        "No tiene permisos para crear envíos con esta cuenta comercial.");
+        "La cuenta comercial no está confirmada y activa.");
 }
 
     // El resto del método continúa igual.
