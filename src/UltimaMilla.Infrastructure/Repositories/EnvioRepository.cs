@@ -14,6 +14,7 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
         db.Envios
             .Include(e => e.Bultos)
             .Include(e => e.Intentos)
+                .ThenInclude(i => i.ResultadosBultos)
             .Include(e => e.Eventos)
             .AsSplitQuery()
             .FirstOrDefaultAsync(e => e.Id == id, ct);

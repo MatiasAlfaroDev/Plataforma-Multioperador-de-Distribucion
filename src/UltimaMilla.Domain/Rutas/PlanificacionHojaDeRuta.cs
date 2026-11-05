@@ -103,8 +103,8 @@ public static class PlanificacionHojaDeRuta
                 throw new InvalidOperationException(
                     "La zona no tiene un tiempo entre paradas válido.");
 
-            pesoTotal += envio.PesoTotalKg;
-            volumenTotal += envio.VolumenTotalMetrosCubicos;
+            pesoTotal += envio.PesoPendienteKg;
+            volumenTotal += envio.VolumenPendienteMetrosCubicos;
         }
 
         if (pesoTotal > ruta.CapacidadPesoKg)

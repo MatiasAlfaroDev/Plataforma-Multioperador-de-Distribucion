@@ -1,4 +1,4 @@
-﻿namespace UltimaMilla.Domain.Envios;
+namespace UltimaMilla.Domain.Envios;
 
 public sealed class IntentoEntrega
 {
@@ -11,6 +11,10 @@ public sealed class IntentoEntrega
     public Guid? MotivoNoEntregaId { get; private set; }
     public string? ReferenciaEvidenciaFallida { get; private set; }
     public PruebaEntrega? PruebaEntrega { get; private set; }
+
+    private readonly List<ResultadoBultoIntento> _resultadosBultos = [];
+    public IReadOnlyCollection<ResultadoBultoIntento> ResultadosBultos =>
+        _resultadosBultos;
 
     private IntentoEntrega() { }
 
@@ -73,4 +77,69 @@ public sealed class IntentoEntrega
         if (numero < 1)
             throw new ArgumentException("El número de intento debe ser positivo.");
     }
+    public static IntentoEntrega RegistrarEntregaParcial(
+        Guid operadorId,
+        Guid envioId,
+        int numero,
+        IReadOnlyCollection<Guid> bultosEntregados,
+        IReadOnlyCollection<(Guid BultoId, Guid MotivoId, string Evidencia)> bultosNoEntregados,
+        PruebaEntrega prueba)
+    {
+        ValidarIdentificacion(operadorId, envioId, numero);
+
+        ArgumentNullException.ThrowIfNull(bultosEntregados);
+        ArgumentNullException.ThrowIfNull(bultosNoEntregados);
+        ArgumentNullException.ThrowIfNull(prueba);
+
+        if (bultosEntregados.Count == 0 ||
+            bultosNoEntregados.Count == 0)
+        {
+            throw new ArgumentException(
+                "Una entrega parcial requiere bultos entregados y no entregados.");
+        }
+
+        var identificaciones = bultosEntregados
+            .Concat(bultosNoEntregados.Select(b => b.BultoId))
+            .ToList();
+
+        if (identificaciones.Any(id => id == Guid.Empty) ||
+            identificaciones.Distinct().Count() != identificaciones.Count)
+        {
+            throw new ArgumentException(
+                "Los bultos deben tener identificaciones válidas y únicas.");
+        }
+
+        var intento = new IntentoEntrega
+        {
+            Id = Guid.NewGuid(),
+            OperadorId = operadorId,
+            EnvioId = envioId,
+            Numero = numero,
+            OcurridoEn = prueba.OcurridoEn,
+            Entregado = false,
+            PruebaEntrega = prueba
+        };
+
+        foreach (var bultoId in bultosEntregados)
+        {
+            intento._resultadosBultos.Add(
+                ResultadoBultoIntento.CrearEntregado(
+                    intento.Id,
+                    bultoId));
+        }
+
+        foreach (var resultado in bultosNoEntregados)
+        {
+            intento._resultadosBultos.Add(
+                ResultadoBultoIntento.CrearNoEntregado(
+                    intento.Id,
+                    resultado.BultoId,
+                    resultado.MotivoId,
+                    resultado.Evidencia));
+        }
+
+        return intento;
+    }
+
+
 }

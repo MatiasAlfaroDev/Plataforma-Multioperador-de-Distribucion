@@ -22,6 +22,17 @@ public sealed class VersionReglasOperativasConfiguration
         builder.Property(v => v.RequierePruebaEntrega)
             .IsRequired();
 
+        builder.Property(v => v.AdmiteEntregaParcial)
+            .IsRequired();
+
+        builder.Property(v => v.AccionBultosPendientes)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
+        builder.Property(v => v.NuevaVisitaConRecargo)
+            .IsRequired();
+
         builder.Property(v => v.VigenciaDesde)
             .IsRequired();
 

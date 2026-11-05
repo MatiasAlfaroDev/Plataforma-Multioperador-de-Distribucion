@@ -37,17 +37,24 @@ public sealed class ReglasOperativasApiClient(HttpClient http)
     }
 }
 
+public sealed record MotivoNoEntregaItem(
+    string Codigo,
+    string Descripcion,
+    bool RequiereDevolucion);
+
 public sealed record ReglasOperativasVigentesItem(
     Guid VersionReglasOperativasId,
     int MaximoIntentosEntrega,
     int HorasMinimasEntreIntentos,
     bool RequierePruebaEntrega,
     int DiasMaximosParaDevolucion,
-    DateTimeOffset VigenciaDesde);
+    DateTimeOffset VigenciaDesde,
+    IReadOnlyList<MotivoNoEntregaItem> Motivos);
 
 public sealed record ActualizarReglasOperativasRequest(
     Guid OperadorId,
     int MaximoIntentosEntrega,
     int HorasMinimasEntreIntentos,
     bool RequierePruebaEntrega,
-    int DiasMaximosParaDevolucion);
+    int DiasMaximosParaDevolucion,
+    IReadOnlyList<MotivoNoEntregaItem>? Motivos = null);

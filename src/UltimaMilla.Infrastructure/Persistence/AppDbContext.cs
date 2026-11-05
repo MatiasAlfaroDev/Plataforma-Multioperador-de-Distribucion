@@ -40,6 +40,7 @@ public sealed class AppDbContext(
     public DbSet<HojaDeRuta> HojasDeRuta => Set<HojaDeRuta>();
     public DbSet<ParadaRuta> ParadasRuta => Set<ParadaRuta>();
     public DbSet<IntentoEntrega> IntentosEntrega => Set<IntentoEntrega>();
+    public DbSet<ResultadoBultoIntento> ResultadosBultosIntento => Set<ResultadoBultoIntento>();
     public DbSet<PruebaEntrega> PruebasEntrega => Set<PruebaEntrega>();
     public DbSet<SolicitudReprogramacion> SolicitudesReprogramacion => Set<SolicitudReprogramacion>();
     public DbSet<EventoMovil> EventosMovil => Set<EventoMovil>();

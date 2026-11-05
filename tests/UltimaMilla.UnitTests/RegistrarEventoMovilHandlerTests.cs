@@ -435,7 +435,7 @@ public class RegistrarEventoMovilHandlerTests
                     (!cuentaComercialId.HasValue ||
                     e.CuentaComercialId == cuentaComercialId.Value))
                 .ToList());
-    
+
         public Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
             Guid operadorId,
             CancellationToken ct)
@@ -529,6 +529,23 @@ public class RegistrarEventoMovilHandlerTests
                 m.OperadorId == operadorId &&
                 m.VersionReglasOperativasId == versionReglasOperativasId &&
                 m.Descripcion == descripcion.Trim()));
+
+        public Task<IReadOnlyList<MotivoNoEntrega>> ListarPorVersionAsync(
+            Guid operadorId,
+            Guid versionReglasOperativasId,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<MotivoNoEntrega>>(
+                Array.Empty<MotivoNoEntrega>());
+        }
+
+        public Task AgregarRangoAsync(
+            IEnumerable<MotivoNoEntrega> motivos,
+            CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
     }
 
     private sealed class PublicadorEnMemoria : IPublicadorDeEventos

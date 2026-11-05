@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using UltimaMilla.Domain.Envios;
 
@@ -10,7 +10,7 @@ public sealed class IntentoEntregaConfiguration : IEntityTypeConfiguration<Inten
     {
         builder.ToTable("intentos_entrega");
         builder.HasKey(i => i.Id);
-        
+
         builder.Property(i => i.Id)
             .ValueGeneratedNever();
 
@@ -26,5 +26,12 @@ public sealed class IntentoEntregaConfiguration : IEntityTypeConfiguration<Inten
             .WithOne()
             .HasForeignKey<PruebaEntrega>("IntentoEntregaId")
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(i => i.ResultadosBultos)
+            .WithOne()
+            .HasForeignKey(r => r.IntentoEntregaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(i => i.ResultadosBultos)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

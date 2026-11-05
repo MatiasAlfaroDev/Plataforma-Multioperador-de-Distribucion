@@ -1,11 +1,11 @@
 
 namespace UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 
-/// <summary>
-/// Evento generado por el móvil y sincronizado posteriormente.
-/// IdEvento identifica el evento para evitar procesarlo dos veces.
-/// FechaHora indica cuándo ocurrió realmente.
-/// </summary>
+public sealed record BultoNoEntregadoMovil(
+    Guid BultoId,
+    string Motivo,
+    string Evidencia);
+
 public sealed record RegistrarEventoMovilCommand(
     Guid EnvioId,
     Guid IdEvento,
@@ -18,4 +18,6 @@ public sealed record RegistrarEventoMovilCommand(
     string? ReferenciaFotografia = null,
     decimal? Latitud = null,
     decimal? Longitud = null,
-    string? EvidenciaFallo = null);
+    string? EvidenciaFallo = null,
+    IReadOnlyCollection<Guid>? BultosEntregados = null,
+    IReadOnlyCollection<BultoNoEntregadoMovil>? BultosNoEntregados = null);

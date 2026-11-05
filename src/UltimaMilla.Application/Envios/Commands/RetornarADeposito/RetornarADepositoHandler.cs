@@ -27,11 +27,15 @@ public sealed class RetornarADepositoHandler(
         var envio = await envios.ObtenerAsync(command.EnvioId, ct)
             ?? throw new NoEncontradoException("El envío no existe.");
 
-        if (envio.Estado != EstadoEnvio.NoEntregado)
+        if (envio.Estado != EstadoEnvio.NoEntregado &&
+            envio.Estado != EstadoEnvio.EntregadoParcialmente)
+        {
             throw new InvalidOperationException(
-                "Solo pueden retornar al depósito envíos en estado NoEntregado.");
+                "Solo pueden retornar al depósito envíos no entregados o parcialmente entregados.");
+        }
 
         var esperados = envio.Bultos
+            .Where(b => b.Estado == EstadoBulto.Pendiente)
             .Select(b => b.Identificacion)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

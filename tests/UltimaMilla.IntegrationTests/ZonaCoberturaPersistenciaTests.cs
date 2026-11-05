@@ -42,6 +42,7 @@ public class ZonaCoberturaPersistenciaTests
         // Crear una zona completa y persistirla.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
             await DbSeeder.SembrarAsync(db, ct);
 
             operadorId = await db.CuentasComerciales
@@ -78,6 +79,8 @@ public class ZonaCoberturaPersistenciaTests
         // utilizando el repositorio real.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
+
             var repositorio = new ZonaCoberturaRepository(db);
 
             var zonas = await repositorio.ListarPorOperadorAsync(

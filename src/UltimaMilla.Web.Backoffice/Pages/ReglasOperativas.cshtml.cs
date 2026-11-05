@@ -20,7 +20,12 @@ public class ReglasOperativasModel(
     [BindProperty]
     public int DiasMaximosParaDevolucion { get; set; } = 1;
 
+    [BindProperty]
+    public List<MotivoNoEntregaFormulario> Motivos { get; set; } = [];
+
     public bool ReglasEncontradas { get; private set; }
+
+    public bool PuedeMostrarFormulario { get; private set; } = true;
 
     public DateTimeOffset? VigenciaDesde { get; private set; }
 
@@ -35,16 +40,17 @@ public class ReglasOperativasModel(
 
     public async Task OnGetAsync(CancellationToken ct)
     {
+        var operadorId = OperadorIdSesion;
+
+        if (operadorId == Guid.Empty)
+        {
+            Error = "No hay un operador seleccionado en la sesión.";
+            PuedeMostrarFormulario = false;
+            return;
+        }
+
         try
         {
-            var operadorId = OperadorIdSesion;
-
-            if (operadorId == Guid.Empty)
-            {
-                Error = "No hay un operador seleccionado en la sesión.";
-                return;
-            }
-
             var reglas = await reglasApi.ObtenerVigentesAsync(
                 operadorId, ct);
 
@@ -56,50 +62,108 @@ public class ReglasOperativasModel(
             RequierePruebaEntrega = reglas.RequierePruebaEntrega;
             DiasMaximosParaDevolucion = reglas.DiasMaximosParaDevolucion;
             VigenciaDesde = reglas.VigenciaDesde;
-
             ReglasEncontradas = true;
+
+            Motivos = reglas.Motivos
+                .Select(m => new MotivoNoEntregaFormulario
+                {
+                    Codigo = m.Codigo,
+                    Descripcion = m.Descripcion,
+                    RequiereDevolucion = m.RequiereDevolucion
+                })
+                .ToList();
         }
         catch (HttpRequestException)
         {
             Error = "No se pudo cargar la configuración de reglas operativas.";
+            PuedeMostrarFormulario = false;
         }
     }
 
-    public async Task<IActionResult> OnPostAsync(CancellationToken ct)
+    public async Task<IActionResult> OnPostAsync(
+        CancellationToken ct)
     {
         var operadorId = OperadorIdSesion;
 
         if (operadorId == Guid.Empty)
             return Forbid();
 
+        if (!ModelState.IsValid)
+        {
+            Error = "Revisá los datos ingresados.";
+            return Page();
+        }
+
         if (MaximoIntentosEntrega < 1 ||
             HorasMinimasEntreIntentos < 0 ||
             DiasMaximosParaDevolucion < 1)
         {
-            Error = "Revisá los valores ingresados.";
+            Error = "Revisá los valores de las reglas operativas.";
+            return Page();
+        }
+
+        if (Motivos.Count == 0)
+        {
+            Error = "Agregá al menos un motivo de no entrega.";
+            return Page();
+        }
+
+        if (Motivos.Any(m =>
+            string.IsNullOrWhiteSpace(m.Codigo) ||
+            string.IsNullOrWhiteSpace(m.Descripcion) ||
+            m.Codigo.Trim().Length > 100 ||
+            m.Descripcion.Trim().Length > 300))
+        {
+            Error = "Los motivos deben tener un código y una descripción válidos.";
+            return Page();
+        }
+
+        var codigos = Motivos
+            .Select(m => m.Codigo.Trim())
+            .ToList();
+
+        if (codigos.Distinct(StringComparer.OrdinalIgnoreCase)
+                   .Count() != codigos.Count)
+        {
+            Error = "No puede haber motivos con códigos repetidos.";
             return Page();
         }
 
         try
         {
+            var motivosRequest = Motivos
+                .Select(m => new MotivoNoEntregaItem(
+                    m.Codigo.Trim(),
+                    m.Descripcion.Trim(),
+                    m.RequiereDevolucion))
+                .ToList();
+
             await reglasApi.ActualizarAsync(
                 new ActualizarReglasOperativasRequest(
                     operadorId,
                     MaximoIntentosEntrega,
                     HorasMinimasEntreIntentos,
                     RequierePruebaEntrega,
-                    DiasMaximosParaDevolucion),
+                    DiasMaximosParaDevolucion,
+                    motivosRequest),
                 ct);
 
             TempData["Mensaje"] =
-                "Reglas operativas guardadas correctamente.";
+                "Reglas operativas y motivos guardados correctamente.";
 
             return RedirectToPage();
         }
         catch (HttpRequestException)
         {
-            Error = "No se pudieron guardar las reglas operativas.";
+            Error = "No se pudieron guardar las reglas operativas. Revisá los datos y probá nuevamente.";
             return Page();
         }
     }
+}
+
+public class MotivoNoEntregaFormulario
+{
+    public string Codigo { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+    public bool RequiereDevolucion { get; set; }
 }
