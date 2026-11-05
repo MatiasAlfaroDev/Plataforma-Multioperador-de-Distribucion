@@ -33,6 +33,7 @@ using UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
 using UltimaMilla.Application.Avisos.Commands.EntregarAviso;
 using UltimaMilla.Application.Avisos.Commands.RegistrarAvisos;
 using UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
+using UltimaMilla.Application.Avisos.Commands.ReintentarAvisosFallidos;
 using UltimaMilla.Application.Avisos.Queries.ListarAvisos;
 using UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
 
@@ -80,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<RegistrarAvisosHandler>();
         services.AddScoped<EntregarAvisoHandler>();
         services.AddScoped<ReenviarAvisoHandler>();
+        services.AddScoped<ReintentarAvisosFallidosHandler>();
         services.AddScoped<ListarAvisosHandler>();
         services.AddScoped<CrearSuscripcionHandler>();
         services.AddScoped<ListarSuscripcionesHandler>();

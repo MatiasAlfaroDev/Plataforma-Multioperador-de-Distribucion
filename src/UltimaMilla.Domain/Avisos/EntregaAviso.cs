@@ -24,6 +24,21 @@ public sealed class EntregaAviso : AuditableEntity, ITenantEntity
     /// </summary>
     public const int LargoMaximoError = 500;
 
+    /// <summary>
+    /// Intentos de cada ronda: el primero más los 5 reintentos en memoria del Worker (EntregarAvisoDefinition).
+    /// </summary>
+    public const int IntentosPorRonda = 6;
+
+    /// <summary>
+    /// Pasado este tope el reintento programado deja de reencolarlo (ocho rondas, unas tres horas); solo queda el reenvío manual.
+    /// </summary>
+    public const int MaximoIntentos = IntentosPorRonda * 8;
+
+    // Espera creciente entre rondas automáticas. La primera supera la ventana de los reintentos en memoria
+    // (el mayor intervalo es de 1 min), así no se reencola un aviso que todavía está reintentando.
+    private static readonly TimeSpan[] EsperasEntreRondas =
+        [TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(30)];
+
     public Guid OperadorId { get; private set; }
 
     public Guid SuscripcionId { get; private set; }
@@ -125,6 +140,24 @@ public sealed class EntregaAviso : AuditableEntity, ITenantEntity
         UltimoIntentoEn = ahora;
         UltimoError = string.IsNullOrWhiteSpace(error) ? "Error desconocido." : error[..Math.Min(error.Length, LargoMaximoError)];
         Estado = EstadoEntregaAviso.Fallida;
+    }
+
+    /// <summary>
+    /// Fallida y con todos los intentos automáticos gastados.
+    /// </summary>
+    public bool Agotada => Estado == EstadoEntregaAviso.Fallida && Intentos >= MaximoIntentos;
+
+    /// <summary>
+    /// Si el reintento programado ya puede reencolarlo: fallido, sin agotar y con la espera de su ronda cumplida.
+    /// </summary>
+    public bool PuedeReintentar(DateTimeOffset ahora)
+    {
+        if (Estado != EstadoEntregaAviso.Fallida || Agotada || UltimoIntentoEn is null)
+            return false;
+
+        var ronda = Math.Max(Intentos / IntentosPorRonda, 1);
+        var espera = EsperasEntreRondas[Math.Min(ronda, EsperasEntreRondas.Length) - 1];
+        return ahora - UltimoIntentoEn.Value >= espera;
     }
 
     /// <summary>

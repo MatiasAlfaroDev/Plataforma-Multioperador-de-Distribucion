@@ -23,6 +23,16 @@ public interface IEntregaAvisoRepository
     Task<IReadOnlyList<EntregaAviso>> ListarAsync(Guid? cuentaComercialId, EstadoEntregaAviso? estado, CancellationToken ct);
 
     /// <summary>
+    /// Entregas fallidas del operador actual que el reintento programado puede volver a encolar.
+    /// </summary>
+    Task<IReadOnlyList<EntregaAviso>> ListarFallidasAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Operadores con entregas fallidas sin agotar. Ignora el filtro por operador: la usa la tarea programada, que no tiene inquilino.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> OperadoresConFallidasAsync(CancellationToken ct);
+
+    /// <summary>
     /// Agrega una nueva entrega a la base de datos.
     /// </summary>
     Task AgregarAsync(EntregaAviso entrega, CancellationToken ct);

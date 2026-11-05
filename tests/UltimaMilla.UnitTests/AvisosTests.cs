@@ -7,6 +7,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Avisos;
 using UltimaMilla.Application.Avisos.Commands.EntregarAviso;
 using UltimaMilla.Application.Avisos.Commands.RegistrarAvisos;
+using UltimaMilla.Application.Avisos.Commands.ReintentarAvisosFallidos;
 using UltimaMilla.Application.Avisos.Eventos;
 using UltimaMilla.Domain.Avisos;
 using UltimaMilla.Domain.Envios;
@@ -246,6 +247,59 @@ public class AvisosTests
         return entrega;
     }
 
+    // ----- Reintento programado -----
+
+    private static EntregaAviso Fallida(EntregaAviso entrega, int intentos, DateTimeOffset ultimo)
+    {
+        for (var i = 0; i < intentos; i++)
+            entrega.RegistrarFallo("HTTP 500", ultimo);
+        return entrega;
+    }
+
+    [Fact]
+    public void Fallida_se_reintenta_recien_cumplida_la_espera_de_su_ronda()
+    {
+        var entrega = Fallida(AgregarEntregaPendiente(), EntregaAviso.IntentosPorRonda, Ahora);
+
+        // Primera ronda: 2 minutos, más que la ventana de los reintentos en memoria.
+        Assert.False(entrega.PuedeReintentar(Ahora.AddMinutes(1)));
+        Assert.True(entrega.PuedeReintentar(Ahora.AddMinutes(2)));
+    }
+
+    [Fact]
+    public void La_espera_crece_con_las_rondas()
+    {
+        var entrega = Fallida(AgregarEntregaPendiente(), EntregaAviso.IntentosPorRonda * 3, Ahora);
+
+        Assert.False(entrega.PuedeReintentar(Ahora.AddMinutes(14)));
+        Assert.True(entrega.PuedeReintentar(Ahora.AddMinutes(15)));
+    }
+
+    [Fact]
+    public void Agotada_no_se_reintenta_sola()
+    {
+        var entrega = Fallida(AgregarEntregaPendiente(), EntregaAviso.MaximoIntentos, Ahora);
+
+        Assert.True(entrega.Agotada);
+        Assert.False(entrega.PuedeReintentar(Ahora.AddDays(1)));
+    }
+
+    [Fact]
+    public async Task Reintento_programado_reencola_y_publica_solo_las_vencidas()
+    {
+        var vencida = Fallida(AgregarEntregaPendiente(), EntregaAviso.IntentosPorRonda, Ahora.AddMinutes(-10));
+        var reciente = Fallida(AgregarEntregaPendiente(), EntregaAviso.IntentosPorRonda, Ahora);
+
+        var n = await new ReintentarAvisosFallidosHandler(_entregas, _publicador, _unidad, new RelojFijo(Ahora))
+            .Handle(new ReintentarAvisosFallidosCommand(), CancellationToken.None);
+
+        Assert.Equal(1, n);
+        Assert.Equal(EstadoEntregaAviso.Pendiente, vencida.Estado);
+        Assert.Equal(EstadoEntregaAviso.Fallida, reciente.Estado);
+        Assert.Equal(vencida.Id, Assert.IsType<AvisoPendiente>(Assert.Single(_publicador.Publicados)).EntregaAvisoId);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
     // ----- Dobles de prueba -----
 
     private sealed class EnviosEnMemoria(Envio envio) : IEnvioRepository
@@ -303,6 +357,14 @@ public class AvisosTests
 
             return Task.FromResult<IReadOnlyList<EntregaAviso>>(query.ToList());
         }
+
+        public Task<IReadOnlyList<EntregaAviso>> ListarFallidasAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<EntregaAviso>>(
+                Lista.Where(e => e.Estado == EstadoEntregaAviso.Fallida && !e.Agotada).ToList());
+
+        public Task<IReadOnlyList<Guid>> OperadoresConFallidasAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Guid>>(
+                Lista.Where(e => e.Estado == EstadoEntregaAviso.Fallida && !e.Agotada).Select(e => e.OperadorId).Distinct().ToList());
 
         public Task AgregarAsync(EntregaAviso entrega, CancellationToken ct)
         {

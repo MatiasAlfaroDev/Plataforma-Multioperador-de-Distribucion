@@ -1,4 +1,5 @@
 using MassTransit;
+using StackExchange.Redis;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -9,6 +10,7 @@ using UltimaMilla.Infrastructure;
 using UltimaMilla.Infrastructure.Mensajeria;
 using UltimaMilla.Worker;
 using UltimaMilla.Worker.Consumidores;
+using UltimaMilla.Worker.Tareas;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -17,6 +19,9 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
     ?? throw new InvalidOperationException("Falta la cadena de conexión ConnectionStrings:RabbitMq.");
+
+var redis = builder.Configuration.GetConnectionString("Redis")
+    ?? throw new InvalidOperationException("Falta la cadena de conexión ConnectionStrings:Redis.");
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, rabbitMq, x =>
@@ -28,6 +33,10 @@ builder.Services.AddInfrastructure(connectionString, rabbitMq, x =>
 // Un TenantDelMensaje por mensaje; AppDbContext lo recibe como ITenantContext.
 builder.Services.AddScoped<TenantDelMensaje>();
 builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantDelMensaje>());
+
+// Tareas programadas (RNF 6.13): solo en el Worker, con lock en Redis para que no corran dos veces.
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redis));
+builder.Services.AddHostedService<ReintentoDeAvisos>();
 
 // Telemetría (RNF 6.12): la traza que empieza en la API sigue por MassTransit hasta el consumidor y el POST al comercio.
 builder.Logging.AddOpenTelemetry(o => o.IncludeFormattedMessage = true);

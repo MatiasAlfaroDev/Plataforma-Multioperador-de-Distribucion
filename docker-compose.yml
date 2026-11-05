@@ -178,8 +178,12 @@ services:
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-ultimamilla}:${RABBITMQ_PASSWORD:-ultimamilla_dev}@rabbitmq:5672"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_SERVICE_NAME: "worker"
+      # Lock de las tareas programadas (reintento de avisos fallidos).
+      ConnectionStrings__Redis: "redis:6379"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy

@@ -29,6 +29,19 @@ public sealed class EntregaAvisoRepository(AppDbContext db) : IEntregaAvisoRepos
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<EntregaAviso>> ListarFallidasAsync(CancellationToken ct) =>
+        await db.EntregasAviso
+            .Where(e => e.Estado == EstadoEntregaAviso.Fallida && e.Intentos < EntregaAviso.MaximoIntentos)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Guid>> OperadoresConFallidasAsync(CancellationToken ct) =>
+        await db.EntregasAviso
+            .IgnoreQueryFilters()
+            .Where(e => e.Estado == EstadoEntregaAviso.Fallida && e.Intentos < EntregaAviso.MaximoIntentos)
+            .Select(e => e.OperadorId)
+            .Distinct()
+            .ToListAsync(ct);
+
     public async Task AgregarAsync(EntregaAviso entrega, CancellationToken ct) =>
         await db.EntregasAviso.AddAsync(entrega, ct);
 }
