@@ -12,3 +12,9 @@ docker/secretos/*
 src/UltimaMilla.Mobile/Platforms/Android/google-services.json
 
 cookies.txt
+
+# Estado y caché de OpenTofu: el estado guarda IPs y datos del ambiente
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/.terraform.lock.hcl.bak

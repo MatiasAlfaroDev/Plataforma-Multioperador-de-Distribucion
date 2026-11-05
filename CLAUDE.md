@@ -20,9 +20,26 @@ docker compose down -v                             # borra también el volumen d
 ```
 
 Entrypoints detrás de Traefik: `portal.localhost:8000`, `backoffice.localhost:8000`,
-`api.localhost:8000`, `grafana.localhost:8000` (Grafana: tablero técnico, trazas y logs)
-y `rabbit.localhost:8000` (panel de RabbitMQ). El panel de Traefik va en `localhost:8081`.
+`api.localhost:8000`, `grafana.localhost:8000` (Grafana: tablero técnico, trazas y logs),
+`rabbit.localhost:8000` (panel de RabbitMQ) y `receptor.localhost:8000` (receptor de prueba de
+los avisos; `POST /modo/{ok|falla|intermitente|lento}` cambia su modo de falla). El panel de Traefik va en `localhost:8081`.
 Los navegadores resuelven `*.localhost` solos.
+
+### Estilos de Portal y Backoffice (Tailwind v4)
+
+Los dos sitios usan Tailwind v4 con el binario standalone (sin Node), v4.1.11. El tema compartido
+(tokens, tipografía, componentes) está en `src/estilos-web/tema.css`, y cada sitio tiene su entrada
+en `Estilos/app.css`. **El CSS compilado (`wwwroot/app.css`) se commitea**, así los Dockerfile y el
+CI no lo compilan; hay que regenerarlo después de tocar markup o el tema:
+
+```bash
+tailwindcss -i src/UltimaMilla.Web.Portal/Estilos/app.css -o src/UltimaMilla.Web.Portal/wwwroot/app.css --minify
+tailwindcss -i src/UltimaMilla.Web.Backoffice/Estilos/app.css -o src/UltimaMilla.Web.Backoffice/wwwroot/app.css --minify
+```
+
+Marca compartida con la app móvil en `assets/marca/`: logo, IBM Plex Sans (texto), Space Grotesk
+(títulos y cifras) e íconos Phosphor. Sin emojis en la interfaz; los íconos son `<i class="ph ph-...">`
+en web y `app:Iconos` en MAUI.
 
 ### App móvil (solución aparte)
 
@@ -66,6 +83,18 @@ externa. No agregues esas dependencias a esos dos proyectos.
   `IEntityTypeConfiguration` en `Persistence/Configurations/`.
 - **Api** — Minimal API. Todos los endpoints se declaran inline en `Program.cs` sobre el grupo
   `/api`; no hay controladores.
+- **Worker** — Worker Service sin HTTP. Los consumidores de MassTransit viven acá (Application no
+  puede depender de MassTransit), se registran con el parámetro `consumidores` de `AddInfrastructure`
+  y llaman a Handlers. Cada mensaje trae su `OperadorId` y el consumidor lo fija en
+  `TenantDelMensaje` (el `ITenantContext` del Worker) **antes** de llamar al Handler; sin eso los
+  filtros por operador no devuelven nada y `TenantSaveChangesInterceptor` rechaza el guardado.
+  Reintentos exponenciales y cola `*_error` se configuran en la `ConsumerDefinition`.
+  Las tareas programadas viven acá y no en la API escalada (`Tareas/`, `BackgroundService`), y cada
+  vuelta toma un lock en Redis (`SET NX` con vencimiento) para no correr dos veces si hay dos réplicas.
+- **Eventos de estado:** ningún Handler publica los cambios de estado del envío. Cada `Envio.Aplicar`
+  deja un `EventoEnvio`, y `EventosDeEstadoInterceptor` publica un `EstadoEnvioCambiado` por cada uno
+  en el outbox, que es lo que convierte en avisos el Worker. El interceptor solo funciona con
+  `SaveChangesAsync`.
 - **Web.Portal** (Blazor InteractiveServer) y **Web.Backoffice** (Razor Pages) **no** referencian
   Application ni Infrastructure: hablan con la API por HTTP a través de su propio
   `Services/EnviosApiClient`, configurado con `Api:BaseUrl`.
@@ -110,15 +139,16 @@ es el caso que demuestra el aislamiento entre tenants.
 
 ## Docker
 
-Los tres `Dockerfile` se construyen **desde la raíz del repo** (`context: .` en el compose) y
+Los cinco `Dockerfile` se construyen **desde la raíz del repo** (`context: .` en el compose) y
 copian todo el árbol, así que las rutas dentro son `src/<Proyecto>/...`. Los contenedores
 escuchan en 8080 (`ASPNETCORE_HTTP_PORTS`); solo Traefik publica puertos. El router de la API
 responde a `Host(api.localhost)` **y** a `PathPrefix(/api)`, esto último para que entre la app
 móvil (emulador Android: `10.0.2.2:8000`, ver `Mobile/Data/Constants.cs`).
 
-Once contenedores: `traefik`, `postgres`, `redis`, `rabbitmq`, `otel-collector`,
-`lgtm`, `inicializador`, **dos réplicas de `api`**, `portal` y `backoffice`.
-`redis` está declarado pero ningún código lo usa todavía (caché 22/10); `rabbitmq` recibe los eventos del outbox de la API, y el Worker que los consume entra el 29/10. `api` e `inicializador` comparten `image: ultimamilla-api:local`, así que la imagen se construye una sola vez; `api` no lleva `container_name` a propósito, porque con uno fijo Docker no puede crear la segunda réplica. El Portal y el Backoffice salen por
+Trece contenedores: `traefik`, `postgres`, `redis`, `rabbitmq`, `otel-collector`,
+`lgtm`, `inicializador`, **dos réplicas de `api`**, `worker`, `receptor-avisos`, `portal` y `backoffice`.
+`rabbitmq` recibe los eventos del outbox y el `worker` los consume; `receptor-avisos` es el sistema
+de comercio de prueba al que apunta la suscripción sembrada para Tienda Norte en RapiEnvíos. `api` e `inicializador` comparten `image: ultimamilla-api:local`, así que la imagen se construye una sola vez; `api` no lleva `container_name` a propósito, porque con uno fijo Docker no puede crear la segunda réplica. El Portal y el Backoffice salen por
 `Api__BaseUrl: http://traefik/` y no por `api:8080`, para usar el balanceador con health
 checks activos en lugar del round-robin del DNS de Docker.
 
@@ -127,6 +157,20 @@ los tres `docker build` fallarían con `NETSDK1147`, porque la imagen `sdk:10.0`
 workload de MAUI. La dependencia va siempre de Mobile hacia afuera.
 
 El router de la API responde a `PathPrefix(/api)`, así que todo router de otro host cuyo panel use `/api` (Grafana, RabbitMQ) necesita `priority=100`.
+
+## Nube (RNF 6.14)
+
+`infra/` es OpenTofu (`azurerm`): VM de Azure con IP fija y, opcionalmente, zona de Azure DNS. Sin
+dominio propio, los hosts son `<servicio>.<ip-con-guiones>.sslip.io`. `infra/reconstruir.sh` hace
+el `apply` y dispara el deploy; `infra/LEEME.md` documenta todo, incluidos secretos y costo. El job
+`desplegar` de `ci.yml` entra por SSH, escribe el `.env` y corre
+`docker compose -f docker-compose.yml -f docker-compose.nube.yml up -d --build`. Queda apagado
+hasta que la variable `DESPLIEGUE_HABILITADO` sea `true`. En la nube, Portal y Backoffice llegan a
+la API por el entrypoint interno `traefik:81`, porque el `web` (80) redirige todo a HTTPS.
+
+`scripts/prueba-caida-instancia.sh` reproduce el escenario 1 (caída de una réplica con tráfico).
+Pega a `/live` y no a `/ready`: `/ready` falla a propósito en la réplica que se apaga
+(`Api/Salud/DrenajeAlApagar.cs`).
 
 ## Documentación
 

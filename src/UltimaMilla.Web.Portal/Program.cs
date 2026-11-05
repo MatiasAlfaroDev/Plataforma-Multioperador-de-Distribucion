@@ -53,8 +53,8 @@ builder.Services.AddCascadingAuthenticationState();
 
 
 
-// Blazor InteractiveServer (informe 6.1). Con más de una réplica hará falta
-// Data Protection y backplane de SignalR en Redis; con una sola no.
+// Blazor InteractiveServer (informe 6.1). Data Protection ya está en Redis; con más de una réplica
+// Traefik mantiene cada circuito en su instancia con la cookie de afinidad del compose.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

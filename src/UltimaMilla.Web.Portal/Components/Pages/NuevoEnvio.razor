@@ -6,7 +6,12 @@
 @inject IJSRuntime JS
 <PageTitle>Nuevo envío</PageTitle>
 
-<h1>Nuevo envío</h1>
+<div class="encabezado">
+    <div>
+        <h1>Nuevo envío</h1>
+        <p>Registrá un nuevo envío para tu comercio.</p>
+    </div>
+</div>
 
 @if (errorDeCarga is not null)
 {
@@ -23,6 +28,7 @@ else
         
         <fieldset>
             <legend>Cuenta comercial</legend>
+            
             <label for="cuenta">Comercio y operador</label>
             <InputSelect id="cuenta" @bind-Value="modelo.CuentaComercialId" @bind-Value:after="CambiarCuentaAsync">
                 <option value="">Elegí una cuenta…</option>
@@ -46,6 +52,7 @@ else
 
         <fieldset>
             <legend>Destinatario</legend>
+            
             <label for="nombre">Nombre</label>
             <InputText id="nombre" @bind-Value="modelo.DestinatarioNombre" />
             <ValidationMessage For="() => modelo.DestinatarioNombre" />
@@ -53,7 +60,7 @@ else
             <label for="telefono">Teléfono (opcional)</label>
             <InputText id="telefono" @bind-Value="modelo.DestinatarioTelefono" />
 
-            <div class="fila">
+            <div class="campos">
                 <div>
                     <label for="calle">Calle</label>
                     <InputText id="calle" @bind-Value="modelo.Calle" />
@@ -64,7 +71,8 @@ else
                     <InputText id="numero" @bind-Value="modelo.Numero" />
                 </div>
             </div>
-            <div class="fila">
+
+            <div class="campos">
                 <div>
                     <label for="localidad">Localidad</label>
                     <InputText id="localidad" @bind-Value="modelo.Localidad" />
@@ -90,10 +98,10 @@ else
                 var indice = i;
                 var bulto = modelo.Bultos[indice];
 
-                <div class="bulto">
+                <div class="tarjeta">
                     <h3>Bulto @(indice + 1)</h3>
 
-                    <div class="fila">
+                    <div class="campos">
                         <div>
                             <label for="peso-@indice">Peso (kg)</label>
                             <InputNumber id="@($"peso-{indice}")" @bind-Value="bulto.PesoKg" />
@@ -188,27 +196,29 @@ else
                 Con errores: @resultadoImportacion.ConErrores
             </p>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Referencia</th>
-                        <th>Fila inicial</th>
-                        <th>Estado</th>
-                        <th>Detalle</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in resultadoImportacion.Resultados)
-                    {
+            <div class="tabla">
+                <table>
+                    <thead>
                         <tr>
-                            <td>@item.ReferenciaExterna</td>
-                            <td>@item.FilaInicial</td>
-                            <td>@EstadoImportacionTexto(item.Estado)</td>
-                            <td>@item.Mensaje</td>
+                            <th>Referencia</th>
+                            <th>Fila inicial</th>
+                            <th>Estado</th>
+                            <th>Detalle</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in resultadoImportacion.Resultados)
+                        {
+                            <tr>
+                                <td>@item.ReferenciaExterna</td>
+                                <td>@item.FilaInicial</td>
+                                <td>@EstadoImportacionTexto(item.Estado)</td>
+                                <td>@item.Mensaje</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
     </section>
 

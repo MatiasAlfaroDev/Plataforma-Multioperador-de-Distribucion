@@ -16,7 +16,7 @@ public sealed record HojaDeRutaItem(
     public string Titulo => HoraSalida is { } hora ? $"Salida {hora:HH}:{hora:mm}" : "Sin hora de salida";
 
     public string Detalle =>
-        $"{Paradas.Count} {(Paradas.Count == 1 ? "parada" : "paradas")} · {CantidadBultos} bultos"
+        $"{Paradas.Count} {(Paradas.Count == 1 ? "parada" : "paradas")}, {CantidadBultos} bultos"
         + (YaDespachada ? " · ya despachada" : string.Empty);
 }
 

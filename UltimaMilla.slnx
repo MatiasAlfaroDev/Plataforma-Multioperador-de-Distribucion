@@ -6,6 +6,8 @@
     <Project Path="src/UltimaMilla.Api/UltimaMilla.Api.csproj" />
     <Project Path="src/UltimaMilla.Web.Portal/UltimaMilla.Web.Portal.csproj" />
     <Project Path="src/UltimaMilla.Web.Backoffice/UltimaMilla.Web.Backoffice.csproj" />
+    <Project Path="src/UltimaMilla.Worker/UltimaMilla.Worker.csproj" />
+    <Project Path="src/UltimaMilla.ReceptorAvisos/UltimaMilla.ReceptorAvisos.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/UltimaMilla.UnitTests/UltimaMilla.UnitTests.csproj" />

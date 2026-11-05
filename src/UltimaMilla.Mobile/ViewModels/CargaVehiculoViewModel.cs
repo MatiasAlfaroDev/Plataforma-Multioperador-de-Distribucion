@@ -192,7 +192,7 @@ public partial class CargaVehiculoViewModel : ObservableObject
             if (!Sobrantes.Contains(leido))
                 Sobrantes.Add(leido);
 
-            MostrarMensaje($"⚠ {leido} no es de esta ruta: bajalo del vehículo.", alerta: true);
+            MostrarMensaje($"{leido} no es de esta ruta: bajalo del vehículo.", alerta: true);
         }
         else if (bulto.Cargado)
         {
@@ -201,7 +201,7 @@ public partial class CargaVehiculoViewModel : ObservableObject
         else
         {
             bulto.Cargado = true;
-            MostrarMensaje($"✓ {leido} cargado ({bulto.Referencia}).", alerta: false);
+            MostrarMensaje($"{leido} cargado ({bulto.Referencia}).", alerta: false);
         }
 
         ActualizarResumen();
@@ -297,9 +297,10 @@ public partial class BultoCarga(string codigo, string referencia, string destina
     public string Destinatario { get; } = destinatario;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Icono), nameof(TextoEstado))]
+    [NotifyPropertyChangedFor(nameof(Icono), nameof(ColorIcono), nameof(TextoEstado))]
     private bool cargado;
 
-    public string Icono => Cargado ? "✅" : "⏳";
+    public string Icono => Cargado ? Iconos.TildeCirculo : Iconos.Reloj;
+    public Color ColorIcono => Paleta.De(Cargado ? "Exito" : "TextoSecundario");
     public string TextoEstado => Cargado ? "Cargado" : "Falta cargar";
 }

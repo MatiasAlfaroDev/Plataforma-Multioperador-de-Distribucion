@@ -19,8 +19,13 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
             {
-                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                // Texto: IBM Plex Sans. Títulos y cifras: Space Grotesk. Íconos: Phosphor (ver Iconos.cs).
+                fonts.AddFont("IBMPlexSans-Regular.ttf", "Texto");
+                fonts.AddFont("IBMPlexSans-Medium.ttf", "TextoMedio");
+                fonts.AddFont("IBMPlexSans-SemiBold.ttf", "TextoFuerte");
+                fonts.AddFont("SpaceGrotesk-Medium.ttf", "Cifras");
+                fonts.AddFont("SpaceGrotesk-Bold.ttf", "Titulos");
+                fonts.AddFont("Phosphor.ttf", "Iconos");
             });
 
 #if DEBUG

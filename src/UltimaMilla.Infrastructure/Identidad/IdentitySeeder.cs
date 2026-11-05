@@ -50,6 +50,15 @@ public static class IdentitySeeder
             }
         }
 
+        // Administrador de plataforma: consulta y reintenta los mensajes fallidos (RNF 6.8). La membresía
+        // necesita un operador, pero sus pantallas no filtran por él.
+        await CrearUsuarioAsync(
+            "admin.plataforma@demo.local",
+            "Administrador de plataforma",
+            Perfiles.AdministradorPlataforma,
+            DbSeeder.RapiEnviosId,
+            null);
+
         await CrearUsuarioAsync(
             "admin.rapi@demo.local",
             "Administrador RapiEnvíos",

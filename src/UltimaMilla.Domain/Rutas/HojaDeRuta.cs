@@ -26,7 +26,7 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
     private HojaDeRuta() { }
 
-    
+
     public static HojaDeRuta Crear(
         Guid operadorId,
         Repartidor repartidor,
@@ -58,7 +58,7 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
         if (maximoParadas <= 0)
             throw new ArgumentOutOfRangeException(nameof(maximoParadas));
-            
+
 
         return new HojaDeRuta
         {
@@ -112,12 +112,12 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             throw new InvalidOperationException(
                 "Se alcanzó el máximo de paradas.");
 
-        if (PesoAsignadoKg + envio.PesoTotalKg > CapacidadPesoKg)
+        if (PesoAsignadoKg + envio.PesoPendienteKg > CapacidadPesoKg)
             throw new InvalidOperationException(
                 "La carga supera la capacidad de peso.");
 
         if (VolumenAsignadoM3 +
-            envio.VolumenTotalMetrosCubicos > CapacidadVolumenM3)
+            envio.VolumenPendienteMetrosCubicos > CapacidadVolumenM3)
             throw new InvalidOperationException(
                 "La carga supera la capacidad de volumen.");
 
@@ -132,8 +132,8 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
                 _paradas.Add(parada);
 
-        PesoAsignadoKg += envio.PesoTotalKg;
-        VolumenAsignadoM3 += envio.VolumenTotalMetrosCubicos;
+        PesoAsignadoKg += envio.PesoPendienteKg;
+        VolumenAsignadoM3 += envio.VolumenPendienteMetrosCubicos;
     }
 
     public void QuitarEnvio(Envio envio, DateTimeOffset fecha)
@@ -157,8 +157,8 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
         parada.Liberar(fecha);
 
-        PesoAsignadoKg -= envio.PesoTotalKg;
-        VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+        PesoAsignadoKg -= envio.PesoPendienteKg;
+        VolumenAsignadoM3 -= envio.VolumenPendienteMetrosCubicos;
     }
 
     public void PrepararRenumeracionParadas()
@@ -210,6 +210,7 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
                 "El envío pertenece a otro operador.");
 
         if (envio.Estado != EstadoEnvio.Entregado &&
+            envio.Estado != EstadoEnvio.EntregadoParcialmente &&
             envio.Estado != EstadoEnvio.NoEntregado)
             throw new InvalidOperationException(
                 "El envío debe tener un resultado de entrega registrado.");

@@ -76,7 +76,7 @@ public sealed class PanelFirma : GraphicsView
 
         public void Draw(ICanvas canvas, RectF rectangulo)
         {
-            canvas.StrokeColor = Color.FromArgb("#14202E");
+            canvas.StrokeColor = Color.FromArgb("#18181B"); // tinta fija: el panel es blanco en los dos temas
             canvas.StrokeSize = 3;
             canvas.StrokeLineCap = LineCap.Round;
             canvas.StrokeLineJoin = LineJoin.Round;

@@ -3,7 +3,8 @@
 /// <summary>① Lo que la app manda a POST /api/auth/login.</summary>
 public sealed record LoginRequest(
     string Email,
-    string Password);
+    string Password,
+    string Aplicacion = "movil");
 
 /// <summary>① Lo que devuelve el login (además, la API deja una cookie de sesión).</summary>
 public sealed record UsuarioLogin(

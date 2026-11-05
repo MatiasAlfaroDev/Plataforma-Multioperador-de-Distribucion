@@ -39,4 +39,27 @@ public sealed class MotivoNoEntregaRepository(AppDbContext db)
                 m.Descripcion == descripcionNormalizada,
                 ct);
     }
+
+    public async Task<IReadOnlyList<MotivoNoEntrega>> ListarPorVersionAsync(
+        Guid operadorId,
+        Guid versionReglasOperativasId,
+        CancellationToken ct)
+    {
+        return await db.Set<MotivoNoEntrega>()
+            .AsNoTracking()
+            .Where(m =>
+                m.OperadorId == operadorId &&
+                m.VersionReglasOperativasId == versionReglasOperativasId)
+            .OrderBy(m => m.Codigo)
+            .ToListAsync(ct);
+    }
+
+    public async Task AgregarRangoAsync(
+        IEnumerable<MotivoNoEntrega> motivos,
+        CancellationToken ct)
+    {
+        await db.Set<MotivoNoEntrega>()
+            .AddRangeAsync(motivos, ct);
+    }
+
 }

@@ -17,11 +17,27 @@ public class ActualizarReglasOperativasHandlerTests
         var repositorio = new ReglasEnMemoria();
         var unidad = new UnidadDeTrabajoEnMemoria();
 
+        var motivos = new MotivosEnMemoria();
+
         var handler = new ActualizarReglasOperativasHandler(
-            repositorio, unidad, new RelojFijo(Ahora));
+            repositorio, motivos, unidad, new RelojFijo(Ahora));
 
         var command = new ActualizarReglasOperativasCommand(
-            operadorId, 3, 24, true, 7);
+            operadorId,
+            3,
+            24,
+            true,
+            7,
+            [
+                new MotivoNoEntregaItem(
+                    "AUSENTE",
+                    "Destinatario ausente",
+                    false),
+                new MotivoNoEntregaItem(
+                    "RECHAZADO",
+                    "Entrega rechazada",
+                    true)
+            ]);
 
         var id = await handler.Handle(command, CancellationToken.None);
 
@@ -30,6 +46,14 @@ public class ActualizarReglasOperativasHandlerTests
         Assert.Equal(3, repositorio.Lista[0].MaximoIntentosEntrega);
         Assert.True(repositorio.Lista[0].EstaVigente(Ahora));
         Assert.Equal(1, unidad.Guardados);
+        var motivosGuardados = await motivos.ListarPorVersionAsync(
+            operadorId,
+            id,
+            CancellationToken.None);
+
+        Assert.Equal(2, motivosGuardados.Count);
+        Assert.Contains(motivosGuardados, m => m.Codigo == "AUSENTE");
+        Assert.Contains(motivosGuardados, m => m.Codigo == "RECHAZADO");
     }
 
     [Fact]
@@ -46,8 +70,27 @@ public class ActualizarReglasOperativasHandlerTests
 
         var unidad = new UnidadDeTrabajoEnMemoria();
 
+       var motivos = new MotivosEnMemoria();
+
+        await motivos.AgregarRangoAsync(
+            [
+                MotivoNoEntrega.Crear(
+                    operadorId,
+                    anterior.Id,
+                    "AUSENTE",
+                    "Destinatario ausente",
+                    false),
+                MotivoNoEntrega.Crear(
+                    operadorId,
+                    anterior.Id,
+                    "RECHAZADO",
+                    "Entrega rechazada",
+                    true)
+            ],
+            CancellationToken.None);
+
         var handler = new ActualizarReglasOperativasHandler(
-            repositorio, unidad, new RelojFijo(Ahora));
+            repositorio, motivos, unidad, new RelojFijo(Ahora));
 
         var command = new ActualizarReglasOperativasCommand(
             operadorId, 2, 12, false, 5);
@@ -73,6 +116,24 @@ public class ActualizarReglasOperativasHandlerTests
         Assert.True(nueva.EstaVigente(Ahora));
 
         Assert.Equal(1, unidad.Guardados);
+        var motivosAnteriores = await motivos.ListarPorVersionAsync(
+            operadorId,
+            anterior.Id,
+            CancellationToken.None);
+
+        var motivosNuevos = await motivos.ListarPorVersionAsync(
+            operadorId,
+            nuevoId,
+            CancellationToken.None);
+
+        Assert.Equal(2, motivosAnteriores.Count);
+        Assert.Equal(2, motivosNuevos.Count);
+
+        Assert.Contains(motivosNuevos, m => m.Codigo == "AUSENTE");
+        Assert.Contains(motivosNuevos, m => m.Codigo == "RECHAZADO");
+
+        Assert.All(motivosNuevos, m =>
+            Assert.Equal(nuevoId, m.VersionReglasOperativasId));
     }
 
     private sealed class ReglasEnMemoria
@@ -114,6 +175,57 @@ public class ActualizarReglasOperativasHandlerTests
         }
     }
 
+    private sealed class MotivosEnMemoria : IMotivoNoEntregaRepository
+    {
+        private readonly List<MotivoNoEntrega> _motivos = [];
+
+        public Task<MotivoNoEntrega?> ObtenerPorCodigoAsync(
+            Guid operadorId,
+            Guid versionReglasOperativasId,
+            string codigo,
+            CancellationToken ct)
+        {
+            return Task.FromResult(_motivos.FirstOrDefault(m =>
+                m.OperadorId == operadorId &&
+                m.VersionReglasOperativasId == versionReglasOperativasId &&
+                m.Codigo == codigo));
+        }
+
+        public Task<IReadOnlyList<MotivoNoEntrega>> ListarPorVersionAsync(
+            Guid operadorId,
+            Guid versionReglasOperativasId,
+            CancellationToken ct)
+        {
+            IReadOnlyList<MotivoNoEntrega> resultado = _motivos
+                .Where(m =>
+                    m.OperadorId == operadorId &&
+                    m.VersionReglasOperativasId == versionReglasOperativasId)
+                .ToList();
+
+            return Task.FromResult(resultado);
+        }
+
+        public Task AgregarRangoAsync(
+            IEnumerable<MotivoNoEntrega> motivos,
+            CancellationToken ct)
+        {
+            _motivos.AddRange(motivos);
+            return Task.CompletedTask;
+        }
+
+        public Task<MotivoNoEntrega?> ObtenerPorDescripcionAsync(
+            Guid operadorId,
+            Guid versionReglasOperativasId,
+            string descripcion,
+            CancellationToken ct)
+        {
+            return Task.FromResult(_motivos.FirstOrDefault(m =>
+                m.OperadorId == operadorId &&
+                m.VersionReglasOperativasId == versionReglasOperativasId &&
+                m.Descripcion == descripcion));
+        }
+    }
+
     private sealed class UnidadDeTrabajoEnMemoria : IUnitOfWork
     {
         public int Guardados { get; private set; }
@@ -135,4 +247,5 @@ public class ActualizarReglasOperativasHandlerTests
     {
         public override DateTimeOffset GetUtcNow() => ahora;
     }
+
 }

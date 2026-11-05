@@ -1,21 +1,26 @@
-
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
 
-<header>
-    <strong>Portal del comercio</strong> · Plataforma de última milla
+<header class="sticky top-0 z-10 border-b border-borde bg-fondo/90 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3 md:px-8">
+        <a href="/" class="flex items-center gap-2.5 text-texto no-underline hover:no-underline">
+            <img src="logo.svg" alt="" class="size-8" />
+            <span class="font-display text-[17px] font-bold tracking-tight">Última Milla</span>
+            <span class="text-[13px] text-suave">Portal del comercio</span>
+        </a>
 
-    <AuthorizeView Policy="ComercioPortal">
-        <Authorized>
-            <nav style="margin-top: 12px;">
-                <a href="/mis-operadores">
-                    Mis operadores
-                </a>
-            </nav>
-        </Authorized>
-    </AuthorizeView>
+        <AuthorizeView Policy="ComercioPortal">
+            <Authorized>
+                <nav class="-mx-3 flex flex-wrap gap-1">
+                    <NavLink href="/" Match="NavLinkMatch.All" class="nav-item"><i class="ph ph-package"></i>Nuevo envío</NavLink>
+                    <NavLink href="avisos" class="nav-item"><i class="ph ph-bell"></i>Avisos</NavLink>
+                    <NavLink href="mis-operadores" class="nav-item"><i class="ph ph-truck"></i>Mis operadores</NavLink>
+                </nav>
+            </Authorized>
+        </AuthorizeView>
+    </div>
 </header>
 
-<main>
+<main class="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-12">
     @Body
 </main>

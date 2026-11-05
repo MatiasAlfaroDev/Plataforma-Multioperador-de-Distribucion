@@ -45,6 +45,30 @@ public class Envio : AuditableEntity, ITenantEntity
     public decimal VolumenTotalMetrosCubicos =>
         _bultos.Sum(b => b.VolumenMetrosCubicos);
 
+    public int CantidadBultos => _bultos.Count;
+
+    public int BultosEntregados =>
+        _bultos.Count(b => b.Estado == EstadoBulto.Entregado);
+
+    public int BultosPendientes =>
+        _bultos.Count(b => b.Estado == EstadoBulto.Pendiente);
+
+    public int BultosEnDevolucion =>
+        _bultos.Count(b => b.Estado == EstadoBulto.EnDevolucion);
+
+    public int BultosDevueltos =>
+        _bultos.Count(b => b.Estado == EstadoBulto.Devuelto);
+
+    public decimal PesoPendienteKg =>
+        _bultos
+            .Where(b => b.Estado == EstadoBulto.Pendiente)
+            .Sum(b => b.PesoKg);
+
+    public decimal VolumenPendienteMetrosCubicos =>
+        _bultos
+            .Where(b => b.Estado == EstadoBulto.Pendiente)
+            .Sum(b => b.VolumenMetrosCubicos);
+
     private Envio() { }
 
     public static Envio Crear(
@@ -135,7 +159,7 @@ public class Envio : AuditableEntity, ITenantEntity
 
         VersionReglasOperativasId = versionReglasOperativasId;
     }
-    
+
     public void EstablecerCompromisoEntrega(
         DateOnly fecha,
         TimeOnly horaDesde,
@@ -199,6 +223,40 @@ public class Envio : AuditableEntity, ITenantEntity
         HoraEntregaHasta = horaHasta;
     }
 
+    public void ValidarBultosEntregaParcial(
+        IReadOnlyCollection<Guid> bultosEntregados)
+    {
+        ArgumentNullException.ThrowIfNull(bultosEntregados);
+
+        if (Estado != EstadoEnvio.EnTransito)
+            throw new InvalidOperationException(
+                "El envío debe estar en tránsito.");
+
+        if (bultosEntregados.Count == 0)
+            throw new ArgumentException(
+                "Debe indicarse al menos un bulto entregado.");
+
+        if (bultosEntregados.Count != bultosEntregados.Distinct().Count())
+            throw new InvalidOperationException(
+                "Hay bultos repetidos.");
+
+        var pendientes = _bultos
+            .Where(b => b.Estado == EstadoBulto.Pendiente)
+            .ToList();
+
+        if (bultosEntregados.Count >= pendientes.Count)
+            throw new InvalidOperationException(
+                "Una entrega parcial debe dejar al menos un bulto pendiente.");
+
+        var idsPendientes = pendientes
+            .Select(b => b.Id)
+            .ToHashSet();
+
+        if (bultosEntregados.Any(id => !idsPendientes.Contains(id)))
+            throw new InvalidOperationException(
+                "Todos los bultos indicados deben pertenecer al envío y estar pendientes.");
+    }
+
     public void Aplicar(
         DisparadorEnvio disparador,
         VersionReglasOperativas reglas,
@@ -212,7 +270,10 @@ public class Envio : AuditableEntity, ITenantEntity
         string? franjaReprogramada = null,
         string? justificacion = null,
         decimal? latitud = null,
-        decimal? longitud = null)
+        decimal? longitud = null,
+        IReadOnlyCollection<Guid>? bultosEntregados = null,
+        IReadOnlyCollection<(Guid BultoId, MotivoNoEntrega Motivo, string Evidencia)>?
+            bultosNoEntregados = null)
     {
         ArgumentNullException.ThrowIfNull(reglas);
 
@@ -242,7 +303,7 @@ public class Envio : AuditableEntity, ITenantEntity
         }
 
         IntentoEntrega? nuevoIntento = null;
-
+        List<Bulto> bultosParaEntregar = [];
         switch (disparador)
         {
             case DisparadorEnvio.AsignarARuta:
@@ -277,6 +338,90 @@ public class Envio : AuditableEntity, ITenantEntity
                     IntentosRealizados + 1,
                     pruebaEntrega);
                 break;
+
+                case DisparadorEnvio.RegistrarEntregaParcial:
+                {
+                    if (IntentosRealizados >= reglas.MaximoIntentosEntrega)
+                        throw new InvalidOperationException(
+                            "Se alcanzó el máximo de intentos.");
+
+                    if (pruebaEntrega is null)
+                        throw new InvalidOperationException(
+                            "La entrega parcial requiere una prueba de entrega.");
+
+                    if (reglas.RequierePruebaEntrega &&
+                        string.IsNullOrWhiteSpace(pruebaEntrega.ReferenciaFirma) &&
+                        string.IsNullOrWhiteSpace(pruebaEntrega.ReferenciaFotografia))
+                    {
+                        throw new InvalidOperationException(
+                            "La prueba de entrega no cumple las reglas del operador.");
+                    }
+
+                    if (bultosEntregados is null || bultosNoEntregados is null)
+                        throw new ArgumentException(
+                            "Deben indicarse los resultados de todos los bultos pendientes.");
+
+                    ValidarBultosEntregaParcial(bultosEntregados);
+
+                    if (bultosNoEntregados.Count == 0)
+                        throw new InvalidOperationException(
+                            "Una entrega parcial debe incluir bultos no entregados.");
+
+                    var pendientes = _bultos
+                        .Where(b => b.Estado == EstadoBulto.Pendiente)
+                        .Select(b => b.Id)
+                        .ToHashSet();
+
+                    var idsNoEntregados = bultosNoEntregados
+                        .Select(b => b.BultoId)
+                        .ToList();
+
+                    if (idsNoEntregados.Count != idsNoEntregados.Distinct().Count())
+                        throw new InvalidOperationException(
+                            "Hay bultos no entregados repetidos.");
+
+                    var idsInformados = bultosEntregados
+                        .Concat(idsNoEntregados)
+                        .ToHashSet();
+
+                    if (!idsInformados.SetEquals(pendientes))
+                        throw new InvalidOperationException(
+                            "Debe informarse el resultado de todos los bultos pendientes.");
+
+                    foreach (var resultado in bultosNoEntregados)
+                    {
+                        if (resultado.Motivo is null ||
+                            resultado.Motivo.OperadorId != OperadorId ||
+                            resultado.Motivo.VersionReglasOperativasId != reglas.Id)
+                        {
+                            throw new InvalidOperationException(
+                                "Uno de los motivos no pertenece al catálogo del envío.");
+                        }
+
+                        if (string.IsNullOrWhiteSpace(resultado.Evidencia))
+                            throw new InvalidOperationException(
+                                "Cada bulto no entregado requiere evidencia del fallo.");
+                    }
+
+                    nuevoIntento = IntentoEntrega.RegistrarEntregaParcial(
+                        OperadorId,
+                        Id,
+                        IntentosRealizados + 1,
+                        bultosEntregados,
+                        bultosNoEntregados
+                            .Select(b => (
+                                b.BultoId,
+                                b.Motivo.Id,
+                                b.Evidencia))
+                            .ToList(),
+                        pruebaEntrega);
+
+                    bultosParaEntregar = _bultos
+                        .Where(b => bultosEntregados.Contains(b.Id))
+                        .ToList();
+
+                    break;
+                }
 
             case DisparadorEnvio.RegistrarIntentoFallido:
                 if (IntentosRealizados >= reglas.MaximoIntentosEntrega)
@@ -368,13 +513,44 @@ public class Envio : AuditableEntity, ITenantEntity
                 : null);
 
         maquina.Fire(disparador);
+        if (disparador == DisparadorEnvio.RegistrarEntregaParcial)
+        {
+            foreach (var bulto in bultosParaEntregar)
+            {
+                bulto.Aplicar(
+                    MaquinaEstadosBulto.Disparador.Entregar);
+            }
+        }
+        else if (disparador == DisparadorEnvio.Entregar)
+        {
+            foreach (var bulto in _bultos.Where(
+                b => b.Estado == EstadoBulto.Pendiente))
+            {
+                bulto.Aplicar(
+                    MaquinaEstadosBulto.Disparador.Entregar);
+            }
+        }
 
         if (nuevoIntento is not null)
         {
             _intentos.Add(nuevoIntento);
             IntentosRealizados++;
 
-            if (!nuevoIntento.Entregado)
+            if (disparador == DisparadorEnvio.RegistrarEntregaParcial)
+            {
+                var motivos = bultosNoEntregados!
+                    .Select(b => b.Motivo)
+                    .ToList();
+
+                UltimoMotivoNoEntregaId =
+                    motivos.Select(m => m.Id).Distinct().Count() == 1
+                        ? motivos[0].Id
+                        : null;
+
+                UltimoMotivoRequiereDevolucion =
+                    motivos.Any(m => m.RequiereDevolucion);
+            }
+            else if (!nuevoIntento.Entregado)
             {
                 UltimoMotivoNoEntregaId = motivoNoEntrega!.Id;
                 UltimoMotivoRequiereDevolucion =
@@ -400,6 +576,7 @@ public class Envio : AuditableEntity, ITenantEntity
             DisparadorEnvio.QuitarDeRuta => ObtenerEstadoAnteriorAsignacion(),
             DisparadorEnvio.Despachar => EstadoEnvio.EnTransito,
             DisparadorEnvio.Entregar => EstadoEnvio.Entregado,
+            DisparadorEnvio.RegistrarEntregaParcial => EstadoEnvio.EntregadoParcialmente,
             DisparadorEnvio.RegistrarIntentoFallido => EstadoEnvio.NoEntregado,
             DisparadorEnvio.RetornarADeposito => EstadoEnvio.EnDeposito,
             DisparadorEnvio.IniciarDevolucion => EstadoEnvio.EnDevolucion,

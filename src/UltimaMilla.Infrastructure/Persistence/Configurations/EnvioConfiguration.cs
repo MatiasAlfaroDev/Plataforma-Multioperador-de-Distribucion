@@ -36,6 +36,14 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
             .OnDelete(DeleteBehavior.Restrict);
         builder.Ignore(e => e.PesoTotalKg);
         builder.Ignore(e => e.VolumenTotalMetrosCubicos);
+        builder.Ignore(e => e.CantidadBultos);
+        builder.Ignore(e => e.BultosEntregados);
+        builder.Ignore(e => e.BultosPendientes);
+        builder.Ignore(e => e.BultosEnDevolucion);
+        builder.Ignore(e => e.BultosDevueltos);
+        builder.Ignore(e => e.PesoPendienteKg);
+        builder.Ignore(e => e.VolumenPendienteMetrosCubicos);
+
         // Concurrencia optimista con la columna de sistema xmin de PostgreSQL (informe 6.1 y 6.4).
         builder.Property<uint>("Version").IsRowVersion();
 
@@ -87,13 +95,26 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
     }
 }
 
+
 public sealed class BultoConfiguration : IEntityTypeConfiguration<Bulto>
 {
     public void Configure(EntityTypeBuilder<Bulto> builder)
     {
         builder.ToTable("bultos");
+
         builder.HasKey(b => b.Id);
-        builder.Property(b => b.Identificacion).HasMaxLength(80).IsRequired();
-        builder.Property(b => b.PesoKg).HasPrecision(10, 3);
+
+        builder.Property(b => b.Identificacion)
+            .HasMaxLength(80)
+            .IsRequired();
+
+        builder.Property(b => b.PesoKg)
+            .HasPrecision(10, 3);
+
+        builder.Property(b => b.Estado)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasDefaultValue(EstadoBulto.Pendiente)
+            .IsRequired();
     }
 }

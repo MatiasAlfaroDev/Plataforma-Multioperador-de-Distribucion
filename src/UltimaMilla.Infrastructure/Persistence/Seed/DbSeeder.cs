@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Configuracion;
+using UltimaMilla.Domain.Avisos;
 
 namespace UltimaMilla.Infrastructure.Persistence.Seed;
 
@@ -16,6 +17,12 @@ public static class DbSeeder
 
     public static readonly Guid TiendaNorteId = Guid.Parse("22222222-0000-0000-0000-000000000001");
     public static readonly Guid ModaExpressId = Guid.Parse("22222222-0000-0000-0000-000000000002");
+
+    /// <summary>
+    /// Secreto de la suscripción de demostración. El compose se lo pasa también al receptor de
+    /// prueba (Receptor__Secreto) para que verifique la firma. Solo para desarrollo.
+    /// </summary>
+    public const string SecretoAvisosDemo = "secreto-demo-tienda-norte";
 
     public static async Task SembrarAsync(
         AppDbContext db,
@@ -150,7 +157,14 @@ public static class DbSeeder
 
         // Catálogo de motivos de no entrega de cada operador (RF 4 y 21). La app los muestra
         // y el servidor los busca por descripción al sincronizar un intento fallido.
-        foreach (var version in await db.VersionesReglasOperativas.ToListAsync(ct))
+        var versionesIniciales = await db.VersionesReglasOperativas
+            .Where(v =>
+                (v.OperadorId == RapiEnviosId ||
+                v.OperadorId == LogisticaSurId) &&
+                v.VigenciaDesde == DateTimeOffset.Parse("2026-01-01T00:00:00Z"))
+            .ToListAsync(ct);
+
+        foreach (var version in versionesIniciales)
         {
             var tieneMotivos = await db.Set<MotivoNoEntrega>()
                 .AnyAsync(m => m.VersionReglasOperativasId == version.Id, ct);
@@ -159,10 +173,10 @@ public static class DbSeeder
                 continue;
 
             db.Set<MotivoNoEntrega>().AddRange(
-                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "AUSENTE", "Destinatario ausente", requiereDevolucion: false),
-                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "DIRECCION", "Dirección incorrecta o inexistente", requiereDevolucion: false),
-                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "RECHAZADO", "Rechazado por el destinatario", requiereDevolucion: true),
-                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "INACCESIBLE", "Zona inaccesible", requiereDevolucion: false));
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "AUSENTE", "Destinatario ausente", false),
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "DIRECCION", "Dirección incorrecta o inexistente", false),
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "RECHAZADO", "Rechazado por el destinatario", true),
+                MotivoNoEntrega.Crear(version.OperadorId, version.Id, "INACCESIBLE", "Zona inaccesible", false));
         }
 
         await db.SaveChangesAsync(ct);
@@ -199,6 +213,19 @@ public static class DbSeeder
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Avisos (RNF 6.9): Tienda Norte en RapiEnvíos escucha todo en el receptor de prueba del compose.
+        if (!await db.SuscripcionesAviso.AnyAsync(ct))
+        {
+            db.SuscripcionesAviso.Add(SuscripcionAviso.Crear(
+                RapiEnviosId,
+                Guid.Parse("33333333-0000-0000-0000-000000000001"),
+                "http://receptor-avisos:8080/avisos",
+                SecretoAvisosDemo,
+                TiposAviso.Todos));
+
+            await db.SaveChangesAsync(ct);
+        }
     }
     
 }

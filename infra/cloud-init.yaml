@@ -1,0 +1,17 @@
+#cloud-config
+# Prepara la VM para el compose: Docker con el plugin compose, swap para los builds y el repo clonado.
+# Los secretos (.env) no pasan por acá: los escribe el job de deploy de GitHub Actions.
+package_update: true
+packages:
+  - git
+  - curl
+
+swap:
+  filename: /swapfile
+  size: 4G
+
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - usermod -aG docker ${usuario}
+  - git clone --branch ${rama} ${repositorio} /opt/ultimamilla
+  - chown -R ${usuario}:${usuario} /opt/ultimamilla

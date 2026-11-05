@@ -7,6 +7,7 @@ public enum DisparadorEnvio
     QuitarDeRuta,
     Despachar,
     Entregar,
+    RegistrarEntregaParcial,
     RegistrarIntentoFallido,
     RetornarADeposito,
     IniciarDevolucion,

@@ -1,4 +1,3 @@
-
 @page "/mis-operadores"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
@@ -7,12 +6,12 @@
 
 <PageTitle>Mis operadores - Última Milla</PageTitle>
 
-<h1>Mis operadores</h1>
-
-<p>
-    Consultá los operadores logísticos disponibles y
-    gestioná tus vinculaciones.
-</p>
+<div class="encabezado">
+    <div>
+        <h1>Mis operadores</h1>
+        <p>Consultá los operadores logísticos disponibles y gestioná tus vinculaciones.</p>
+    </div>
+</div>
 
 @if (cargando)
 {
@@ -40,11 +39,7 @@ else
         var cuenta = cuentas.FirstOrDefault(
             c => c.OperadorId == operador.Id);
 
-        <div style="border: 1px solid #ccc;
-                    border-radius: 8px;
-                    padding: 16px;
-                    margin-bottom: 12px;">
-
+        <div class="tarjeta">
             <h3>@operador.Nombre</h3>
 
             @if (cuenta is null)
@@ -60,13 +55,11 @@ else
            else if (cuenta.Estado == EstadoVinculacion.Confirmada
                     && cuenta.Activa)
             {
-                <p style="color: green;">
-                    ✓ Vinculado
-                </p>
+                <p class="ok flex items-center gap-1.5"><i class="ph ph-check-circle"></i>Vinculado</p>
 
                 <p>Ya podés crear envíos con este operador.</p>
 
-                <a class="btn btn-primary"
+                <a class="btn-primario"
                 href="@($"/?cuentaComercialId={cuenta.Id}")">
                     Crear envío
                 </a>

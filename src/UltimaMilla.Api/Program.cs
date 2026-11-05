@@ -52,7 +52,13 @@ using UltimaMilla.Infrastructure.Caching;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
 using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
 using UltimaMilla.Application.Envios.Queries.ConsultarSeguimientoPublico;
-
+using UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
+using UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
+using UltimaMilla.Application.Avisos.Queries.ListarAvisos;
+using UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
+using UltimaMilla.Application.Mensajeria.Commands.ReintentarMensajesFallidos;
+using UltimaMilla.Application.Mensajeria.Queries.ListarMensajesFallidos;
+using UltimaMilla.Domain.Avisos;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -98,7 +104,12 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ManejadorDeErrores>();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks()
-    .AddCheck<BaseDeDatosHealthCheck>("base-de-datos", tags: ["ready"]);
+    .AddCheck<BaseDeDatosHealthCheck>("base-de-datos", tags: ["ready"])
+    .AddCheck<DrenajeAlApagar>("apagado", tags: ["ready"]);
+
+// Apagado controlado (RNF 6.13): primero el drenaje de DrenajeAlApagar y después hasta 30 s para lo que esté en curso.
+builder.Services.AddHostedService<DrenajeAlApagar>();
+builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
 // Telemetría (RNF 6.12): logs, métricas y trazas salen por OTLP al Collector, y es él el que
 // decide el backend (docker/otel-collector-config.yaml). El destino y el nombre del servicio
@@ -341,7 +352,7 @@ api.MapGet("/envios", async (
 api.MapPost("/envios/{envioId:guid}/eventos-movil",
     async (Guid envioId, EventoMovilRequest request, RegistrarEventoMovilHandler handler, CancellationToken ct) =>
     {
-        await handler.Handle(          
+        await handler.Handle(
             new RegistrarEventoMovilCommand(
                 envioId,
                 request.IdEvento,
@@ -354,7 +365,14 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                 request.ReferenciaFotografia,
                 request.Latitud,
                 request.Longitud,
-                request.EvidenciaFallo),ct);
+                request.EvidenciaFallo,
+                request.BultosEntregados,
+                request.BultosNoEntregados?
+                    .Select(b => new BultoNoEntregadoMovil(
+                        b.BultoId,
+                        b.Motivo,
+                        b.Evidencia))
+                    .ToArray()), ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     })
     .RequireAuthorization();
@@ -581,7 +599,7 @@ api.MapPost("/reglas-operativas", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador));
-    
+
 api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, CancellationToken ct) =>
 {
     var zonas = await handler.Handle(
@@ -831,6 +849,70 @@ api.MapPost("/notificaciones/prueba", async (
     Results.Ok(await handler.Handle(command, ct)))
 .RequireAuthorization();
 
+// GET /api/avisos?estado=Fallida → historial de avisos a comercios (RNF 6.9). El comercio ve solo
+// los de su cuenta; el operador, todos los suyos (consulta de fallidos, RNF 6.8).
+api.MapGet("/avisos", async (
+    EstadoEntregaAviso? estado,
+    ListarAvisosHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ListarAvisosQuery(estado), ct)))
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
+
+// POST /api/avisos/{id}/reenviar → vuelve a encolar un aviso fallido; lo entrega el Worker.
+api.MapPost("/avisos/{entregaId:guid}/reenviar", async (
+    Guid entregaId,
+    ReenviarAvisoHandler handler,
+    CancellationToken ct) =>
+{
+    await handler.Handle(new ReenviarAvisoCommand(entregaId), ct);
+    return Results.NoContent();
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador,
+    Perfiles.Comercio));
+
+// GET /api/suscripciones-aviso → a qué URL y tipos de evento avisa la plataforma, con el secreto de la firma.
+api.MapGet("/suscripciones-aviso", async (
+    ListarSuscripcionesHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ListarSuscripcionesQuery(), ct)))
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Comercio));
+
+// POST /api/suscripciones-aviso → alta de una suscripción; el secreto lo genera la plataforma.
+api.MapPost("/suscripciones-aviso", async (
+    CrearSuscripcionCommand command,
+    CrearSuscripcionHandler handler,
+    CancellationToken ct) =>
+{
+    var id = await handler.Handle(command, ct);
+    return Results.Created($"/api/suscripciones-aviso/{id}", new { id });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Comercio));
+
+// GET /api/mensajes-fallidos → colas *_error del broker con una muestra de sus mensajes (RNF 6.8).
+// Solo el administrador de plataforma: las colas mezclan mensajes de todos los operadores.
+api.MapGet("/mensajes-fallidos", async (
+    ListarMensajesFallidosHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(await handler.Handle(new ListarMensajesFallidosQuery(), ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorPlataforma));
+
+// POST /api/mensajes-fallidos/{cola}/reintentar → devuelve los mensajes a su cola original; los procesa el Worker.
+api.MapPost("/mensajes-fallidos/{cola}/reintentar", async (
+    string cola,
+    ReintentarMensajesFallidosHandler handler,
+    CancellationToken ct) =>
+    Results.Ok(new { reintentados = await handler.Handle(new ReintentarMensajesFallidosCommand(cola), ct) }))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorPlataforma));
+
 app.Run();
 
 // Las sondas de salud no se instrumentan: al descartarse la span del request, la consulta
@@ -843,8 +925,10 @@ public partial class Program { }
 
 /// <summary>Cuerpo que manda la app del repartidor; el envío viaja en la URL.</summary>
 
-public sealed record EventoMovilRequest( Guid IdEvento,  string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null);
-public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record BultoNoEntregadoRequest( Guid BultoId, string Motivo, string Evidencia);
+
+public sealed record EventoMovilRequest( Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null, IReadOnlyCollection<Guid>? BultosEntregados = null,
+    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null);public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
 public sealed record ConfirmarReprogramacionRequest( string Responsable);
 public sealed record QuitarEnvioDeRutaRequest(string Responsable);
 public sealed record AgregarEnvioARutaRequest( Guid EnvioId, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta);

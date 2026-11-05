@@ -15,4 +15,13 @@ public interface IMotivoNoEntregaRepository
         Guid versionReglasOperativasId,
         string descripcion,
         CancellationToken ct);
+
+    Task<IReadOnlyList<MotivoNoEntrega>> ListarPorVersionAsync(
+        Guid operadorId,
+        Guid versionReglasOperativasId,
+        CancellationToken ct);
+
+    Task AgregarRangoAsync(
+        IEnumerable<MotivoNoEntrega> motivos,
+        CancellationToken ct);
 }

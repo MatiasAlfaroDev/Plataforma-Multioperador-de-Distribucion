@@ -52,36 +52,36 @@ public sealed class EnvioRuta
 
     /// <summary>Color fuerte del estado: franja lateral y texto de la etiqueta.</summary>
     public Color ColorEstado =>
-        Rechazado ? Color.FromArgb("#C5221F")
+        Rechazado ? Paleta.De("Peligro")
         : ResultadoLocal switch
         {
-            null => Color.FromArgb("#1F5FAD"),
-            "NoEntregado" => Color.FromArgb("#C5221F"),
-            _ => Color.FromArgb("#1E8E3E")
+            null => Paleta.De("Primary"),
+            "NoEntregado" => Paleta.De("Peligro"),
+            _ => Paleta.De("Exito")
         };
 
     /// <summary>Color suave del estado: fondo de la etiqueta.</summary>
     public Color ColorEstadoSuave =>
-        Rechazado ? Color.FromArgb("#FCE8E6")
+        Rechazado ? Paleta.De("PeligroSuave")
         : ResultadoLocal switch
         {
-            null => Color.FromArgb("#DCE8F7"),
-            "NoEntregado" => Color.FromArgb("#FCE8E6"),
-            _ => Color.FromArgb("#E6F4EA")
+            null => Paleta.De("AcentoSuave"),
+            "NoEntregado" => Paleta.De("PeligroSuave"),
+            _ => Paleta.De("ExitoSuave")
         };
 
     /// <summary>La línea de sincronización se muestra solo si ya se registró algo.</summary>
     public bool MostrarSincronizacion => ResultadoLocal is not null;
 
     public string TextoSincronizacion =>
-        Rechazado ? $"⚠ Rechazado por el servidor: {UltimoError}"
-        : PendienteDeSincronizar ? "⏳ Guardado en el teléfono · falta enviarlo"
-        : "✓ Enviado al servidor";
+        Rechazado ? $"Rechazado por el servidor: {UltimoError}"
+        : PendienteDeSincronizar ? "Guardado en el teléfono, falta enviarlo"
+        : "Enviado al servidor";
 
     public Color ColorSincronizacion =>
-        Rechazado ? Color.FromArgb("#C5221F")
-        : PendienteDeSincronizar ? Color.FromArgb("#B05A00")
-        : Color.FromArgb("#1E8E3E");
+        Rechazado ? Paleta.De("Peligro")
+        : PendienteDeSincronizar ? Paleta.De("Alerta")
+        : Paleta.De("Exito");
 
     /// <summary>Por qué el servidor rechazó lo registrado (null si nunca lo rechazó).</summary>
     public string? UltimoError { get; set; }
