@@ -30,7 +30,7 @@ public static class DependencyInjection
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AuditableEntityInterceptor>();
-        services.AddSingleton<TenantSaveChangesInterceptor>();
+        services.AddScoped<TenantSaveChangesInterceptor>();
         // Scoped: publica en el outbox del scope (RF 28); sp acá es el del scope, porque las opciones del contexto son Scoped.
         services.AddScoped<EventosDeEstadoInterceptor>();
         services.AddDbContext<AppDbContext>((sp, options) => options

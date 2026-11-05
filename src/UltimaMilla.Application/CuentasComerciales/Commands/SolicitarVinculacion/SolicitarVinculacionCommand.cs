@@ -1,0 +1,3 @@
+namespace UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
+
+public sealed record SolicitarVinculacionCommand(Guid OperadorId);

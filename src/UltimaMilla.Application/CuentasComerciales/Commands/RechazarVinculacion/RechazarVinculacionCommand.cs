@@ -1,0 +1,3 @@
+namespace UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
+
+public sealed record RechazarVinculacionCommand(Guid SolicitudId);

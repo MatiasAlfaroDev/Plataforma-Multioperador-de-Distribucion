@@ -232,6 +232,8 @@ else
     private bool importacionExitosa;
     private string? mensajeImportacion;
     private ResultadoImportacionPortal? resultadoImportacion;
+    [SupplyParameterFromQuery(Name = "cuentaComercialId")]
+    public Guid? CuentaComercialIdSeleccionada { get; set; }
 
     private async Task ImportarCsvAsync()
     {
@@ -318,12 +320,27 @@ else
             .Where(c => c.Activa)
             .ToList();
 
-        // La API ya devuelve únicamente las cuentas autorizadas.
-        if (cuentas.Count == 1)
+        // Si viene una cuenta desde Mis operadores, la seleccionamos.
+        if (CuentaComercialIdSeleccionada.HasValue)
+        {
+            var cuenta = cuentas.FirstOrDefault(
+                c => c.Id == CuentaComercialIdSeleccionada.Value);
+
+            if (cuenta is not null)
+            {
+                modelo.CuentaComercialId = cuenta.Id.ToString();
+                await CambiarCuentaAsync();
+            }
+            else
+            {
+                errorDeCarga = "La cuenta comercial seleccionada no está disponible.";
+            }
+        }
+        // Si solamente tiene una cuenta activa, la seleccionamos automáticamente.
+        else if (cuentas.Count == 1)
         {
             modelo.CuentaComercialId = cuentas[0].Id.ToString();
             await CambiarCuentaAsync();
-
         }
     }
     catch (JSException)

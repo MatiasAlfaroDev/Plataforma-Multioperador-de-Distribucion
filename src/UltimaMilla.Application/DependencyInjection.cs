@@ -38,6 +38,10 @@ using UltimaMilla.Application.Mensajeria.Commands.ReintentarMensajesFallidos;
 using UltimaMilla.Application.Mensajeria.Queries.ListarMensajesFallidos;
 using UltimaMilla.Application.Avisos.Queries.ListarAvisos;
 using UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
+using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
+using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
 
 namespace UltimaMilla.Application;
 
@@ -58,6 +62,10 @@ public static class DependencyInjection
         services.AddScoped<ConfirmarReprogramacionHandler>();
         services.AddScoped<ListarSolicitudesReprogramacionHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
+        services.AddScoped<SolicitarVinculacionHandler>();
+        services.AddScoped<AceptarVinculacionHandler>();
+        services.AddScoped<RechazarVinculacionHandler>();
+        services.AddScoped<ListarSolicitudesPendientesHandler>();
         services.AddScoped<ListarOperadoresHandler>();
         services.AddScoped<ActualizarTarifaHandler>();
         services.AddScoped<ObtenerTarifaVigenteHandler>();

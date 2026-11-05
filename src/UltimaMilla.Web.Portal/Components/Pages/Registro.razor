@@ -1,0 +1,149 @@
+@page "/registro"
+@rendermode InteractiveServer
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject NavigationManager Navegacion
+
+<PageTitle>Crear cuenta - Última Milla</PageTitle>
+
+<div class="login-container">
+    <h1>Portal del comercio</h1>
+    <h2>Crear cuenta</h2>
+
+    <p>Registrate para comenzar a trabajar con operadores de distribución.</p>
+
+    <form @onsubmit="Registrar" @onsubmit:preventDefault>
+        <div>
+            <label for="nombre">Nombre completo</label>
+            <input id="nombre"
+                   type="text"
+                   @bind="nombreCompleto"
+                   maxlength="150"
+                   required />
+        </div>
+
+        <div>
+            <label for="email">Correo electrónico</label>
+            <input id="email"
+                   type="email"
+                   autocomplete="email"
+                   @bind="email"
+                   required />
+        </div>
+
+        <div>
+            <label for="password">Contraseña</label>
+            <input id="password"
+                   type="password"
+                   autocomplete="new-password"
+                   @bind="password"
+                   minlength="8"
+                   required />
+        </div>
+
+        <div>
+            <label for="confirmarPassword">Confirmar contraseña</label>
+            <input id="confirmarPassword"
+                   type="password"
+                   autocomplete="new-password"
+                   @bind="confirmarPassword"
+                   required />
+        </div><h3>Datos del comercio</h3>
+
+        <div>
+            <label for="nombreComercio">Nombre del comercio</label>
+            <input id="nombreComercio"
+                type="text"
+                @bind="nombreComercio"
+                required />
+        </div>
+
+        <div>
+            <label for="rut">RUT del comercio</label>
+            <input id="rut"
+                type="text"
+                @bind="rut"
+                required />
+        </div>
+
+
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <p role="alert" style="color: red;">@error</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(exito))
+        {
+            <p role="status" style="color: green;">@exito</p>
+        }
+
+        <button type="submit" disabled="@procesando">
+            @(procesando ? "Registrando..." : "Crear cuenta")
+        </button>
+    </form>
+
+    <p>
+        ¿Ya tenés una cuenta?
+        <a href="/login">Iniciar sesión</a>
+    </p>
+</div>
+
+@code {
+    private string nombreCompleto = "";
+    private string email = "";
+    private string password = "";
+    private string confirmarPassword = "";
+    private string nombreComercio = "";
+    private string rut = "";
+
+    private string? error;
+    private string? exito;
+    private bool procesando;
+
+    private async Task Registrar()
+    {
+        if (procesando)
+            return;
+
+        error = null;
+        exito = null;
+
+        if (password != confirmarPassword)
+        {
+            error = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        procesando = true;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "autenticacionPortal.registrar",
+                nombreCompleto,
+                email,
+                password,
+                confirmarPassword,
+                nombreComercio,
+                rut);
+
+            exito = "Tu cuenta fue creada correctamente. Ya podés iniciar sesión.";
+
+            nombreCompleto = "";
+            email = "";
+            password = "";
+            confirmarPassword = "";
+            nombreComercio = "";
+            rut = "";
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+}

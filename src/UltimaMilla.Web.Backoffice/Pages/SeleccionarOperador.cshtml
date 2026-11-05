@@ -49,6 +49,33 @@
                     "Tu usuario no tiene permisos para acceder al Backoffice.";
                 return;
             }
+            if (operadores.length === 1) {
+    try {
+        const respuestaSeleccion = await fetch(
+            "/api/auth/seleccionar-operador",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({
+                    membresiaId: operadores[0].id
+                })
+            }
+        );
+
+        if (!respuestaSeleccion.ok) {
+            throw new Error("No se pudo seleccionar el operador.");
+        }
+
+        window.location.replace("/");
+        return;
+    } catch (ex) {
+        error.textContent = ex.message;
+        return;
+    }
+}
 
             operadores.forEach(m => {
                 const boton = document.createElement("button");

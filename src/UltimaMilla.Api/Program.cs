@@ -163,8 +163,13 @@ if (!soloInicializar)
 
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddScoped<HttpTenantContext>();
 
+builder.Services.AddScoped<ITenantContext>(
+    sp => sp.GetRequiredService<HttpTenantContext>());
+
+builder.Services.AddScoped<IOperadorActivo>(
+    sp => sp.GetRequiredService<HttpTenantContext>());
 // Caché distribuida con Redis
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
@@ -192,6 +197,8 @@ app.MapHealthChecks("/health");
 app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapAutenticacionEndpoints();
+app.MapVinculacionesComercialesEndpoints();
+
 
 app.MapGet("/api/antiforgery/token", (
     HttpContext context,
@@ -220,10 +227,12 @@ api.MapGet("/cuentas-comerciales", async (
     Results.Ok(await handler.Handle(
         new ListarCuentasComercialesQuery(), ct)))
     .RequireAuthorization(policy =>
-        policy.RequireRole(
-            "Comercio",
-            "AdministradorOperador",
-            "Operador"));
+    policy.RequireAuthenticatedUser()
+          .RequireAssertion(context =>
+              context.User.HasClaim("perfil_comercio", "AdministradorComercio") ||
+              context.User.HasClaim("perfil_comercio", "Comercio") ||
+              context.User.IsInRole("AdministradorOperador") ||
+              context.User.IsInRole("Operador")));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
 api.MapPost("/envios", async (
@@ -250,6 +259,7 @@ api.MapPost("/envios", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
+    Perfiles.AdministradorComercio,
     Perfiles.Comercio));
 
 

@@ -1,0 +1,95 @@
+
+@page
+@model UltimaMilla.Web.Backoffice.Pages.SolicitudesComercialesModel
+
+@{
+    ViewData["Title"] = "Solicitudes de comercios";
+}
+
+<h1>Solicitudes de comercios</h1>
+
+<p class="nota">
+    Gestioná las solicitudes de vinculación de comercios
+    con tu operador logístico.
+</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.Mensaje))
+{
+    <p class="aviso ok" role="status">
+        @Model.Mensaje
+    </p>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <p class="aviso error" role="alert">
+        @Model.Error
+    </p>
+}
+
+@if (Model.Solicitudes.Count == 0)
+{
+    <p>No hay solicitudes pendientes.</p>
+}
+else
+{
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>Comercio</th>
+                    <th>Fecha de solicitud</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var solicitud in Model.Solicitudes)
+                {
+                    <tr>
+                        <td>@solicitud.NombreComercio</td>
+
+                        <td>
+                            @solicitud.CreadoEn.ToLocalTime()
+                                .ToString("dd/MM/yyyy HH:mm")
+                        </td>
+
+                        <td>Pendiente</td>
+
+                        <td>
+                            <form method="post"
+                                  asp-page-handler="Aceptar"
+                                  style="display:inline">
+                                @Html.AntiForgeryToken()
+
+                                <input type="hidden"
+                                       name="id"
+                                       value="@solicitud.Id" />
+
+                                <button type="submit" class="primario">
+                                    Aceptar
+                                </button>
+                            </form>
+
+                            <form method="post"
+                                  asp-page-handler="Rechazar"
+                                  style="display:inline">
+                                @Html.AntiForgeryToken()
+
+                                <input type="hidden"
+                                       name="id"
+                                       value="@solicitud.Id" />
+
+                                <button type="submit"
+                                        class="peligro"
+                                        onclick="return confirm('¿Rechazar esta solicitud?');">
+                                    Rechazar
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

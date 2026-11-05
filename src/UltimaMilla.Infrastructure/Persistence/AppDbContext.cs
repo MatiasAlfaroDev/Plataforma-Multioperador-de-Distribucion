@@ -49,6 +49,7 @@ public sealed class AppDbContext(
     public DbSet<VersionTarifaria> VersionesTarifarias => Set<VersionTarifaria>();
     public DbSet<VersionReglasOperativas> VersionesReglasOperativas => Set<VersionReglasOperativas>();
     public DbSet<MembresiaUsuario> MembresiasUsuarios=> Set<MembresiaUsuario>();
+    public DbSet<UsuarioComercio> UsuariosComercios=> Set<UsuarioComercio>();
     public DbSet<DispositivoMovil> DispositivosMoviles => Set<DispositivoMovil>();
     public DbSet<SuscripcionAviso> SuscripcionesAviso => Set<SuscripcionAviso>();
     public DbSet<EntregaAviso> EntregasAviso => Set<EntregaAviso>();
