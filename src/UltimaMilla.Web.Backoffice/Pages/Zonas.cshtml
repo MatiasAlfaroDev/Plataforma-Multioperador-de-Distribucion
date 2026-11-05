@@ -1,4 +1,3 @@
-
 @page
 @model UltimaMilla.Web.Backoffice.Pages.ZonasModel
 
@@ -6,12 +5,12 @@
     ViewData["Title"] = "Zonas de cobertura";
 }
 
-<h1>Zonas de cobertura</h1>
-
-<p class="nota">
-    Configurá las áreas de reparto, las franjas disponibles
-    y los tiempos estimados de cada operador.
-</p>
+<div class="encabezado">
+    <div>
+        <h1>Zonas de cobertura</h1>
+        <p>Configurá las áreas de reparto, las franjas disponibles y los tiempos estimados de cada operador.</p>
+    </div>
+</div>
 
 @if (TempData["Mensaje"] is string mensaje)
 {
@@ -66,8 +65,7 @@
 
         <form method="post">
             <p class="nota">
-                Configurá las áreas de reparto, franjas disponibles
-                y tiempos estimados de tu operador.
+                Configurá las áreas de reparto, franjas disponibles y tiempos estimados de tu operador.
             </p>
                 
             <div asp-validation-summary="All"
@@ -106,12 +104,6 @@
 
             <textarea asp-for="Formulario.Coberturas"
                       rows="5"
-                      style="width:100%;box-sizing:border-box;
-                             background:var(--superficie);
-                             color:var(--texto);
-                             border:1px solid var(--borde);
-                             border-radius:var(--radio);
-                             padding:.6rem;font:inherit;"
                       placeholder="San José de Mayo&#10;Otra localidad&#10;Montevideo | Cordón"></textarea>
 
             <p class="nota">
@@ -126,12 +118,6 @@
 
             <textarea asp-for="Formulario.Franjas"
                       rows="4"
-                      style="width:100%;box-sizing:border-box;
-                             background:var(--superficie);
-                             color:var(--texto);
-                             border:1px solid var(--borde);
-                             border-radius:var(--radio);
-                             padding:.6rem;font:inherit;"
                       placeholder="09:00-12:00&#10;14:00-18:00"></textarea>
 
             <p class="nota">

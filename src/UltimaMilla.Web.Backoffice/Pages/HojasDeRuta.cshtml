@@ -1,4 +1,3 @@
-
 @page
 @model UltimaMilla.Web.Backoffice.Pages.HojasDeRutaModel
 
@@ -6,29 +5,28 @@
     ViewData["Title"] = "Hojas de ruta";
 }
 
-<h1>Hojas de ruta</h1>
-
-<p>
-    Seleccioná los envíos, el repartidor y el vehículo.
-    El sistema comprobará las restricciones y calculará
-    el orden de las paradas.
-</p>
+<div class="encabezado">
+    <div>
+        <h1>Hojas de ruta</h1>
+        <p>Seleccioná los envíos, el repartidor y el vehículo. El sistema comprobará las restricciones y calculará el orden de las paradas.</p>
+    </div>
+</div>
 
 @if (TempData["Exito"] is string exito)
 {
-    <div class="alert alert-success">
+    <div class="aviso ok">
         @exito
     </div>
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.Error))
 {
-    <div class="alert alert-danger">
+    <div class="aviso error">
         @Model.Error
     </div>
 }
 
-<p class="text-muted">
+<p class="nota">
     Los datos corresponden al operador de tu sesión.
 </p>
 
@@ -38,7 +36,7 @@
     <form method="post">
 
         <div asp-validation-summary="All"
-             class="text-danger mb-3"></div>
+             class="error mb-3"></div>
 
 
         <!-- Fecha de reparto -->
@@ -49,9 +47,9 @@
 
             <input asp-for="Formulario.Fecha"
                    type="date"
-                   class="form-control" />
+                   />
 
-            <small class="text-muted">
+            <small class="nota">
                 Día en que se realizará el reparto.
             </small>
         </div>
@@ -64,9 +62,9 @@
 
             <input asp-for="Formulario.HoraSalida"
                    type="time"
-                   class="form-control" />
+                   />
 
-            <small class="text-muted">
+            <small class="nota">
                 Hora prevista de salida del repartidor.
             </small>
         </div>
@@ -78,7 +76,7 @@
             </label>
 
             <select asp-for="Formulario.FranjaSeleccionada"
-                    class="form-select">
+                   >
 
                 <option value="">
                     Seleccionar franja
@@ -98,9 +96,9 @@
             </select>
 
             <span asp-validation-for="Formulario.FranjaSeleccionada"
-                  class="text-danger"></span>
+                  class="error"></span>
 
-            <small class="text-muted">
+            <small class="nota">
                 Se utilizará para validar los horarios
                 de los envíos seleccionados.
             </small>
@@ -113,7 +111,7 @@
             </label>
 
             <select asp-for="Formulario.RepartidorId"
-                    class="form-select">
+                   >
 
                 <option value="">
                     Seleccionar repartidor
@@ -135,7 +133,7 @@
             </label>
 
             <select asp-for="Formulario.VehiculoId"
-                    class="form-select">
+                   >
 
                 <option value="">
                     Seleccionar vehículo
@@ -144,7 +142,7 @@
                 @foreach (var vehiculo in Model.Vehiculos)
                 {
                     <option value="@vehiculo.Id">
-                        @vehiculo.Matricula —
+                        @vehiculo.Matricula:
                         @vehiculo.CapacidadPesoKg kg,
                         @vehiculo.CapacidadVolumenM3 m³
                     </option>
@@ -162,29 +160,30 @@
                    type="number"
                    min="1"
                    max="200"
-                   class="form-control" />
+                   />
 
             <span asp-validation-for="Formulario.MaximoParadas"
-                  class="text-danger"></span>
+                  class="error"></span>
         </div>
 
         <!-- Selección de envíos -->
         <h3>Envíos disponibles</h3>
 
-        <p class="text-muted">
+        <p class="nota">
             Seleccioná los envíos que querés incluir
             en esta hoja de ruta.
         </p>
 
         @if (Model.Envios.Count == 0)
         {
-            <div class="alert alert-info">
-                No hay envíos en depósito para este operador.
+            <div class="aviso">
+                <i class="ph ph-info"></i>
+                <p>No hay envíos en depósito para este operador.</p>
             </div>
         }
         else
         {
-            <div class="table-responsive">
+            <div class="tabla">
                 <table class="table">
                     <thead>
                         <tr>
@@ -207,7 +206,7 @@
                                            checked="@(Model.Formulario.EnviosIds.Contains(envio.Id))" />
                                 </td>
 
-                                <td>
+                                <td class="codigo">
                                     @envio.ReferenciaExterna
                                 </td>
 
@@ -215,7 +214,7 @@
                                     @envio.Localidad
                                 </td>
 
-                                <td>
+                                <td class="num">
                                     @envio.PesoKg kg
                                 </td>
 
@@ -225,12 +224,12 @@
                                         <span>
                                             @envio.FechaComprometida
                                             |
-                                            @envio.HoraDesde–@envio.HoraHasta
+                                            @envio.HoraDesde a @envio.HoraHasta
                                         </span>
                                     }
                                     else
                                     {
-                                        <span class="text-muted">
+                                        <span class="nota">
                                             Se definirá al planificar
                                         </span>
                                     }
@@ -243,7 +242,7 @@
         }
 
         <button type="submit"
-                class="btn btn-primary"
+                class="btn-primario"
                 disabled="@(Model.Envios.Count == 0)">
             Crear y asignar hoja de ruta
         </button>
@@ -262,7 +261,7 @@
     }
     else
     {
-        <div class="table-responsive">
+        <div class="tabla">
             <table class="table">
                 <thead>
                     <tr>
@@ -284,11 +283,11 @@
                                 @(hoja.HoraSalida?.ToString("HH:mm") ?? "Sin definir")
                             </td>
 
-                            <td>@hoja.CantidadParadas</td>
+                            <td class="num">@hoja.CantidadParadas</td>
 
-                            <td>@hoja.PesoAsignadoKg kg</td>
+                            <td class="num">@hoja.PesoAsignadoKg kg</td>
 
-                            <td>@hoja.Id</td>
+                            <td class="codigo">@hoja.Id</td>
                         </tr>
                     }
                 </tbody>

@@ -1,4 +1,3 @@
-
 @page "/seleccionar-operador"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
@@ -8,9 +7,12 @@
 
 <PageTitle>Seleccionar operador - Última Milla</PageTitle>
 
-<h1>Seleccionar operador</h1>
-
-<p>Elegí con qué operador querés trabajar.</p>
+<div class="encabezado">
+    <div>
+        <h1>Seleccionar operador</h1>
+        <p>Elegí con qué operador querés trabajar.</p>
+    </div>
+</div>
 
 @if (cargando)
 {
@@ -18,22 +20,29 @@
 }
 else if (!string.IsNullOrWhiteSpace(error))
 {
-    <p role="alert" style="color: red;">@error</p>
+    <div class="aviso error">
+        <i class="ph ph-x-circle"></i>
+        <span>@error</span>
+    </div>
 }
 else if (membresias.Count == 0)
 {
-    <p>No tenés membresías activas.</p>
+    <div class="tarjeta">
+        <p>No tenés membresías activas.</p>
+    </div>
 }
 else
 {
     @foreach (var membresia in membresias)
     {
-        <div style="border: 1px solid #ccc; padding: 16px; margin-bottom: 12px;">
+        <div class="tarjeta">
             <h3>@ObtenerNombreOperador(membresia.OperadorId)</h3>
             <p>Perfil: @membresia.Perfil</p>
 
-            <button disabled="@seleccionando"
+            <button class="primario"
+                    disabled="@seleccionando"
                     @onclick="() => Seleccionar(membresia.Id)">
+                <i class="ph ph-check"></i>
                 Seleccionar
             </button>
         </div>

@@ -6,13 +6,12 @@
     ViewData["Title"] = "Mensajes fallidos";
 }
 
-<h1>Mensajes fallidos</h1>
-
-<p class="nota">
-    Cuando un mensaje agota sus reintentos, MassTransit lo deja en la cola &lt;cola&gt;_error con el motivo del último error.
-    Reintentar lo devuelve a su cola original; es seguro porque los consumidores son idempotentes.
-    Las colas mezclan mensajes de todos los operadores: esta pantalla es solo del administrador de plataforma.
-</p>
+<div class="encabezado">
+    <div>
+        <h1>Mensajes fallidos</h1>
+        <p>Cuando un mensaje agota sus reintentos, MassTransit lo deja en la cola &lt;cola&gt;_error con el motivo del último error. Reintentar lo devuelve a su cola original; es seguro porque los consumidores son idempotentes. Las colas mezclan mensajes de todos los operadores: esta pantalla es solo del administrador de plataforma.</p>
+    </div>
+</div>
 
 @if (Model.Mensaje is not null)
 {
@@ -34,7 +33,7 @@
 }
 else
 {
-    foreach (var c in Model.Colas)
+    @foreach (var c in Model.Colas)
     {
         <h2>@c.Cola (@c.Cantidad)</h2>
 

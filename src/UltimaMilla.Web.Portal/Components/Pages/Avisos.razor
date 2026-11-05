@@ -6,12 +6,12 @@
 
 <PageTitle>Avisos</PageTitle>
 
-<h1>Avisos a mi sistema</h1>
-
-<p class="nota">
-    La plataforma avisa a tu sistema por HTTP con cada novedad del envío; cada aviso lleva la cabecera
-    <code>X-UltimaMilla-Firma</code> (HMAC-SHA256 del cuerpo con el secreto) para que verifiques que viene de la plataforma.
-</p>
+<div class="encabezado">
+    <div>
+        <h1>Avisos</h1>
+        <p>La plataforma avisa a tu sistema por HTTP con cada novedad del envío.</p>
+    </div>
+</div>
 
 @if (mensaje is not null)
 {
@@ -63,8 +63,12 @@ else
 <h3>Nueva suscripción</h3>
 
 <form @onsubmit="SuscribirAsync">
-    <label for="url">URL de tu sistema</label>
-    <input type="url" id="url" @bind="nuevaUrl" placeholder="https://mi-tienda.uy/avisos" required />
+    <div class="campos">
+        <div>
+            <label for="url">URL de tu sistema</label>
+            <input type="url" id="url" @bind="nuevaUrl" placeholder="https://mi-tienda.uy/avisos" required />
+        </div>
+    </div>
 
     <fieldset>
         <legend>Eventos</legend>
@@ -96,7 +100,6 @@ else if (avisos.Count == 0)
 }
 else
 {
-
     <div class="tabla">
         <table>
             <thead>

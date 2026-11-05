@@ -134,6 +134,8 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// wwwroot: CSS compilado de Tailwind, fuentes, íconos y logo.
+app.MapStaticAssets();
 app.MapRazorPages();
 
 app.Run();

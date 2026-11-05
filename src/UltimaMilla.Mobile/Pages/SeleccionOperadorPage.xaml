@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:UltimaMilla.Mobile.ViewModels"
              xmlns:models="clr-namespace:UltimaMilla.Mobile.Models"
+             xmlns:app="clr-namespace:UltimaMilla.Mobile"
              x:Class="UltimaMilla.Mobile.Pages.SeleccionOperadorPage"
              x:DataType="vm:SeleccionOperadorViewModel"
              Title="Repartidor">
@@ -19,33 +20,41 @@
 
             <!-- ===== Bienvenida ===== -->
             <CollectionView.Header>
-                <VerticalStackLayout Spacing="14" Padding="0,16,0,8">
-                    <Border Style="{StaticResource Hero}">
-                        <VerticalStackLayout Spacing="4">
-                            <Label Text="📦" FontSize="34" />
-                            <Label Text="¡Hola!" TextColor="White" FontFamily="OpenSansSemibold" FontSize="26" />
-                            <Label Text="¿Para qué operador repartís hoy?" TextColor="#CFE0F5" FontSize="15" />
-                        </VerticalStackLayout>
+                <VerticalStackLayout Spacing="6" Padding="0,8,0,0">
+                    <Label Text="Elegí el operador" Style="{StaticResource Titulo}" />
+                    <Label Text="Vas a ver la ruta de hoy de ese operador." Style="{StaticResource Secundario}" FontSize="15" />
+
+                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" Padding="12,10"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource PeligroSuave}, Dark={StaticResource PeligroSuaveOscuro}}"
+                            IsVisible="{Binding HayError}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Label Style="{StaticResource Icono}" Text="{x:Static app:Iconos.Advertencia}" 
+                                    TextColor="{AppThemeBinding Light={StaticResource Peligro}, Dark={StaticResource PeligroOscuro}}" />
+                            <Label Text="{Binding Error}" 
+                                    TextColor="{AppThemeBinding Light={StaticResource Peligro}, Dark={StaticResource PeligroOscuro}}" 
+                                    FontSize="13" Grid.Column="1" />
+                        </Grid>
                     </Border>
 
-                    <Border Style="{StaticResource Chip}" BackgroundColor="{StaticResource PeligroSuave}"
-                            Padding="12,8" HorizontalOptions="Fill" IsVisible="{Binding HayError}">
-                        <Label Text="{Binding Error}" TextColor="{StaticResource Peligro}" FontSize="13" />
+                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" Padding="12,10"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource AlertaSuave}, Dark={StaticResource AlertaSuaveOscuro}}"
+                            IsVisible="{Binding HayAviso}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Label Style="{StaticResource Icono}" Text="{x:Static app:Iconos.SinConexion}" 
+                                    TextColor="{AppThemeBinding Light={StaticResource Alerta}, Dark={StaticResource AlertaOscuro}}" />
+                            <Label Text="{Binding Aviso}" 
+                                    TextColor="{AppThemeBinding Light={StaticResource Alerta}, Dark={StaticResource AlertaOscuro}}" 
+                                    FontSize="14" Grid.Column="1" />
+                        </Grid>
                     </Border>
-                    <Border Style="{StaticResource Tarjeta}" BackgroundColor="{StaticResource AlertaSuave}"
-                            Stroke="{StaticResource AlertaSuave}" Padding="14,10" IsVisible="{Binding HayAviso}">
-                        <Label Text="{Binding Aviso, StringFormat='📡 {0}'}" TextColor="{StaticResource Alerta}" FontSize="13" />
-                    </Border>
-
-                    <Label Text="Operadores" Style="{StaticResource Seccion}" />
                 </VerticalStackLayout>
             </CollectionView.Header>
 
             <CollectionView.EmptyView>
                 <VerticalStackLayout Padding="24,40" Spacing="8" HorizontalOptions="Center">
-                    <Label Text="🔌" FontSize="44" HorizontalOptions="Center" />
-                    <Label Text="No hay operadores" Style="{StaticResource Titulo}" FontSize="18" HorizontalOptions="Center" />
-                    <Label Text="¿La API está levantada? Tocá «Actualizar» para reintentar."
+                    <Label Text="{x:Static app:Iconos.Operador}" Style="{StaticResource Icono}" FontSize="40" HorizontalOptions="Center" />
+                    <Label Text="No hay operadores" Style="{StaticResource Subtitulo}" HorizontalOptions="Center" />
+                    <Label Text="¿La API está levantada? Tocá Actualizar para reintentar."
                            Style="{StaticResource Secundario}" HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
             </CollectionView.EmptyView>
@@ -53,7 +62,7 @@
             <!-- ===== Tarjeta de cada operador ===== -->
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:OperadorItem">
-                    <Border Style="{StaticResource Tarjeta}" Margin="0,6" Padding="16">
+                    <Border Style="{StaticResource Tarjeta}" Margin="0,5" Padding="14">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SeleccionOperadorViewModel}}, Path=ElegirCommand}"
@@ -61,17 +70,14 @@
                         </Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
                             <!-- Círculo con la inicial, en el color de marca del operador -->
-                            <Border StrokeThickness="0" StrokeShape="RoundRectangle 14" WidthRequest="52" HeightRequest="52"
+                            <Border StrokeThickness="0" StrokeShape="RoundRectangle 12" WidthRequest="44" HeightRequest="44"
                                     BackgroundColor="{Binding ColorMarca}">
-                                <Label Text="{Binding Inicial}" TextColor="White" FontFamily="OpenSansSemibold" FontSize="20"
+                                <Label Text="{Binding Inicial}" TextColor="{StaticResource White}" FontFamily="Titulos" FontSize="18"
                                        HorizontalOptions="Center" VerticalOptions="Center" />
                             </Border>
-                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
-                                <Label Text="{Binding Nombre}" FontFamily="OpenSansSemibold" FontSize="17" />
-                                <Label Text="Tocá para ver tu ruta" Style="{StaticResource Secundario}" />
-                            </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="28" VerticalOptions="Center"
-                                   TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray300}}" />
+                            <Label Grid.Column="1" Text="{Binding Nombre}" Style="{StaticResource Subtitulo}" VerticalOptions="Center" />
+                            <Label Grid.Column="2" Text="{x:Static app:Iconos.Avanzar}" Style="{StaticResource Icono}" 
+                                   VerticalOptions="Center" />
                         </Grid>
                     </Border>
                 </DataTemplate>
@@ -79,7 +85,7 @@
 
             <CollectionView.Footer>
                 <Label Text="Provisorio: el operador saldrá del inicio de sesión." Style="{StaticResource Secundario}"
-                       FontSize="12" HorizontalOptions="Center" Margin="0,16,0,24" />
+                       FontSize="12" HorizontalOptions="Start" Margin="2,16,0,24" />
             </CollectionView.Footer>
         </CollectionView>
     </RefreshView>

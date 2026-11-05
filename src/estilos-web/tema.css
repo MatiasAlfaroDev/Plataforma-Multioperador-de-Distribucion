@@ -1,0 +1,178 @@
+/*
+  Sistema visual compartido por Portal y Backoffice (Tailwind v4).
+  Mismos tokens que la app móvil (src/UltimaMilla.Mobile/Resources/Styles/Colors.xaml):
+  neutros zinc, un solo acento naranja, colores de estado solo para estado.
+  Tipografía: Space Grotesk en títulos y cifras, IBM Plex Sans en el resto.
+  Radios: tarjetas 16px (rounded-2xl), controles 12px (rounded-xl), chips redondos.
+
+  Las clases sueltas (.nota, .aviso, .filtro, .campos, .tabla, button.primario...) ya las
+  usan las páginas y su JS; se mantienen los nombres y acá cambia solo cómo se ven.
+*/
+
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("fuentes/IBMPlexSans-Regular.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("fuentes/IBMPlexSans-Medium.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("fuentes/IBMPlexSans-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 500; font-display: swap; src: url("fuentes/SpaceGrotesk-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 700; font-display: swap; src: url("fuentes/SpaceGrotesk-Bold.woff2") format("woff2"); }
+
+:root {
+  color-scheme: light dark;
+  --c-fondo: #f4f4f5;
+  --c-superficie: #ffffff;
+  --c-hundido: #fafafa;
+  --c-borde: #e4e4e7;
+  --c-borde-fuerte: #d4d4d8;
+  --c-texto: #18181b;
+  --c-suave: #52525b;
+  --c-acento: #c2410c;
+  --c-acento-hover: #9a3412;
+  --c-sobre-acento: #ffffff;
+  --c-acento-suave: #ffedd5;
+  --c-exito: #15803d;
+  --c-exito-suave: #dcfce7;
+  --c-peligro: #b91c1c;
+  --c-peligro-suave: #fee2e2;
+  --c-alerta: #b45309;
+  --c-alerta-suave: #fef3c7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-fondo: #0c0c0e;
+    --c-superficie: #18181b;
+    --c-hundido: #131316;
+    --c-borde: #27272a;
+    --c-borde-fuerte: #3f3f46;
+    --c-texto: #f4f4f5;
+    --c-suave: #a1a1aa;
+    --c-acento: #f97316;
+    --c-acento-hover: #fb923c;
+    --c-sobre-acento: #431407;
+    --c-acento-suave: #2c1608;
+    --c-exito: #4ade80;
+    --c-exito-suave: #0f2918;
+    --c-peligro: #f87171;
+    --c-peligro-suave: #2c1313;
+    --c-alerta: #fbbf24;
+    --c-alerta-suave: #2b1d08;
+  }
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "IBM Plex Sans", ui-sans-serif, sans-serif;
+
+  --color-fondo: var(--c-fondo);
+  --color-superficie: var(--c-superficie);
+  --color-hundido: var(--c-hundido);
+  --color-borde: var(--c-borde);
+  --color-borde-fuerte: var(--c-borde-fuerte);
+  --color-texto: var(--c-texto);
+  --color-suave: var(--c-suave);
+  --color-acento: var(--c-acento);
+  --color-acento-hover: var(--c-acento-hover);
+  --color-sobre-acento: var(--c-sobre-acento);
+  --color-acento-suave: var(--c-acento-suave);
+  --color-exito: var(--c-exito);
+  --color-exito-suave: var(--c-exito-suave);
+  --color-peligro: var(--c-peligro);
+  --color-peligro-suave: var(--c-peligro-suave);
+  --color-alerta: var(--c-alerta);
+  --color-alerta-suave: var(--c-alerta-suave);
+}
+
+@layer base {
+  html { @apply bg-fondo text-texto font-sans antialiased; font-size: 15px; line-height: 1.55; }
+  body { @apply min-h-dvh; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-acento; }
+
+  /* Escala: 32 / 18 / 15 / 13, con saltos marcados. Títulos con tracking cerrado. */
+  h1 { @apply font-display font-bold text-[28px] md:text-[32px] leading-[1.1] tracking-[-0.02em]; }
+  h2 { @apply font-semibold text-lg leading-snug mt-10 mb-3; }
+  h3 { @apply font-semibold text-[15px] mt-6 mb-2; }
+  p { @apply max-w-[68ch]; }
+  .tarjeta > form > p:empty, p.error:empty { @apply hidden; }
+  a { @apply text-acento underline-offset-4 hover:underline; }
+
+  label { @apply block text-[13px] font-medium mt-4 mb-1.5; }
+  input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea {
+    @apply w-full rounded-xl border border-borde-fuerte bg-superficie px-3 py-2 text-texto
+           placeholder:text-suave transition-colors focus:border-acento focus:outline-none
+           focus:ring-2 focus:ring-acento/25 disabled:opacity-60;
+  }
+  textarea { @apply min-h-24; }
+  input[type=checkbox], input[type=radio] { @apply size-4 accent-acento align-[-2px]; }
+  input[type=file] { @apply text-sm file:mr-3 file:rounded-xl file:border file:border-borde-fuerte file:bg-superficie file:px-3 file:py-1.5 file:text-texto file:font-medium; }
+  fieldset { @apply rounded-2xl border border-borde p-4 mt-4; }
+  legend { @apply px-1 text-[13px] font-semibold; }
+
+  /* Botón por defecto: secundario con borde. Presión física al hacer clic. */
+  button { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-borde-fuerte bg-superficie
+                  px-4 py-2 font-medium text-texto cursor-pointer transition-[background-color,transform]
+                  hover:bg-hundido active:scale-[0.98] disabled:cursor-progress disabled:opacity-60; }
+
+  table { @apply w-full border-collapse text-sm; }
+  th { @apply text-left font-medium text-suave px-3 py-2.5 border-b border-borde whitespace-nowrap; }
+  td { @apply px-3 py-3 border-b border-borde align-top; }
+  tbody tr:last-child td { @apply border-b-0; }
+  tbody tr { @apply transition-colors hover:bg-hundido; }
+
+  details > summary { @apply cursor-pointer text-acento font-medium; }
+  dialog { @apply rounded-2xl border border-borde bg-superficie text-texto p-6 shadow-xl shadow-zinc-950/10 backdrop:bg-zinc-950/40; }
+}
+
+@layer components {
+  .ph { @apply leading-none; font-size: 1.15em; }
+
+  /* Botones */
+  button.primario, .btn-primario {
+    @apply border-acento bg-acento text-sobre-acento font-semibold hover:bg-acento-hover hover:border-acento-hover;
+  }
+  button.peligro, .btn-peligro { @apply border-transparent bg-peligro-suave text-peligro hover:bg-peligro-suave; }
+  button.texto, .btn-texto { @apply border-transparent bg-transparent px-0 text-acento hover:bg-transparent hover:underline; }
+  .btn-primario, .btn-secundario { @apply inline-flex items-center gap-2 rounded-xl border px-4 py-2 no-underline hover:no-underline; }
+  .btn-secundario { @apply border-borde-fuerte bg-superficie text-texto font-medium hover:bg-hundido; }
+
+  /* Superficies */
+  .tarjeta { @apply rounded-2xl border border-borde bg-superficie p-5 md:p-6; }
+  .tabla { @apply overflow-x-auto rounded-2xl border border-borde bg-superficie; }
+  .tabla td, .tabla th { @apply whitespace-nowrap; }
+  .num { @apply text-right tabular-nums font-display font-medium; }
+  .codigo { @apply font-display font-medium tracking-tight; }
+
+  /* Formularios */
+  .campos { @apply grid gap-x-4 sm:grid-cols-2 max-w-3xl; }
+  .filtro { @apply flex flex-wrap items-end gap-3 my-6; }
+  .filtro label { @apply mt-0; }
+  .filtro select, .filtro input { @apply w-auto min-w-56; }
+  .acciones { @apply mt-6 flex flex-wrap items-center gap-3; }
+
+  /* Texto y estados */
+  .nota { @apply text-[13px] text-suave; }
+  .ok { @apply text-exito; }
+  .error, .validation-message, .validation-errors { @apply text-peligro text-[13px]; }
+  .aviso { @apply flex items-start gap-2 rounded-xl px-4 py-3 text-sm bg-alerta-suave text-alerta; }
+  .aviso.ok { @apply bg-exito-suave text-exito; }
+  .aviso.error { @apply bg-peligro-suave text-peligro text-sm; }
+
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-hundido text-suave border border-borde; }
+  .chip-exito { @apply bg-exito-suave text-exito border-transparent; }
+  .chip-peligro { @apply bg-peligro-suave text-peligro border-transparent; }
+  .chip-alerta { @apply bg-alerta-suave text-alerta border-transparent; }
+  .chip-acento { @apply bg-acento-suave text-acento border-transparent; }
+
+  /* Color de marca de un operador (dato real, no decoración) */
+  .operador { @apply inline-block size-2.5 rounded-full mr-1.5 align-middle; }
+
+  /* Encabezado de página: título + bajada + acción opcional */
+  .encabezado { @apply flex flex-wrap items-end justify-between gap-4 mb-8; }
+  .encabezado p { @apply mt-2 text-suave; }
+
+  /* Navegación */
+  .nav-item { @apply flex items-center gap-3 rounded-xl px-3 py-2 text-[14px] font-medium text-suave no-underline hover:bg-hundido hover:text-texto hover:no-underline; }
+  .nav-item[aria-current=page], .nav-item.active { @apply bg-acento-suave text-acento; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}

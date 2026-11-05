@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Colores del sistema en Android (barra de estado, cursor): azul de la app en lugar del violeta de la plantilla -->
-    <color name="colorPrimary">#1F5FAD</color>
-    <color name="colorPrimaryDark">#123D73</color>
-    <color name="colorAccent">#1F5FAD</color>
+    <!-- Colores del sistema en Android (barra de estado, cursor): el naranja de la marca -->
+    <color name="colorPrimary">#C2410C</color>
+    <color name="colorPrimaryDark">#9A3412</color>
+    <color name="colorAccent">#C2410C</color>
 </resources>

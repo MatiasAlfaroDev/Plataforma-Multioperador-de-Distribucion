@@ -25,6 +25,22 @@ Entrypoints detrás de Traefik: `portal.localhost:8000`, `backoffice.localhost:8
 los avisos; `POST /modo/{ok|falla|intermitente|lento}` cambia su modo de falla). El panel de Traefik va en `localhost:8081`.
 Los navegadores resuelven `*.localhost` solos.
 
+### Estilos de Portal y Backoffice (Tailwind v4)
+
+Los dos sitios usan Tailwind v4 con el binario standalone (sin Node), v4.1.11. El tema compartido
+(tokens, tipografía, componentes) está en `src/estilos-web/tema.css`, y cada sitio tiene su entrada
+en `Estilos/app.css`. **El CSS compilado (`wwwroot/app.css`) se commitea**, así los Dockerfile y el
+CI no lo compilan; hay que regenerarlo después de tocar markup o el tema:
+
+```bash
+tailwindcss -i src/UltimaMilla.Web.Portal/Estilos/app.css -o src/UltimaMilla.Web.Portal/wwwroot/app.css --minify
+tailwindcss -i src/UltimaMilla.Web.Backoffice/Estilos/app.css -o src/UltimaMilla.Web.Backoffice/wwwroot/app.css --minify
+```
+
+Marca compartida con la app móvil en `assets/marca/`: logo, IBM Plex Sans (texto), Space Grotesk
+(títulos y cifras) e íconos Phosphor. Sin emojis en la interfaz; los íconos son `<i class="ph ph-...">`
+en web y `app:Iconos` en MAUI.
+
 ### App móvil (solución aparte)
 
 `src/UltimaMilla.Mobile` **no está en `UltimaMilla.slnx`** ni la toca el CI. Se compila por

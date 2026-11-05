@@ -1,4 +1,3 @@
-
 @page
 @model UltimaMilla.Web.Backoffice.Pages.SolicitudesComercialesModel
 
@@ -6,12 +5,12 @@
     ViewData["Title"] = "Solicitudes de comercios";
 }
 
-<h1>Solicitudes de comercios</h1>
-
-<p class="nota">
-    Gestioná las solicitudes de vinculación de comercios
-    con tu operador logístico.
-</p>
+<div class="encabezado">
+    <div>
+        <h1>Solicitudes de comercios</h1>
+        <p>Gestioná las solicitudes de vinculación de comercios con tu operador logístico.</p>
+    </div>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(Model.Mensaje))
 {
@@ -29,7 +28,7 @@
 
 @if (Model.Solicitudes.Count == 0)
 {
-    <p>No hay solicitudes pendientes.</p>
+    <p class="nota">No hay solicitudes pendientes.</p>
 }
 else
 {
@@ -59,7 +58,7 @@ else
                         <td>
                             <form method="post"
                                   asp-page-handler="Aceptar"
-                                  style="display:inline">
+                                  class="inline">
                                 @Html.AntiForgeryToken()
 
                                 <input type="hidden"
@@ -73,7 +72,7 @@ else
 
                             <form method="post"
                                   asp-page-handler="Rechazar"
-                                  style="display:inline">
+                                  class="inline">
                                 @Html.AntiForgeryToken()
 
                                 <input type="hidden"

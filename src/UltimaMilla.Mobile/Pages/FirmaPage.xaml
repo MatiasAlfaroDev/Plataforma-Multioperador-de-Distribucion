@@ -18,7 +18,7 @@
         <!-- Recuadro para firmar -->
         <Border Grid.Row="1" Style="{StaticResource Tarjeta}" Padding="0" BackgroundColor="White">
             <Grid>
-                <Label Text="Firmá acá con el dedo" TextColor="{StaticResource Gray300}" FontSize="16"
+                <Label Text="Firmá acá con el dedo" TextColor="{StaticResource Gray400}" FontSize="16"
                        HorizontalOptions="Center" VerticalOptions="End" Margin="0,0,0,24" InputTransparent="True" />
                 <BoxView HeightRequest="1" Color="{StaticResource Gray200}" VerticalOptions="End"
                          Margin="32,0,32,56" InputTransparent="True" />

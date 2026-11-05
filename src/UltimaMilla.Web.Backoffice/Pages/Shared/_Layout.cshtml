@@ -4,106 +4,104 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] · Backoffice</title>
-    <style>
-        /* Tokens compartidos por Portal y Backoffice: mismos nombres en los dos archivos. */
-        :root {
-          color-scheme: light dark;
-          --fondo: #f6f7f9; --superficie: #ffffff; --texto: #1f2328; --texto-suave: #57606a;
-          --borde: #d0d7de; --acento: #0b6e4f; --acento-texto: #ffffff;
-          --peligro: #b3261e; --ok: #16692e; --radio: 6px;
-        }
-        @@media (prefers-color-scheme: dark) {
-          :root {
-            --fondo: #16181c; --superficie: #1f2228; --texto: #e6e8eb; --texto-suave: #a3aab3;
-            --borde: #3a3f47; --acento: #3fb68b; --acento-texto: #0d1512;
-            --peligro: #ff8a80; --ok: #6fd38f;
-          }
-        }
-        body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; background: var(--fondo); color: var(--texto); }
-        header { padding-bottom: .5rem; border-bottom: 1px solid var(--borde); margin-bottom: 1rem; }
-        label { display: block; margin: .7rem 0 .2rem; font-weight: 600; }
-        input, select { width: 100%; padding: .5rem; box-sizing: border-box; background: var(--superficie);
-          color: var(--texto); border: 1px solid var(--borde); border-radius: var(--radio); font: inherit; }
-        button { padding: .55rem 1.1rem; border-radius: var(--radio); border: 1px solid var(--borde);
-          background: var(--superficie); color: var(--texto); font: inherit; cursor: pointer; }
-        button:active { transform: translateY(1px); }
-        button.primario { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); font-weight: 600; }
-        button.peligro { color: var(--peligro); border-color: currentColor; background: transparent; }
-        button:disabled { opacity: .6; cursor: progress; }
-        :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
-        .nota { color: var(--texto-suave); font-size: .9rem; }
-        .aviso { padding: .6rem .8rem; border-radius: var(--radio); border: 1px solid currentColor; }
-        .ok { color: var(--ok); }
-        .error, .validation-message, .validation-errors { color: var(--peligro); }
-
-        .filtro { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; margin: 1rem 0; }
-        .filtro label { margin: 0 0 .2rem; }
-        .filtro select { width: auto; min-width: 14rem; }
-        .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0 1rem; max-width: 760px; }
-        .acciones { margin-top: 1rem; }
-        .tabla { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: .95rem; }
-        th, td { text-align: left; padding: .5rem; border-bottom: 1px solid var(--borde); vertical-align: top; white-space: nowrap; }
-        .num { text-align: right; font-variant-numeric: tabular-nums; }
-        .operador { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .3rem; }
-        nav { margin-top: .75rem; }
-        nav a { color: var(--acento); margin-right: 1rem; }
-    </style>
+    <link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
+    <link rel="preload" href="~/fuentes/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="~/app.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/iconos/phosphor.css" />
 </head>
 
-<body>
-    <header>
-        <strong>Backoffice del operador</strong> · Plataforma de última milla
-              @{
-          var esPaginaPublica =
-              ViewContext.RouteData.Values["page"]?.ToString() is
-                  "/Login" or "/Registro";
+@{
+    var paginaActual = ViewContext.RouteData.Values["page"]?.ToString();
 
-          var mostrarMenu =
-              !esPaginaPublica &&
-              User.Identity?.IsAuthenticated == true &&
-              (User.IsInRole("AdministradorOperador") ||
-              User.IsInRole("Operador"));
-      }
+    var esPaginaPublica = paginaActual is "/Login" or "/Registro";
 
-      @if (mostrarMenu)
-{
-    <nav>
-        <a asp-page="/Index">Envíos</a>
-        <a asp-page="/Tarifas">Tarifas</a>
-        <a asp-page="/ReglasOperativas">Reglas operativas</a>
-        <a asp-page="/Zonas">Zonas de cobertura</a>
-        <a asp-page="/HojasDeRuta">Hojas de ruta</a>
-        <a asp-page="/Avisos">Avisos a comercios</a>
-        <a asp-page="/SeleccionarOperador">Cambiar operador</a>
-        @if (User.IsInRole("AdministradorOperador"))
+    var mostrarMenu =
+        !esPaginaPublica &&
+        User.Identity?.IsAuthenticated == true &&
+        (User.IsInRole("AdministradorOperador") ||
+        User.IsInRole("Operador"));
+
+    var mostrarMenuPlataforma = !esPaginaPublica && User.IsInRole("AdministradorPlataforma");
+
+    // Entradas del menú lateral: página, ícono de Phosphor y texto.
+    var entradas = new List<(string Pagina, string Icono, string Texto)>();
+    if (mostrarMenu)
+    {
+        entradas.Add(("/Index", "ph-package", "Envíos"));
+        entradas.Add(("/HojasDeRuta", "ph-path", "Hojas de ruta"));
+        entradas.Add(("/Zonas", "ph-map-trifold", "Zonas de cobertura"));
+        entradas.Add(("/Tarifas", "ph-currency-dollar", "Tarifas"));
+        entradas.Add(("/ReglasOperativas", "ph-sliders-horizontal", "Reglas operativas"));
+        entradas.Add(("/Avisos", "ph-bell", "Avisos a comercios"));
+        if (User.IsInRole("AdministradorOperador"))
         {
-            <a asp-page="/SolicitudesComerciales">
-                Solicitudes de comercios
-            </a>
+            entradas.Add(("/SolicitudesComerciales", "ph-handshake", "Solicitudes de comercios"));
         }
-
-        <button type="button" id="btnCerrarSesion" class="peligro">
-            Cerrar sesión
-        </button>
-    </nav>
+    }
+    if (mostrarMenuPlataforma)
+    {
+        entradas.Add(("/MensajesFallidos", "ph-warning-octagon", "Mensajes fallidos"));
+    }
+    var hayMenu = entradas.Count > 0;
 }
 
-@if (!esPaginaPublica && User.IsInRole("AdministradorPlataforma"))
-{
-    <nav>
-        <a asp-page="/MensajesFallidos">Mensajes fallidos</a>
-        <a asp-page="/SeleccionarOperador">Cambiar operador</a>
+<body>
+    @if (!hayMenu)
+    {
+        <!-- Páginas públicas (login, registro, elegir operador): sin menú lateral -->
+        <header class="mx-auto flex max-w-5xl items-center gap-2.5 px-4 py-5 md:px-8">
+            <img src="~/logo.svg" alt="" class="size-8" />
+            <span class="font-display text-[17px] font-bold tracking-tight">Última Milla</span>
+            <span class="text-[13px] text-suave">Backoffice del operador</span>
+        </header>
+        <main class="mx-auto max-w-5xl px-4 pb-16 pt-6 md:px-8">@RenderBody()</main>
+    }
+    else
+    {
+        <div class="lg:grid lg:min-h-dvh lg:grid-cols-[248px_1fr]">
+            <!-- Menú: lateral fijo en escritorio; desplegable con <details> en el celular -->
+            <aside class="border-b border-borde bg-superficie lg:sticky lg:top-0 lg:h-dvh lg:border-b-0 lg:border-r">
+                <details class="group lg:contents" open>
+                    <summary class="flex list-none items-center gap-2.5 px-4 py-3 text-texto no-underline lg:pointer-events-none lg:px-5 lg:py-5 [&::-webkit-details-marker]:hidden">
+                        <img src="~/logo.svg" alt="" class="size-8" />
+                        <span class="flex flex-col leading-tight">
+                            <span class="font-display text-[16px] font-bold tracking-tight">Última Milla</span>
+                            <span class="text-[12px] font-normal text-suave">Backoffice del operador</span>
+                        </span>
+                        <i class="ph ph-list ml-auto text-xl text-suave lg:hidden"></i>
+                    </summary>
 
-        <button type="button" id="btnCerrarSesion" class="peligro">
-            Cerrar sesión
-        </button>
-    </nav>
-}
-    </header>
-    <main>@RenderBody()</main>
+                    <nav class="flex flex-col gap-0.5 px-3 pb-4 lg:pb-0">
+                        @foreach (var e in entradas)
+                        {
+                            <a asp-page="@e.Pagina" class="nav-item" aria-current="@(paginaActual == e.Pagina ? "page" : null)">
+                                <i class="ph @e.Icono"></i>@e.Texto
+                            </a>
+                        }
+                    </nav>
+
+                    <div class="flex flex-col gap-0.5 border-t border-borde px-3 py-3 lg:absolute lg:inset-x-0 lg:bottom-0">
+                        <a asp-page="/SeleccionarOperador" class="nav-item"><i class="ph ph-arrows-left-right"></i>Cambiar operador</a>
+                        <button type="button" id="btnCerrarSesion"
+                                class="nav-item w-full justify-start border-0 bg-transparent">
+                            <i class="ph ph-sign-out"></i>Cerrar sesión
+                        </button>
+                    </div>
+                </details>
+            </aside>
+
+            <main class="min-w-0 px-4 py-8 md:px-10 md:py-12">
+                <div class="mx-auto max-w-6xl">@RenderBody()</div>
+            </main>
+        </div>
+    }
+
     <script>
     document.addEventListener("DOMContentLoaded", () => {
+        // En escritorio el menú siempre está abierto; en el celular arranca cerrado.
+        const menu = document.querySelector("aside details");
+        if (menu && !matchMedia("(min-width: 1024px)").matches) menu.open = false;
+
         const btnCerrarSesion = document.getElementById("btnCerrarSesion");
 
         if (!btnCerrarSesion) return;
@@ -132,6 +130,6 @@
             }
         });
     });
-</script>
+    </script>
 </body>
 </html>

@@ -5,16 +5,17 @@
     ViewData["Title"] = "Seleccionar operador";
 }
 
-<section style="max-width: 600px; margin: 3rem auto;">
-    <h1>Seleccionar operador</h1>
+<section>
+    <div class="encabezado">
+        <div>
+            <h1>Seleccionar operador</h1>
+            <p>Seleccioná la membresía con la que querés trabajar.</p>
+        </div>
+    </div>
 
-    <p class="nota">
-        Seleccioná la membresía con la que querés trabajar.
-    </p>
+    <div id="listaOperadores" class="mt-6 space-y-4"></div>
 
-    <div id="listaOperadores"></div>
-
-    <p id="mensajeError" class="error" role="alert"></p>
+    <p id="mensajeError" class="aviso error mt-4" role="alert"></p>
 </section>
 
 <script>
