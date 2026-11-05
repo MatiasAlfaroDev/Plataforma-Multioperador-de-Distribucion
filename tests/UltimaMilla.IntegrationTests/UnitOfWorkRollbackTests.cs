@@ -42,6 +42,7 @@ public class UnitOfWorkRollbackTests
         // Preparar un envío exclusivo, inicialmente Admitido.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
             await DbSeeder.SembrarAsync(db, ct);
 
             var cuenta = await db.CuentasComerciales
@@ -75,6 +76,8 @@ public class UnitOfWorkRollbackTests
         // Ejecutar dos cambios y guardarlos dentro de una transacción.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
+
             var unidad = new UnitOfWork(db);
 
             var envio = await db.Envios
@@ -124,6 +127,8 @@ public class UnitOfWorkRollbackTests
         // Otro contexto verifica lo que realmente quedó en PostgreSQL.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
+
             var envio = await db.Envios
                 .AsNoTracking()
                 .Include(e => e.Eventos)

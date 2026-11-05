@@ -16,7 +16,7 @@ public sealed class EventoMovilConfiguration : IEntityTypeConfiguration<EventoMo
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).ValueGeneratedNever();
 
-        builder.Property(e => e.Tipo).HasConversion<string>().HasMaxLength(16);
+        builder.Property(e => e.Tipo).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.Motivo).HasMaxLength(200);
         builder.Property(e => e.Receptor).HasMaxLength(200);
 

@@ -36,6 +36,9 @@ public sealed class ObtenerReglasOperativasVigentesHandler(
             motivos.Select(m => new MotivoNoEntregaDto(
                 m.Codigo,
                 m.Descripcion,
-                m.RequiereDevolucion)).ToList());
+                m.RequiereDevolucion)).ToList(),
+            version.AdmiteEntregaParcial,
+            version.AccionBultosPendientes,
+            version.NuevaVisitaConRecargo);
     }
 }

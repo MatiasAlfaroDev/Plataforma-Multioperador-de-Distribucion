@@ -28,11 +28,18 @@ public static class MaquinaEstadosEnvio
 
         maquina.Configure(EstadoEnvio.EnTransito)
             .Permit(DisparadorEnvio.Entregar, EstadoEnvio.Entregado)
-            .Permit(DisparadorEnvio.RegistrarIntentoFallido, EstadoEnvio.NoEntregado);
-
+            .Permit(
+                DisparadorEnvio.RegistrarEntregaParcial,
+                EstadoEnvio.EntregadoParcialmente)
+            .Permit(
+                DisparadorEnvio.RegistrarIntentoFallido,
+                EstadoEnvio.NoEntregado);
         maquina.Configure(EstadoEnvio.NoEntregado)
             .Permit(DisparadorEnvio.RetornarADeposito, EstadoEnvio.EnDeposito);
-
+        maquina.Configure(EstadoEnvio.EntregadoParcialmente)
+            .Permit(
+                DisparadorEnvio.RetornarADeposito,
+                EstadoEnvio.EnDeposito);
         maquina.Configure(EstadoEnvio.Reprogramado)
             .Permit(DisparadorEnvio.AsignarARuta, EstadoEnvio.AsignadoARuta);
 
@@ -49,6 +56,7 @@ public static class MaquinaEstadosEnvio
             EstadoEnvio.AsignadoARuta,
             EstadoEnvio.EnTransito,
             EstadoEnvio.NoEntregado,
+            EstadoEnvio.EntregadoParcialmente,
             EstadoEnvio.Reprogramado,
             EstadoEnvio.EnDevolucion
         ];

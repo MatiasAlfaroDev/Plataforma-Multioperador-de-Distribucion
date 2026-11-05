@@ -1,3 +1,5 @@
+using UltimaMilla.Domain.Configuracion;
+
 namespace UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigentes;
 
 public sealed record ReglasOperativasVigentesDto(
@@ -7,7 +9,10 @@ public sealed record ReglasOperativasVigentesDto(
     bool RequierePruebaEntrega,
     int DiasMaximosParaDevolucion,
     DateTimeOffset VigenciaDesde,
-    IReadOnlyList<MotivoNoEntregaDto> Motivos);
+    IReadOnlyList<MotivoNoEntregaDto> Motivos,
+    bool AdmiteEntregaParcial,
+    AccionBultosPendientes AccionBultosPendientes,
+    bool NuevaVisitaConRecargo);
 
 public sealed record MotivoNoEntregaDto(
     string Codigo,

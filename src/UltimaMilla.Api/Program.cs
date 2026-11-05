@@ -310,7 +310,7 @@ api.MapGet("/envios", async (
 api.MapPost("/envios/{envioId:guid}/eventos-movil",
     async (Guid envioId, EventoMovilRequest request, RegistrarEventoMovilHandler handler, CancellationToken ct) =>
     {
-        await handler.Handle(          
+        await handler.Handle(
             new RegistrarEventoMovilCommand(
                 envioId,
                 request.IdEvento,
@@ -323,7 +323,14 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                 request.ReferenciaFotografia,
                 request.Latitud,
                 request.Longitud,
-                request.EvidenciaFallo),ct);
+                request.EvidenciaFallo,
+                request.BultosEntregados,
+                request.BultosNoEntregados?
+                    .Select(b => new BultoNoEntregadoMovil(
+                        b.BultoId,
+                        b.Motivo,
+                        b.Evidencia))
+                    .ToArray()), ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     })
     .RequireAuthorization();
@@ -550,7 +557,7 @@ api.MapPost("/reglas-operativas", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador));
-    
+
 api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, CancellationToken ct) =>
 {
     var zonas = await handler.Handle(
@@ -812,8 +819,10 @@ public partial class Program { }
 
 /// <summary>Cuerpo que manda la app del repartidor; el envío viaja en la URL.</summary>
 
-public sealed record EventoMovilRequest( Guid IdEvento,  string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null);
-public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record BultoNoEntregadoRequest( Guid BultoId, string Motivo, string Evidencia);
+
+public sealed record EventoMovilRequest( Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null, IReadOnlyCollection<Guid>? BultosEntregados = null,
+    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null);public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
 public sealed record ConfirmarReprogramacionRequest( string Responsable);
 public sealed record QuitarEnvioDeRutaRequest(string Responsable);
 public sealed record AgregarEnvioARutaRequest( Guid EnvioId, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta);

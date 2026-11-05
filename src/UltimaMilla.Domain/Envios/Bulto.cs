@@ -31,4 +31,22 @@ public class Bulto
             ProfundidadCm = datos.ProfundidadCm
         };
     }
+
+    public EstadoBulto Estado { get; private set; } = EstadoBulto.Pendiente;
+
+    internal void Aplicar(MaquinaEstadosBulto.Disparador disparador)
+    {
+        var maquina = MaquinaEstadosBulto.Crear(
+            () => Estado,
+            nuevoEstado => Estado = nuevoEstado);
+
+        if (!maquina.CanFire(disparador))
+        {
+            throw new InvalidOperationException(
+                $"No se puede aplicar {disparador} a un bulto en estado {Estado}.");
+        }
+
+        maquina.Fire(disparador);
+    }
+
 }

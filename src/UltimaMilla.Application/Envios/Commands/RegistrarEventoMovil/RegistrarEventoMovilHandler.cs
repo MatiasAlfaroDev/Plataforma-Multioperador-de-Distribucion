@@ -4,6 +4,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Envios.Eventos;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
@@ -45,7 +46,7 @@ public sealed class RegistrarEventoMovilHandler(
         if (envio.Estado != EstadoEnvio.EnTransito)
             throw new InvalidOperationException(
                 "El envío debe estar en tránsito para registrar una entrega o intento fallido.");
-     
+
         if (envio.VersionReglasOperativasId is not Guid versionReglasId)
             throw new InvalidOperationException(
                 "El envío no tiene una versión de reglas operativas asignada.");
@@ -99,6 +100,63 @@ public sealed class RegistrarEventoMovilHandler(
                 latitud: command.Latitud,
                 longitud: command.Longitud);
         }
+        else if (tipo == TipoEventoMovil.EntregadoParcialmente)
+        {
+            if (!command.Latitud.HasValue ||
+                !command.Longitud.HasValue)
+            {
+                throw new ArgumentException(
+                    "La entrega parcial debe incluir coordenadas.");
+            }
+
+            if (command.BultosEntregados is null ||
+                command.BultosNoEntregados is null)
+            {
+                throw new ArgumentException(
+                    "Deben indicarse los resultados de los bultos.");
+            }
+
+            var prueba = PruebaEntrega.Crear(
+                command.Receptor!,
+                command.DocumentoReceptor,
+                command.ReferenciaFirma,
+                command.ReferenciaFotografia,
+                ocurridoEn,
+                command.Latitud.Value,
+                command.Longitud.Value);
+
+            var resultadosNoEntregados =
+                new List<(Guid BultoId, MotivoNoEntrega Motivo, string Evidencia)>();
+
+            foreach (var resultado in command.BultosNoEntregados)
+            {
+                var motivo = await motivos.ObtenerPorDescripcionAsync(
+                    envio.OperadorId,
+                    versionReglasId,
+                    resultado.Motivo,
+                    ct)
+                    ?? throw new NoEncontradoException(
+                        $"El motivo '{resultado.Motivo}' no existe en el catálogo del operador.");
+
+                resultadosNoEntregados.Add((
+                    resultado.BultoId,
+                    motivo,
+                    resultado.Evidencia));
+            }
+
+            envio.Aplicar(
+                DisparadorEnvio.RegistrarEntregaParcial,
+                reglas,
+                ocurridoEn,
+                "Mobile",
+                "Mobile",
+                pruebaEntrega: prueba,
+                bultosEntregados: command.BultosEntregados,
+                bultosNoEntregados: resultadosNoEntregados,
+                latitud: command.Latitud,
+                longitud: command.Longitud);
+        }
+
         else if (tipo == TipoEventoMovil.NoEntregado)
         {
             if (string.IsNullOrWhiteSpace(command.EvidenciaFallo))
@@ -161,6 +219,6 @@ public sealed class RegistrarEventoMovilHandler(
             var claveComercio =
                 $"envios:operador:{envio.OperadorId}:cuenta:{envio.CuentaComercialId}";
 
-            await cache.EliminarAsync(claveComercio, ct);    
+            await cache.EliminarAsync(claveComercio, ct);
         }
 }

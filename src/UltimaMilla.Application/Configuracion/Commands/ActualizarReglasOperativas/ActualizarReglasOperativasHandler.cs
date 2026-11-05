@@ -59,7 +59,10 @@ public sealed class ActualizarReglasOperativasHandler(
                 command.HorasMinimasEntreIntentos,
                 command.RequierePruebaEntrega,
                 command.DiasMaximosParaDevolucion,
-                ahora);
+                ahora,
+                admiteEntregaParcial: command.AdmiteEntregaParcial,
+                accionBultosPendientes: command.AccionBultosPendientes,
+                nuevaVisitaConRecargo: command.NuevaVisitaConRecargo);
 
             var nuevosMotivos = catalogo
                 .Select(m => MotivoNoEntrega.Crear(

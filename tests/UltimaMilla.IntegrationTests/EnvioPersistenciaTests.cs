@@ -37,6 +37,7 @@ public class EnvioPersistenciaTests
         // Preparación de los datos de referencia.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
             await DbSeeder.SembrarAsync(db, ct);
 
             var cuenta = await db.CuentasComerciales
@@ -69,6 +70,8 @@ public class EnvioPersistenciaTests
         // Otro contexto recupera el envío y ejecuta la transición.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
+
             var envio = await db.Envios
                 .Include(e => e.Eventos)
                 .Include(e => e.Intentos)
@@ -95,6 +98,8 @@ public class EnvioPersistenciaTests
         // Un tercer contexto comprueba lo realmente persistido.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
+
             var envio = await db.Envios
                 .AsNoTracking()
                 .Include(e => e.Eventos)
@@ -114,7 +119,7 @@ public class EnvioPersistenciaTests
             Assert.Equal("OperarioTest", evento.Responsable);
         }
     }
-    
+
     [Fact]
     public async Task DosOperacionesSimultaneas_NoSobrescribenElEstado()
     {
@@ -141,6 +146,7 @@ public class EnvioPersistenciaTests
         // Crear un envío exclusivo para esta prueba.
         await using (var db = new AppDbContext(opciones))
         {
+            db.HabilitarAccesoInicializacion();
             await DbSeeder.SembrarAsync(db, CancellationToken.None);
 
             var cuenta = await db.CuentasComerciales
@@ -172,6 +178,9 @@ public class EnvioPersistenciaTests
 
         await using var contexto1 = new AppDbContext(opciones);
         await using var contexto2 = new AppDbContext(opciones);
+
+        contexto1.HabilitarAccesoInicializacion();
+        contexto2.HabilitarAccesoInicializacion();
 
         // Los dos contextos leen el mismo estado inicial.
         var envio1 = await contexto1.Envios
@@ -212,6 +221,7 @@ public class EnvioPersistenciaTests
 
         // Verificar que el segundo intento no sobrescribió el primero.
         await using var verificacion = new AppDbContext(opciones);
+        verificacion.HabilitarAccesoInicializacion();
 
         var resultado = await verificacion.Envios
             .AsNoTracking()
@@ -223,5 +233,4 @@ public class EnvioPersistenciaTests
         var evento = Assert.Single(resultado.Eventos);
         Assert.Equal("Operario1", evento.Responsable);
     }
-
 }
