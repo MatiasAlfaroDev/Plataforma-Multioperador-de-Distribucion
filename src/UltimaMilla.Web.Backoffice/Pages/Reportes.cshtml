@@ -337,4 +337,56 @@
             }
         </section>
     }
+    
+    @if (Model.Puntualidad is not null)
+    {
+        var datos = Model.Puntualidad.Resultados;
+
+        <section class="space-y-4">
+            <div>
+                <h2 class="text-xl font-semibold">
+                    Cumplimiento de plazos
+                </h2>
+                <p class="text-sm text-suave">
+                    Entregas completas comparadas con la fecha y
+                    franja horaria comprometidas.
+                </p>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="rounded-lg border border-borde bg-superficie p-5">
+                    <p class="text-sm text-suave">A tiempo</p>
+                    <p class="text-3xl font-bold">@datos.ATiempo</p>
+                </div>
+
+                <div class="rounded-lg border border-borde bg-superficie p-5">
+                    <p class="text-sm text-suave">Fuera de plazo</p>
+                    <p class="text-3xl font-bold">@datos.FueraDePlazo</p>
+                </div>
+
+                <div class="rounded-lg border border-borde bg-superficie p-5">
+                    <p class="text-sm text-suave">No evaluables</p>
+                    <p class="text-3xl font-bold">@datos.NoEvaluables</p>
+                </div>
+
+                <div class="rounded-lg border border-borde bg-superficie p-5">
+                    <p class="text-sm text-suave">Puntualidad</p>
+                    <p class="text-3xl font-bold">
+                        @(datos.PorcentajePuntualidad.HasValue
+                            ? datos.PorcentajePuntualidad.Value.ToString("N2") + "%"
+                            : "Sin datos")
+                    </p>
+                </div>
+            </div>
+
+            <p class="text-sm text-suave">
+                Entregas parciales registradas:
+                <strong>@datos.EntregasParciales</strong>.
+                No se incluyen en el porcentaje de puntualidad.
+                Tampoco se incluyen las entregas sin compromiso verificable
+                o con reprogramaciones cuyo historial horario es insuficiente.
+            </p>
+        </section>
+    }
+
 </div>

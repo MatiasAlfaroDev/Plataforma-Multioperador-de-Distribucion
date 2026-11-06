@@ -28,6 +28,8 @@ public sealed class ReportesModel(
 
     public DetalleLiquidacionReporte? Liquidacion { get; private set; }
 
+    public PuntualidadReporte? Puntualidad { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(
         CancellationToken ct)
     {
@@ -91,6 +93,11 @@ public sealed class ReportesModel(
                 Desde.Value,
                 Hasta.Value,
                 ct);
+            
+            Puntualidad = await reportesApi.ObtenerPuntualidadAsync(
+                Desde.Value,
+                Hasta.Value,
+                ct);
         }
         catch (HttpRequestException ex)
         {
@@ -103,4 +110,5 @@ public sealed class ReportesModel(
 
         return Page();
     }
+    
 }

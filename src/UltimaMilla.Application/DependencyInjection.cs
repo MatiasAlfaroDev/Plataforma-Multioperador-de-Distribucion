@@ -48,6 +48,7 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
 using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
+using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 
 namespace UltimaMilla.Application;
 
@@ -110,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<ObtenerResultadosRepartidoresHandler>();
         services.AddScoped<ObtenerCumplimientoHandler>();
         services.AddScoped<ObtenerDetalleLiquidacionHandler>();
+        services.AddScoped<ObtenerPuntualidadHandler>();
         return services;
     }
 }

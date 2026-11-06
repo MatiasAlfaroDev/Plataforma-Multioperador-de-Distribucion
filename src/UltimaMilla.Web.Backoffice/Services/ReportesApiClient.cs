@@ -101,6 +101,18 @@ public sealed record DetalleLiquidacionReporte(
     List<DetalleLiquidacionComercioItem> Comercios);
 
 
+public sealed record ResultadoPuntualidadItem(
+    int ATiempo,
+    int FueraDePlazo,
+    int NoEvaluables,
+    int EntregasParciales,
+    decimal? PorcentajePuntualidad);
+
+public sealed record PuntualidadReporte(
+    DateOnly Desde,
+    DateOnly Hasta,
+    ResultadoPuntualidadItem Resultados);
+
 public sealed class ReportesApiClient(HttpClient http)
 {
     public async Task<ResumenEnviosReporte> ObtenerResumenAsync(
@@ -183,6 +195,20 @@ public sealed class ReportesApiClient(HttpClient http)
             url, ct)
             ?? throw new InvalidOperationException(
                 "La API no devolvió el detalle de liquidación.");
+    }
+    
+    public async Task<PuntualidadReporte> ObtenerPuntualidadAsync(
+        DateOnly desde,
+        DateOnly hasta,
+        CancellationToken ct = default)
+    {
+        var url =
+            $"api/reportes/puntualidad?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}";
+
+        return await http.GetFromJsonAsync<PuntualidadReporte>(
+            url, ct)
+            ?? throw new InvalidOperationException(
+                    "La API no devolvió el reporte de puntualidad.");
     }
 
 }

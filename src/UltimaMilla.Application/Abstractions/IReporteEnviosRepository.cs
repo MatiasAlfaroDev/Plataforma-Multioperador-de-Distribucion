@@ -46,6 +46,12 @@ public interface IReporteEnviosRepository
         DateTimeOffset desde,
         DateTimeOffset hastaExclusivo,
         CancellationToken ct);
+
+    Task<ResultadoPuntualidadReporte> ObtenerPuntualidadAsync(
+        Guid operadorId,
+        DateTimeOffset desde,
+        DateTimeOffset hastaExclusivo,
+        CancellationToken ct);
 }
 
 public sealed record ConteoEnviosPorEstado(
@@ -113,3 +119,10 @@ public sealed record DetalleLiquidacionComercio(
     int EnviosSinTarifa,
     decimal TotalTarifado,
     IReadOnlyList<DetalleLiquidacionEnvio> Envios);
+
+public sealed record ResultadoPuntualidadReporte(
+    int ATiempo,
+    int FueraDePlazo,
+    int NoEvaluables,
+    int EntregasParciales,
+    decimal? PorcentajePuntualidad);

@@ -486,4 +486,125 @@ public sealed class ReporteEnviosRepository(
             .ToList();
     }
 
+    public async Task<ResultadoPuntualidadReporte> ObtenerPuntualidadAsync(
+        Guid operadorId,
+        DateTimeOffset desde,
+        DateTimeOffset hastaExclusivo,
+        CancellationToken ct)
+    {
+        if (operadorId == Guid.Empty)
+            throw new ArgumentException("El operador es obligatorio.");
+
+        var eventos = await (
+            from evento in db.EventosEnvio.AsNoTracking()
+            join envio in db.Envios.AsNoTracking()
+                on evento.EnvioId equals envio.Id
+            where evento.OperadorId == operadorId
+                && envio.OperadorId == operadorId
+                && evento.OcurridoEn >= desde
+                && evento.OcurridoEn < hastaExclusivo
+                && (
+                    evento.Disparador == DisparadorEnvio.Entregar ||
+                    evento.Disparador == DisparadorEnvio.RegistrarEntregaParcial
+                )
+            select new
+            {
+                evento.EnvioId,
+                evento.Disparador,
+                evento.OcurridoEn,
+                envio.FechaEntregaComprometida,
+                envio.HoraEntregaDesde,
+                envio.HoraEntregaHasta
+            }
+        ).ToListAsync(ct);
+
+        var entregasCompletas = eventos
+            .Where(x => x.Disparador == DisparadorEnvio.Entregar)
+            .ToList();
+
+        var parciales = eventos.Count(x =>
+            x.Disparador == DisparadorEnvio.RegistrarEntregaParcial);
+
+        var ids = entregasCompletas
+            .Select(x => x.EnvioId)
+            .Distinct()
+            .ToArray();
+
+        // Las reprogramaciones pueden haber modificado la ventana.
+        // Como no existe un historial completo de compromisos,
+        // estos envíos se consideran no evaluables.
+        var reprogramados = await db.EventosEnvio
+            .AsNoTracking()
+            .Where(e =>
+                e.OperadorId == operadorId &&
+                ids.Contains(e.EnvioId) &&
+                e.Disparador == DisparadorEnvio.Reprogramar)
+            .Select(e => e.EnvioId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var idsReprogramados = reprogramados.ToHashSet();
+
+        var zonaHoraria = TimeZoneInfo.FindSystemTimeZoneById(
+            "America/Montevideo");
+
+        var aTiempo = 0;
+        var fueraDePlazo = 0;
+        var noEvaluables = 0;
+
+        foreach (var entrega in entregasCompletas)
+        {
+            if (idsReprogramados.Contains(entrega.EnvioId) ||
+                !entrega.FechaEntregaComprometida.HasValue ||
+                !entrega.HoraEntregaDesde.HasValue ||
+                !entrega.HoraEntregaHasta.HasValue)
+            {
+                noEvaluables++;
+                continue;
+            }
+
+            var horaLocal = TimeZoneInfo.ConvertTime(
+                entrega.OcurridoEn,
+                zonaHoraria);
+
+            var fechaReal = DateOnly.FromDateTime(
+                horaLocal.DateTime);
+
+            var horaReal = TimeOnly.FromDateTime(
+                horaLocal.DateTime);
+
+            var fechaComprometida =
+                entrega.FechaEntregaComprometida.Value;
+
+            var inicio =
+                entrega.HoraEntregaDesde.Value;
+
+            var fin =
+                entrega.HoraEntregaHasta.Value;
+
+            if (fechaReal == fechaComprometida &&
+                horaReal >= inicio &&
+                horaReal <= fin)
+            {
+                aTiempo++;
+            }
+            else
+            {
+                fueraDePlazo++;
+            }
+        }
+
+        var evaluables = aTiempo + fueraDePlazo;
+
+        decimal? porcentaje = evaluables == 0
+            ? null
+            : Math.Round(100m * aTiempo / evaluables, 2);
+
+        return new ResultadoPuntualidadReporte(
+            aTiempo,
+            fueraDePlazo,
+            noEvaluables,
+            parciales,
+            porcentaje);
+    }
 }

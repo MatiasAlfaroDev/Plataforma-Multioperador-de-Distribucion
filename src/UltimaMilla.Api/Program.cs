@@ -64,6 +64,7 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
 using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
+using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -457,6 +458,33 @@ api.MapGet("/reportes/liquidacion", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador));
+
+
+api.MapGet("/reportes/puntualidad", async (
+    DateOnly desde,
+    DateOnly hasta,
+    HttpContext context,
+    ObtenerPuntualidadHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (hasta < desde || hasta == DateOnly.MaxValue)
+        return Results.BadRequest("Rango de fechas no válido.");
+
+    return Results.Ok(await handler.Handle(
+        operadorId, desde, hasta, ct));
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
 
 
 api.MapPost("/envios/importar-csv", async (
