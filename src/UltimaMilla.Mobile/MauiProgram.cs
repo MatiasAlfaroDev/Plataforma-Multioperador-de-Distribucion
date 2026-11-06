@@ -83,6 +83,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IDialogos, DialogosShell>();
         builder.Services.AddSingleton<ICaptura, Captura>();
         builder.Services.AddSingleton<IFirma, Firma>();
+        builder.Services.AddSingleton<IElegirBultos, ElegirBultos>();
 #if ANDROID
         builder.Services.AddSingleton<ILectorCodigos, LectorCodigosAndroid>();
         builder.Services.AddSingleton<ISeguimiento, SeguimientoAndroid>();

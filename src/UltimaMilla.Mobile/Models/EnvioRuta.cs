@@ -28,13 +28,15 @@ public sealed class EnvioRuta
     public bool PuedeRegistrar => ResultadoLocal is null;
     
     // Un registro rechazado por el servidor no cuenta: gana lo que dice el servidor.
-    public bool EsEntregado => ResultadoLocal == "Entregado" && !Rechazado;
+    // La entrega parcial cuenta como parada resuelta (entregó algo); los bultos pendientes vuelven en otra ruta.
+    public bool EsEntregado => (ResultadoLocal is "Entregado" or "EntregadoParcialmente") && !Rechazado;
     public bool EsNoEntregado => ResultadoLocal == "NoEntregado" && !Rechazado;
 
     public string EstadoMostrado => ResultadoLocal switch
     {
         null => EstadoServidor,
         "NoEntregado" => PendienteDeSincronizar ? "No entregado · pendiente de sincronizar" : "No entregado",
+        "EntregadoParcialmente" => PendienteDeSincronizar ? "Entrega parcial · pendiente de sincronizar" : "Entrega parcial",
         _ => PendienteDeSincronizar ? "Entregado · pendiente de sincronizar" : "Entregado"
     };
 
@@ -47,6 +49,7 @@ public sealed class EnvioRuta
         {
             null => "Por entregar",
             "NoEntregado" => "No entregado",
+            "EntregadoParcialmente" => "Entrega parcial",
             _ => "Entregado"
         };
 
@@ -57,6 +60,7 @@ public sealed class EnvioRuta
         {
             null => Paleta.De("Primary"),
             "NoEntregado" => Paleta.De("Peligro"),
+            "EntregadoParcialmente" => Paleta.De("Alerta"),
             _ => Paleta.De("Exito")
         };
 
@@ -67,6 +71,7 @@ public sealed class EnvioRuta
         {
             null => Paleta.De("AcentoSuave"),
             "NoEntregado" => Paleta.De("PeligroSuave"),
+            "EntregadoParcialmente" => Paleta.De("AlertaSuave"),
             _ => Paleta.De("ExitoSuave")
         };
 

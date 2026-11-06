@@ -85,6 +85,30 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
             upsert.Parameters.AddWithValue("$bultos", e.CantidadBultos);
             upsert.Parameters.AddWithValue("$estado", e.Estado);
             await upsert.ExecuteNonQueryAsync();
+
+            // Bultos pendientes del envío (RF 32). Si la API no los mandó, se dejan los que había.
+            if (e.Bultos is { Count: > 0 })
+            {
+                var borrarBultos = conexion.CreateCommand();
+                borrarBultos.Transaction = tx;
+                borrarBultos.CommandText = "DELETE FROM bultos_ruta WHERE envio_id = $envio";
+                borrarBultos.Parameters.AddWithValue("$envio", e.Id.ToString());
+                await borrarBultos.ExecuteNonQueryAsync();
+
+                foreach (var bulto in e.Bultos)
+                {
+                    var insertarBulto = conexion.CreateCommand();
+                    insertarBulto.Transaction = tx;
+                    insertarBulto.CommandText = """
+                        INSERT OR REPLACE INTO bultos_ruta (bulto_id, identificacion, envio_id)
+                        VALUES ($id, $codigo, $envio)
+                        """;
+                    insertarBulto.Parameters.AddWithValue("$id", bulto.Id.ToString());
+                    insertarBulto.Parameters.AddWithValue("$codigo", bulto.Identificacion);
+                    insertarBulto.Parameters.AddWithValue("$envio", e.Id.ToString());
+                    await insertarBulto.ExecuteNonQueryAsync();
+                }
+            }
         }
 
         // Envíos que ya no vienen en la ruta (por ejemplo, reasignados a otro repartidor):
@@ -104,6 +128,21 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
         await borrar.ExecuteNonQueryAsync();
 
         await tx.CommitAsync();
+    }
+
+    /// <summary>Los bultos pendientes de un envío, guardados al descargar la ruta.</summary>
+    public async Task<IReadOnlyList<BultoItem>> ListarBultosAsync(Guid envioId)
+    {
+        await using var conexion = await db.AbrirAsync();
+        var comando = conexion.CreateCommand();
+        comando.CommandText = "SELECT bulto_id, identificacion FROM bultos_ruta WHERE envio_id = $envio ORDER BY identificacion";
+        comando.Parameters.AddWithValue("$envio", envioId.ToString());
+
+        var lista = new List<BultoItem>();
+        await using var lector = await comando.ExecuteReaderAsync();
+        while (await lector.ReadAsync())
+            lista.Add(new BultoItem(Guid.Parse(lector.GetString(0)), lector.GetString(1)));
+        return lista;
     }
 
     public async Task<IReadOnlyList<EnvioRuta>> ListarRutaAsync(Guid operadorId)

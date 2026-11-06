@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using UltimaMilla.Mobile.Models;
 
@@ -22,8 +23,10 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         var insertar = conexion.CreateCommand();
         insertar.Transaction = tx;
         insertar.CommandText = """
-            INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora, latitud, longitud, foto, documento, firma)
-            VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha, $lat, $lon, $foto, $documento, $firma)
+            INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora, latitud, longitud, foto, documento, firma,
+                                            bultos_entregados, bultos_no_entregados)
+            VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha, $lat, $lon, $foto, $documento, $firma,
+                    $bultosEntregados, $bultosNoEntregados)
             """;
         insertar.Parameters.AddWithValue("$id", evento.Id.ToString());
         insertar.Parameters.AddWithValue("$envio", evento.EnvioId.ToString());
@@ -36,6 +39,11 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         insertar.Parameters.AddWithValue("$foto", (object?)evento.ReferenciaFoto ?? DBNull.Value);
         insertar.Parameters.AddWithValue("$documento", (object?)evento.DocumentoReceptor ?? DBNull.Value);
         insertar.Parameters.AddWithValue("$firma", (object?)evento.ReferenciaFirma ?? DBNull.Value);
+        // Las listas de bultos se guardan como texto JSON en una sola columna.
+        insertar.Parameters.AddWithValue("$bultosEntregados",
+            evento.BultosEntregados is null ? DBNull.Value : JsonSerializer.Serialize(evento.BultosEntregados));
+        insertar.Parameters.AddWithValue("$bultosNoEntregados",
+            evento.BultosNoEntregados is null ? DBNull.Value : JsonSerializer.Serialize(evento.BultosNoEntregados));
         await insertar.ExecuteNonQueryAsync();
 
         var marcar = conexion.CreateCommand();
@@ -54,7 +62,8 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         await using var conexion = await db.AbrirAsync();
         var comando = conexion.CreateCommand();
         comando.CommandText = """
-            SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error, latitud, longitud, foto, documento, firma
+            SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error, latitud, longitud, foto, documento, firma,
+                   bultos_entregados, bultos_no_entregados
             FROM eventos_pendientes
             ORDER BY fecha_hora
             """;
@@ -77,7 +86,9 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
                 Longitud = lector.IsDBNull(9) ? null : (decimal)lector.GetDouble(9),
                 ReferenciaFoto = lector.IsDBNull(10) ? null : lector.GetString(10),
                 DocumentoReceptor = lector.IsDBNull(11) ? null : lector.GetString(11),
-                ReferenciaFirma = lector.IsDBNull(12) ? null : lector.GetString(12)
+                ReferenciaFirma = lector.IsDBNull(12) ? null : lector.GetString(12),
+                BultosEntregados = lector.IsDBNull(13) ? null : JsonSerializer.Deserialize<List<Guid>>(lector.GetString(13)),
+                BultosNoEntregados = lector.IsDBNull(14) ? null : JsonSerializer.Deserialize<List<BultoNoEntregado>>(lector.GetString(14))
             });
         }
         return lista;

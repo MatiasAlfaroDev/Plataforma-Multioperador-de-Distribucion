@@ -1,6 +1,7 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 
@@ -40,6 +41,12 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                 if (envio is null)
                     continue;
 
+                // Solo los bultos pendientes: los ya entregados en una entrega parcial no vuelven a cargarse (RF 32).
+                var pendientes = envio.Bultos
+                    .Where(b => b.Estado == EstadoBulto.Pendiente)
+                    .OrderBy(b => b.Identificacion)
+                    .ToList();
+
                 paradas.Add(new MiParadaDto(
                     parada.Orden,
                     envio.Id,
@@ -49,7 +56,8 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                     $"{envio.Direccion.Calle} {envio.Direccion.Numero}",
                     envio.Direccion.Localidad,
                     envio.Estado.ToString(),
-                    envio.Bultos.Select(b => b.Identificacion).OrderBy(i => i).ToList()));
+                    pendientes.Select(b => b.Identificacion).ToList(),
+                    pendientes.Select(b => new MiBultoDto(b.Id, b.Identificacion)).ToList()));
             }
 
             resultado.Add(new MiHojaDeRutaDto(

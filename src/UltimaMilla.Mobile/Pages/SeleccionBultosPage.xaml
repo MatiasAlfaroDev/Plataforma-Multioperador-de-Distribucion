@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:UltimaMilla.Mobile.ViewModels"
+             xmlns:app="clr-namespace:UltimaMilla.Mobile"
+             x:Class="UltimaMilla.Mobile.Pages.SeleccionBultosPage"
+             x:DataType="vm:SeleccionBultosViewModel"
+             Title="Bultos entregados">
+
+    <!-- Se abre encima de la ruta (modal) al tocar Entregar en un envío con más de un bulto (RF 32). -->
+    <Grid RowDefinitions="*,Auto">
+
+        <CollectionView ItemsSource="{Binding Bultos}" Margin="16,0"
+                        WidthRequest="{OnIdiom Phone=-1, Default=680}"
+                        HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
+
+            <CollectionView.Header>
+                <VerticalStackLayout Spacing="12" Padding="0,16,0,4">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="¿Qué bultos se entregan?" Style="{StaticResource Titulo}" />
+                        <Label Text="{Binding Referencia}" Style="{StaticResource Secundario}" FontSize="15" />
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource Tarjeta}" Padding="14">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Escaneá o escribí el código de cada bulto que entregás" Style="{StaticResource EtiquetaCampo}" />
+
+                            <Grid ColumnDefinitions="2*,*" ColumnSpacing="10" IsVisible="{Binding HayLectorCamara}">
+                                <Button Text="Escanear" Style="{StaticResource BotonPrimario}"
+                                        Command="{Binding EscanearCommand}" ContentLayout="Left,8">
+                                    <Button.ImageSource>
+                                        <FontImageSource FontFamily="Iconos" Glyph="{x:Static app:Iconos.Camara}" Size="18"
+                                                         Color="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource PrimaryDarkText}}" />
+                                    </Button.ImageSource>
+                                </Button>
+                                <Button Grid.Column="1" Text="Imagen" Style="{StaticResource BotonSecundario}"
+                                        Command="{Binding EscanearDesdeImagenCommand}" ContentLayout="Left,8">
+                                    <Button.ImageSource>
+                                        <FontImageSource FontFamily="Iconos" Glyph="{x:Static app:Iconos.Imagen}" Size="18"
+                                                         Color="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
+                                    </Button.ImageSource>
+                                </Button>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <Border Style="{StaticResource Campo}">
+                                    <Entry x:Name="CampoCodigo" Placeholder="Ej. PED-300-1"
+                                           Text="{Binding Codigo}" ReturnType="Done"
+                                           ReturnCommand="{Binding AgregarCodigoCommand}" />
+                                </Border>
+                                <Button Grid.Column="1" Text="Agregar" Style="{StaticResource BotonSecundario}"
+                                        Command="{Binding AgregarCodigoCommand}" />
+                            </Grid>
+
+                            <Label Text="{Binding Mensaje}" FontFamily="TextoMedio" FontSize="14" IsVisible="{Binding HayMensaje}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding MensajeEsAlerta}" Value="True">
+                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Peligro}, Dark={StaticResource PeligroOscuro}}" />
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label" Binding="{Binding MensajeEsAlerta}" Value="False">
+                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Exito}, Dark={StaticResource ExitoOscuro}}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Label Text="Bultos del envío (tocá uno para marcarlo o desmarcarlo)" Style="{StaticResource Seccion}" />
+                </VerticalStackLayout>
+            </CollectionView.Header>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:BultoParada">
+                    <Border Style="{StaticResource Tarjeta}" Padding="14,12" Margin="0,5">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SeleccionBultosViewModel}}, Path=AlternarCommand}"
+                                CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                            <Label Text="{Binding Icono}" FontSize="24" TextColor="{Binding ColorIcono}"
+                                   VerticalOptions="Center" Style="{StaticResource Icono}" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="{Binding Codigo}" Style="{StaticResource Codigo}" FontSize="15"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
+                                <Label Text="{Binding TextoEstado}" Style="{StaticResource Secundario}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+
+            <CollectionView.Footer>
+                <ContentView HeightRequest="16" />
+            </CollectionView.Footer>
+        </CollectionView>
+
+        <!-- Barra fija abajo: resumen y botones -->
+        <Border Grid.Row="1" Padding="16,12,16,16" StrokeThickness="0"
+                BackgroundColor="{AppThemeBinding Light={StaticResource FondoTarjeta}, Dark={StaticResource FondoTarjetaOscuro}}">
+            <VerticalStackLayout Spacing="8"
+                                 WidthRequest="{OnIdiom Phone=-1, Default=680}"
+                                 HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
+                <Label HorizontalTextAlignment="Center" Style="{StaticResource Secundario}" Text="{Binding TextoResumen}" />
+                <Grid ColumnDefinitions="*,2*" ColumnSpacing="10">
+                    <Button Text="Cancelar" Style="{StaticResource BotonTexto}" Clicked="AlCancelar" />
+                    <Button Grid.Column="1" Text="Continuar" Style="{StaticResource BotonPrimario}" Clicked="AlContinuar" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentPage>

@@ -30,4 +30,5 @@ public sealed record ParadaItem(
     string Direccion,
     string Localidad,
     string Estado,
-    IReadOnlyList<string> Bultos);
+    IReadOnlyList<string> Bultos,
+    IReadOnlyList<BultoItem>? DetalleBultos = null);
