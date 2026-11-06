@@ -2,6 +2,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 
@@ -38,14 +39,17 @@ public sealed class DespacharMiHojaDeRutaHandler(
         if (hoja.RepartidorId != repartidor.Id)
             throw new UnauthorizedAccessException("La hoja de ruta es de otro repartidor.");
 
-        // Los bultos que tienen que subir al vehículo: los de los envíos de las paradas activas.
+        // Los bultos que tienen que subir al vehículo: los pendientes de los envíos de las paradas activas
+        // (después de una entrega parcial, solo vuelven a salir los que quedaron sin entregar, RF 32).
         var esperados = new List<string>();
         foreach (var parada in hoja.Paradas.Where(p => p.Activa))
         {
             var envio = await envios.ObtenerAsync(parada.EnvioId, ct)
                 ?? throw new NoEncontradoException($"No existe el envío de la parada {parada.Orden}.");
 
-            esperados.AddRange(envio.Bultos.Select(b => b.Identificacion));
+            esperados.AddRange(envio.Bultos
+                .Where(b => b.Estado == EstadoBulto.Pendiente)
+                .Select(b => b.Identificacion));
         }
 
         var carga = VerificacionDeCarga.Verificar(esperados, command.BultosEscaneados ?? []);

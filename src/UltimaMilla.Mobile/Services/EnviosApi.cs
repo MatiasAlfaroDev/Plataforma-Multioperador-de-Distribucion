@@ -47,7 +47,8 @@ public class EnviosApi : IEnviosApi
                 $"{p.Direccion}, {p.Localidad}",
                 p.Bultos.Count,
                 PesoTotalKg: 0m,
-                FechaAlta: DateTimeOffset.Now))
+                FechaAlta: DateTimeOffset.Now,
+                Bultos: p.DetalleBultos))
             .ToList();
     }
 
@@ -99,7 +100,8 @@ public class EnviosApi : IEnviosApi
     /// </summary>
     public async Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarEventoAsync(EventoPendiente evento, CancellationToken ct = default)
     {
-        var esEntrega = evento.Tipo == "Entregado";
+        // La prueba de entrega va tanto en la entrega completa como en la parcial.
+        var esEntrega = evento.Tipo is "Entregado" or "EntregadoParcialmente";
         var cuerpo = new
         {
             idEvento = evento.Id,
@@ -113,7 +115,10 @@ public class EnviosApi : IEnviosApi
             referenciaFotografia = esEntrega ? evento.ReferenciaFoto : null,
             documentoReceptor = esEntrega ? evento.DocumentoReceptor : null,
             referenciaFirma = esEntrega ? evento.ReferenciaFirma : null,
-            evidenciaFallo = esEntrega ? null : evento.ReferenciaFoto
+            evidenciaFallo = esEntrega ? null : evento.ReferenciaFoto,
+            // Entrega parcial (RF 32): solo en ese tipo van las listas de bultos (el servidor rechaza las listas en los demás).
+            bultosEntregados = evento.BultosEntregados,
+            bultosNoEntregados = evento.BultosNoEntregados?.Select(b => new { bultoId = b.BultoId, motivo = b.Motivo, evidencia = b.Evidencia })
         };
 
         try

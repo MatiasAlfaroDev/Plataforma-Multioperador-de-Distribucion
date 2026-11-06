@@ -41,6 +41,12 @@ public sealed class EventoPendiente
     /// <summary>Referencia de la firma en pantalla (archivo SVG), solo para "Entregado" (RF 20).</summary>
     public string? ReferenciaFirma { get; set; }
 
+    /// <summary>Entrega parcial (RF 32): Ids de los bultos que se entregaron.</summary>
+    public IReadOnlyList<Guid>? BultosEntregados { get; set; }
+
+    /// <summary>Entrega parcial (RF 32): los bultos que no se entregaron, cada uno con motivo y evidencia.</summary>
+    public IReadOnlyList<BultoNoEntregado>? BultosNoEntregados { get; set; }
+
     public int Intentos { get; set; }
     public string? UltimoError { get; set; }
 }
