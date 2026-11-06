@@ -31,6 +31,16 @@ public sealed class EventoEnvioConfiguration : IEntityTypeConfiguration<EventoEn
 
         builder.Property(e => e.Justificacion)
             .HasMaxLength(1000);
+        
+        builder.Property(e => e.ModalidadDevolucion)
+            .HasConversion<string>()
+            .HasMaxLength(40);
+
+        builder.Property(e => e.ReceptorDevolucion)
+            .HasMaxLength(200);
+
+        builder.Property(e => e.ReferenciaConstanciaDevolucion)
+            .HasMaxLength(500);
 
         builder.Property(e => e.Latitud).HasPrecision(9, 6);
         builder.Property(e => e.Longitud).HasPrecision(9, 6);

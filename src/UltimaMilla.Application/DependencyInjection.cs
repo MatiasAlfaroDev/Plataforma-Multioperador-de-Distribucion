@@ -7,6 +7,8 @@ using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Envios.Commands.Reprogramacion;
+using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
+using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
 using UltimaMilla.Application.Envios.Queries.ListarSolicitudesReprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
@@ -42,6 +44,13 @@ using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
 using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResumenEnvios;
+using UltimaMilla.Application.Reportes.Queries.ObtenerMotivosNoEntrega;
+using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
+using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
+using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
+using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 
 namespace UltimaMilla.Application;
 
@@ -61,6 +70,8 @@ public static class DependencyInjection
         services.AddScoped<SolicitarReprogramacionHandler>();
         services.AddScoped<ConfirmarReprogramacionHandler>();
         services.AddScoped<ListarSolicitudesReprogramacionHandler>();
+        services.AddScoped<IniciarDevolucionHandler>();
+        services.AddScoped<ConfirmarDevolucionHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
         services.AddScoped<SolicitarVinculacionHandler>();
         services.AddScoped<AceptarVinculacionHandler>();
@@ -97,6 +108,14 @@ public static class DependencyInjection
         services.AddScoped<ListarAvisosHandler>();
         services.AddScoped<CrearSuscripcionHandler>();
         services.AddScoped<ListarSuscripcionesHandler>();
+
+        services.AddScoped<ObtenerResumenEnviosHandler>();
+        services.AddScoped<ObtenerMotivosNoEntregaHandler>();
+        services.AddScoped<ObtenerActividadComercialHandler>();
+        services.AddScoped<ObtenerResultadosRepartidoresHandler>();
+        services.AddScoped<ObtenerCumplimientoHandler>();
+        services.AddScoped<ObtenerDetalleLiquidacionHandler>();
+        services.AddScoped<ObtenerPuntualidadHandler>();
         return services;
     }
 }
