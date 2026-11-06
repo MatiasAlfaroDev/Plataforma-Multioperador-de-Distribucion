@@ -42,6 +42,12 @@ using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
 using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResumenEnvios;
+using UltimaMilla.Application.Reportes.Queries.ObtenerMotivosNoEntrega;
+using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
+using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
+using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 
 namespace UltimaMilla.Application;
 
@@ -97,6 +103,13 @@ public static class DependencyInjection
         services.AddScoped<ListarAvisosHandler>();
         services.AddScoped<CrearSuscripcionHandler>();
         services.AddScoped<ListarSuscripcionesHandler>();
+
+        services.AddScoped<ObtenerResumenEnviosHandler>();
+        services.AddScoped<ObtenerMotivosNoEntregaHandler>();
+        services.AddScoped<ObtenerActividadComercialHandler>();
+        services.AddScoped<ObtenerResultadosRepartidoresHandler>();
+        services.AddScoped<ObtenerCumplimientoHandler>();
+        services.AddScoped<ObtenerDetalleLiquidacionHandler>();
         return services;
     }
 }

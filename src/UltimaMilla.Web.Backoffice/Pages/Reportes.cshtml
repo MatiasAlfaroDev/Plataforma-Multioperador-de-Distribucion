@@ -1,0 +1,340 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.ReportesModel
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Reportes de gestión";
+    var cultura = CultureInfo.GetCultureInfo("es-UY");
+}
+
+@functions {
+    private static string EstadoLegible(string estado) => estado switch
+    {
+        "Admitido" => "Admitido",
+        "EnDeposito" => "En depósito",
+        "AsignadoARuta" => "Asignado a ruta",
+        "EnTransito" => "En tránsito",
+        "Entregado" => "Entregado",
+        "EntregadoParcialmente" => "Entregado parcialmente",
+        "NoEntregado" => "No entregado",
+        "Reprogramado" => "Reprogramado",
+        "EnDevolucion" => "En devolución",
+        "Devuelto" => "Devuelto",
+        "Extraviado" => "Extraviado",
+        _ => estado
+    };
+}
+
+<div class="space-y-8">
+    <header class="space-y-1">
+        <h1 class="font-display text-2xl font-bold tracking-tight">Reportes de gestión</h1>
+        <p class="nota">Consultá los resultados de la operación por período.</p>
+    </header>
+
+    <section class="rounded-xl border border-borde bg-superficie p-5">
+        <form method="get" class="filtro">
+            <div>
+                <label for="desde">Desde</label>
+                <input id="desde" name="desde" type="date"
+                       value="@(Model.Desde?.ToString("yyyy-MM-dd"))" required />
+            </div>
+            <div>
+                <label for="hasta">Hasta</label>
+                <input id="hasta" name="hasta" type="date"
+                       value="@(Model.Hasta?.ToString("yyyy-MM-dd"))" required />
+            </div>
+            <button type="submit" class="primario">Consultar reportes</button>
+        </form>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <p class="aviso error" role="alert">@Model.Error</p>
+    }
+
+    @if (Model.Resumen is not null)
+    {
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Resumen de envíos</h2>
+            <div class="rounded-xl border border-borde bg-superficie p-5">
+                <p class="text-sm text-suave">Total de envíos</p>
+                <p class="mt-1 text-3xl font-bold">@Model.Resumen.TotalEnvios</p>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr><th class="p-3">Estado</th><th class="p-3 text-right">Cantidad</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Resumen.PorEstado.Count == 0)
+                        {
+                            <tr><td colspan="2" class="p-4 text-suave">No hay envíos en el período seleccionado.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var estado in Model.Resumen.PorEstado)
+                            {
+                                <tr class="border-t border-borde">
+                                    <td class="p-3">@EstadoLegible(estado.Estado)</td>
+                                    <td class="p-3 text-right">@estado.Cantidad</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="nota">Envíos dados de alta en el período, clasificados según su estado actual.</p>
+        </section>
+    }
+
+    @if (Model.Motivos is not null)
+    {
+        <section class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="font-display text-xl font-semibold">Motivos de no entrega</h2>
+                <span class="text-sm text-suave">Total de incidencias: <strong>@Model.Motivos.TotalIncidencias</strong></span>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr>
+                            <th class="p-3">Motivo</th>
+                            <th class="p-3 text-right">Intentos fallidos</th>
+                            <th class="p-3 text-right">Bultos no entregados</th>
+                            <th class="p-3 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Motivos.Motivos.Count == 0)
+                        {
+                            <tr><td colspan="4" class="p-4 text-suave">No se registraron incidencias en el período.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var motivo in Model.Motivos.Motivos)
+                            {
+                                <tr class="border-t border-borde">
+                                    <td class="p-3">@motivo.Descripcion</td>
+                                    <td class="p-3 text-right">@motivo.IntentosFallidos</td>
+                                    <td class="p-3 text-right">@motivo.BultosNoEntregados</td>
+                                    <td class="p-3 text-right font-semibold">@motivo.TotalIncidencias</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="nota">Se consideran los intentos del período. Los bultos no entregados corresponden a entregas parciales.</p>
+        </section>
+    }
+
+    @if (Model.Actividad is not null)
+    {
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Volumen diario</h2>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr><th class="p-3">Fecha</th><th class="p-3 text-right">Envíos registrados</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Actividad.VolumenDiario.Count == 0)
+                        {
+                            <tr><td colspan="2" class="p-4 text-suave">No hay actividad registrada en el período.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var dia in Model.Actividad.VolumenDiario)
+                            {
+                                <tr class="border-t border-borde">
+                                    <td class="p-3">@dia.Fecha.ToString("dd/MM/yyyy")</td>
+                                    <td class="p-3 text-right">@dia.Cantidad</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Actividad por comercio</h2>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr>
+                            <th class="p-3">Comercio</th>
+                            <th class="p-3 text-right">Envíos</th>
+                            <th class="p-3 text-right">Entregados</th>
+                            <th class="p-3 text-right">Parciales</th>
+                            <th class="p-3 text-right">Importe tarifado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Actividad.Comercios.Count == 0)
+                        {
+                            <tr><td colspan="5" class="p-4 text-suave">No hay actividad comercial en el período.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var comercio in Model.Actividad.Comercios)
+                            {
+                                <tr class="border-t border-borde">
+                                    <td class="p-3">@comercio.Comercio</td>
+                                    <td class="p-3 text-right">@comercio.TotalEnvios</td>
+                                    <td class="p-3 text-right">@comercio.Entregados</td>
+                                    <td class="p-3 text-right">@comercio.EntregadosParcialmente</td>
+                                    <td class="p-3 text-right">$ @comercio.ImporteTarifado.ToString("N2", cultura)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="nota">El importe tarifado suma las tarifas calculadas de los envíos dados de alta en el período. No es una liquidación definitiva.</p>
+        </section>
+    }
+
+    @if (Model.Repartidores is not null)
+    {
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Resultados por repartidor</h2>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr>
+                            <th class="p-3">Repartidor</th>
+                            <th class="p-3 text-right">Completas</th>
+                            <th class="p-3 text-right">Parciales</th>
+                            <th class="p-3 text-right">Fallidas</th>
+                            <th class="p-3 text-right">Completas / resultados</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Repartidores.Repartidores.Count == 0)
+                        {
+                            <tr><td colspan="5" class="p-4 text-suave">No hay resultados de entrega por repartidor en el período.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var repartidor in Model.Repartidores.Repartidores)
+                            {
+                                var total = repartidor.EntregasCompletas + repartidor.EntregasParciales + repartidor.IntentosFallidos;
+                                var porcentaje = total == 0 ? 0m : Math.Round(100m * repartidor.EntregasCompletas / total, 2);
+                                <tr class="border-t border-borde">
+                                    <td class="p-3">@repartidor.Repartidor</td>
+                                    <td class="p-3 text-right">@repartidor.EntregasCompletas</td>
+                                    <td class="p-3 text-right">@repartidor.EntregasParciales</td>
+                                    <td class="p-3 text-right">@repartidor.IntentosFallidos</td>
+                                    <td class="p-3 text-right font-semibold">@porcentaje.ToString("N2", cultura)%</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="nota">Se muestran resultados de intentos, no envíos únicos. Un envío puede tener varios intentos y los casos sin asignación inequívoca se agrupan aparte.</p>
+        </section>
+    }
+
+    @if (Model.Cumplimiento is not null)
+    {
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Cumplimiento por zona</h2>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr><th class="p-3">Zona</th><th class="p-3 text-right">Completas</th><th class="p-3 text-right">Parciales</th><th class="p-3 text-right">Fallidas</th><th class="p-3 text-right">Completas / resultados</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Cumplimiento.Resultados.Zonas.Count == 0)
+                        {
+                            <tr><td colspan="5" class="p-4 text-suave">No hay resultados por zona en el período.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var zona in Model.Cumplimiento.Resultados.Zonas)
+                            {
+                                <tr class="border-t border-borde">
+                                    <td class="p-3">@zona.Zona</td><td class="p-3 text-right">@zona.Completas</td><td class="p-3 text-right">@zona.Parciales</td><td class="p-3 text-right">@zona.Fallidas</td><td class="p-3 text-right font-semibold">@zona.PorcentajeCompletas.ToString("N2", cultura)%</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Cumplimiento por comercio</h2>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr><th class="p-3">Comercio</th><th class="p-3 text-right">Completas</th><th class="p-3 text-right">Parciales</th><th class="p-3 text-right">Fallidas</th><th class="p-3 text-right">Completas / resultados</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Cumplimiento.Resultados.Comercios.Count == 0)
+                        {
+                            <tr><td colspan="5" class="p-4 text-suave">No hay resultados por comercio en el período.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var comercio in Model.Cumplimiento.Resultados.Comercios)
+                            {
+                                <tr class="border-t border-borde">
+                                    <td class="p-3">@comercio.Comercio</td><td class="p-3 text-right">@comercio.Completas</td><td class="p-3 text-right">@comercio.Parciales</td><td class="p-3 text-right">@comercio.Fallidas</td><td class="p-3 text-right font-semibold">@comercio.PorcentajeCompletas.ToString("N2", cultura)%</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="nota">Indicador = entregas completas / resultados de entrega × 100. Las parciales y fallidas cuentan por separado. No mide puntualidad horaria.</p>
+        </section>
+    }
+
+    @if (Model.Liquidacion is not null)
+    {
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Detalle de tarifas por comercio</h2>
+            <p class="nota">Desglose tarifario de envíos dados de alta en el período. No representa una liquidación emitida ni importes cobrados.</p>
+            @if (Model.Liquidacion.Comercios.Count == 0)
+            {
+                <div class="rounded-xl border border-borde bg-superficie p-5 text-suave">No hay envíos en el período seleccionado.</div>
+            }
+            else
+            {
+                @foreach (var comercio in Model.Liquidacion.Comercios)
+                {
+                    <div class="overflow-hidden rounded-xl border border-borde bg-superficie">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-borde p-4">
+                            <div>
+                                <h3 class="font-display font-semibold">@comercio.Comercio</h3>
+                                <p class="text-sm text-suave">@comercio.TotalEnvios envíos · @comercio.EnviosSinTarifa sin tarifa</p>
+                            </div>
+                            <p class="text-xl font-bold">$ @comercio.TotalTarifado.ToString("N2", cultura)</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="border-b border-borde">
+                                    <tr><th class="p-3">Referencia</th><th class="p-3">Fecha de alta</th><th class="p-3">Estado actual</th><th class="p-3 text-right">Tarifa calculada</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var envio in comercio.Envios)
+                                    {
+                                        <tr class="border-t border-borde">
+                                            <td class="p-3">@(string.IsNullOrWhiteSpace(envio.Referencia) ? envio.EnvioId.ToString("N")[..8] : envio.Referencia)</td>
+                                            <td class="p-3">@envio.FechaAlta.ToString("dd/MM/yyyy")</td>
+                                            <td class="p-3">@EstadoLegible(envio.Estado)</td>
+                                            <td class="p-3 text-right">@(envio.Tarifa.HasValue ? "$ " + envio.Tarifa.Value.ToString("N2", cultura) : "Sin tarifa")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+    }
+</div>
