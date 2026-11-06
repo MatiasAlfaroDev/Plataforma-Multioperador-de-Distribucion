@@ -7,6 +7,8 @@ using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Envios.Commands.Reprogramacion;
+using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
+using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
 using UltimaMilla.Application.Envios.Queries.ListarSolicitudesReprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
 using UltimaMilla.Application.Operadores.Queries.ListarOperadores;
@@ -68,6 +70,8 @@ public static class DependencyInjection
         services.AddScoped<SolicitarReprogramacionHandler>();
         services.AddScoped<ConfirmarReprogramacionHandler>();
         services.AddScoped<ListarSolicitudesReprogramacionHandler>();
+        services.AddScoped<IniciarDevolucionHandler>();
+        services.AddScoped<ConfirmarDevolucionHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
         services.AddScoped<SolicitarVinculacionHandler>();
         services.AddScoped<AceptarVinculacionHandler>();

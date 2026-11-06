@@ -65,6 +65,8 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
 using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
+using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
+using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -616,7 +618,81 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
             ct);
 
         return Results.NoContent();
-    });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapPost("/envios/{envioId:guid}/iniciar-devolucion",
+    async (
+        Guid envioId,
+        IniciarDevolucionRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        IniciarDevolucionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new IniciarDevolucionCommand(
+                envioId,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+
+api.MapPost("/envios/{envioId:guid}/confirmar-devolucion",
+    async (
+        Guid envioId,
+        ConfirmarDevolucionRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ConfirmarDevolucionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        await handler.Handle(
+            new ConfirmarDevolucionCommand(
+                request.CuentaComercialId,
+                envioId,
+                request.IdentificacionesEscaneadas,
+                request.Responsable,
+                request.Modalidad,
+                request.Receptor,
+                request.ReferenciaConstancia),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorComercio,
+        Perfiles.Comercio));
 
 // Declarar un envío como extraviado.
 api.MapPost("/envios/{envioId:guid}/extravio",
@@ -1151,3 +1227,6 @@ public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEs
 
 public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
 public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record IniciarDevolucionRequest( string Responsable);
+
+public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);
