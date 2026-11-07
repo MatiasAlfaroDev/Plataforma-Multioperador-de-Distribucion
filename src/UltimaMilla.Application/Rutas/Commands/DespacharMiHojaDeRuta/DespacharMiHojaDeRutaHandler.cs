@@ -3,8 +3,8 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Seguridad;
-using UltimaMilla.Domain.Retiros;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Retiros;
 
 namespace UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 
@@ -46,31 +46,15 @@ public sealed class DespacharMiHojaDeRutaHandler(
                 "La hoja de ruta es de otro repartidor.");
         }
 
-        // Los bultos pendientes de los envíos de las paradas activas.
-        var esperados = new List<string>();
-
-        foreach (var parada in hoja.Paradas.Where(p => p.Activa))
-        {
-            var envio = await envios.ObtenerAsync(parada.EnvioId, ct)
-                ?? throw new NoEncontradoException(
-                    $"No existe el envío de la parada {parada.Orden}.");
-
-            esperados.AddRange(envio.Bultos
-                .Where(b => b.Estado == EstadoBulto.Pendiente)
-                .Select(b => b.Identificacion));
-        }
-        }
-
-        // Solo los paquetes de entrega se cargan al salir.
-        // Los paquetes de retiro todavía están en los domicilios.
+        // RF32: solo se cargan los bultos pendientes de los envíos.
+        // RF39: los bultos de los retiros todavía están en los domicilios.
         var esperados = new List<string>();
 
         foreach (var parada in hoja.Paradas.Where(p => p.Activa))
         {
             if (parada.EnvioId is Guid envioId)
             {
-                var envio = await envios.ObtenerAsync(
-                    envioId, ct)
+                var envio = await envios.ObtenerAsync(envioId, ct)
                     ?? throw new NoEncontradoException(
                         $"No existe el envío de la parada {parada.Orden}.");
 
@@ -80,13 +64,16 @@ public sealed class DespacharMiHojaDeRutaHandler(
                         "El envío pertenece a otro operador.");
                 }
 
+                // Los bultos ya entregados en una entrega parcial
+                // no deben volver a cargarse.
                 esperados.AddRange(
-                    envio.Bultos.Select(b => b.Identificacion));
+                    envio.Bultos
+                        .Where(b => b.Estado == EstadoBulto.Pendiente)
+                        .Select(b => b.Identificacion));
             }
             else if (parada.RetiroId is Guid retiroId)
             {
-                var retiro = await retiros.ObtenerAsync(
-                    retiroId, ct)
+                var retiro = await retiros.ObtenerAsync(retiroId, ct)
                     ?? throw new NoEncontradoException(
                         $"No existe el retiro de la parada {parada.Orden}.");
 
@@ -98,8 +85,8 @@ public sealed class DespacharMiHojaDeRutaHandler(
                         "La hoja contiene un retiro inválido.");
                 }
 
-                // Los bultos del retiro no se incluyen en la
-                // verificación de carga inicial del vehículo.
+                // Los bultos del retiro se recogen durante el recorrido.
+                // No se incluyen en la carga inicial del vehículo.
             }
             else
             {
