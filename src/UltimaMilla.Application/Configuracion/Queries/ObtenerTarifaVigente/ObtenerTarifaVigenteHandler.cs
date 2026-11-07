@@ -1,4 +1,5 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Domain.Configuracion;
 
 namespace UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
 
@@ -10,13 +11,24 @@ public sealed class ObtenerTarifaVigenteHandler(
         ObtenerTarifaVigenteQuery query,
         CancellationToken ct)
     {
-        var ahora = reloj.GetUtcNow();
+        ArgumentNullException.ThrowIfNull(query);
+
+        if (!Enum.TryParse<TipoServicioTarifario>(
+                query.TipoServicio,
+                ignoreCase: true,
+                out var tipoServicio) ||
+            !Enum.IsDefined(tipoServicio))
+        {
+            throw new ArgumentException(
+                "El tipo de servicio debe ser Entrega o RetiroDomicilio.");
+        }
 
         var version = await tarifas.ObtenerVigentePorZonaAsync(
             query.OperadorId,
             query.ZonaCoberturaId,
-            ahora,
-            ct);
+            reloj.GetUtcNow(),
+            ct,
+            tipoServicio);
 
         if (version is null)
             return null;
@@ -30,6 +42,7 @@ public sealed class ObtenerTarifaVigenteHandler(
             version.PrecioPorMetroCubico,
             version.RecargoUrgentePorcentaje,
             version.BonificacionPorcentaje,
-            version.VigenciaDesde);
+            version.VigenciaDesde,
+            version.TipoServicio.ToString());
     }
 }

@@ -8,4 +8,5 @@ public sealed record ActualizarTarifaCommand(
     decimal PrecioPorKg,
     decimal PrecioPorMetroCubico,
     decimal RecargoUrgentePorcentaje,
-    decimal BonificacionPorcentaje);
+    decimal BonificacionPorcentaje,
+    string TipoServicio = "Entrega");

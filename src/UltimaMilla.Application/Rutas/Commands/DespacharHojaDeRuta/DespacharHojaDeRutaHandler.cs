@@ -3,12 +3,14 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Retiros;
 
 namespace UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 
 public sealed class DespacharHojaDeRutaHandler(
     IHojaDeRutaRepository hojas,
     IEnvioRepository envios,
+    IRetiroRepository retiros,
     IVersionReglasOperativasRepository reglasRepository,
     IUnitOfWork unitOfWork,
     TimeProvider reloj)
@@ -33,6 +35,8 @@ public sealed class DespacharHojaDeRutaHandler(
             ?? throw new NoEncontradoException(
                 "La hoja de ruta no existe.");
 
+        hoja.VerificarEditable();
+
         var paradas = hoja.Paradas
             .Where(p => p.Activa)
             .OrderBy(p => p.Orden)
@@ -41,57 +45,78 @@ public sealed class DespacharHojaDeRutaHandler(
         if (paradas.Count == 0)
         {
             throw new InvalidOperationException(
-                "La hoja de ruta no tiene envíos activos para despachar.");
+                "La hoja de ruta no tiene paradas activas para despachar.");
         }
 
-        // Primero validamos y obtenemos las reglas de todos los envíos.
-        // Todavía no modificamos ningún estado.
+        // Validar toda la hoja antes de modificar estados.
         var enviosPreparados = new List<(
             Envio Envio,
             VersionReglasOperativas Reglas)>();
 
         foreach (var parada in paradas)
         {
-            var envio = await envios.ObtenerAsync(
-                parada.EnvioId,
-                ct)
-                ?? throw new NoEncontradoException(
-                    $"No existe el envío asociado a la parada {parada.Id}.");
+            if (parada.EnvioId is Guid envioId)
+            {
+                var envio = await envios.ObtenerAsync(
+                    envioId, ct)
+                    ?? throw new NoEncontradoException(
+                        $"No existe el envío de la parada {parada.Id}.");
 
-            if (envio.OperadorId != command.OperadorId)
+                if (envio.OperadorId != command.OperadorId)
+                {
+                    throw new InvalidOperationException(
+                        "El envío pertenece a otro operador.");
+                }
+
+                if (envio.Estado != EstadoEnvio.AsignadoARuta)
+                {
+                    throw new InvalidOperationException(
+                        $"El envío {envio.ReferenciaExterna} no está asignado a ruta.");
+                }
+
+                if (envio.VersionReglasOperativasId is not Guid reglasId)
+                {
+                    throw new InvalidOperationException(
+                        $"El envío {envio.ReferenciaExterna} no tiene reglas operativas.");
+                }
+
+                var reglas = await reglasRepository.ObtenerPorIdAsync(
+                    command.OperadorId,
+                    reglasId,
+                    ct)
+                    ?? throw new InvalidOperationException(
+                        $"No existen las reglas operativas del envío {envio.ReferenciaExterna}.");
+
+                enviosPreparados.Add((envio, reglas));
+            }
+            else if (parada.RetiroId is Guid retiroId)
+            {
+                var retiro = await retiros.ObtenerAsync(
+                    retiroId, ct)
+                    ?? throw new NoEncontradoException(
+                        $"No existe el retiro de la parada {parada.Id}.");
+
+                if (retiro.OperadorId != command.OperadorId ||
+                    retiro.HojaDeRutaId != hoja.Id ||
+                    retiro.Estado != EstadoRetiro.AsignadoARuta)
+                {
+                    throw new InvalidOperationException(
+                        "La parada contiene un retiro que no está correctamente asignado.");
+                }
+
+                // No cambiamos el estado del retiro al despachar:
+                // permanece AsignadoARuta hasta registrar su resultado.
+            }
+            else
             {
                 throw new InvalidOperationException(
-                    "El envío pertenece a otro operador.");
+                    "La hoja contiene una parada sin operación válida.");
             }
-
-            if (envio.Estado != EstadoEnvio.AsignadoARuta)
-            {
-                throw new InvalidOperationException(
-                    $"El envío {envio.ReferenciaExterna} no está " +
-                    "en estado AsignadoARuta.");
-            }
-
-            if (envio.VersionReglasOperativasId is not Guid reglasId)
-            {
-                throw new InvalidOperationException(
-                    $"El envío {envio.ReferenciaExterna} " +
-                    "no tiene reglas operativas asignadas.");
-            }
-
-            var reglas = await reglasRepository.ObtenerPorIdAsync(
-                command.OperadorId,
-                reglasId,
-                ct)
-                ?? throw new InvalidOperationException(
-                    $"No se encontraron las reglas operativas " +
-                    $"del envío {envio.ReferenciaExterna}.");
-
-            enviosPreparados.Add((envio, reglas));
         }
 
-        // Todas las validaciones finalizaron correctamente.
         var ahora = reloj.GetUtcNow();
 
+        // Mantener las transiciones existentes de entregas.
         foreach (var item in enviosPreparados)
         {
             item.Envio.Aplicar(
@@ -101,11 +126,14 @@ public sealed class DespacharHojaDeRutaHandler(
                 "Mobile",
                 hoja.RepartidorId.ToString());
         }
+
+        // Permite despachar hojas con entregas, retiros o ambos.
         hoja.MarcarDespachada(ahora);
 
-        // Una sola operación de persistencia para todos los envíos.
         await unitOfWork.GuardarCambiosAsync(ct);
 
+        // Se conserva el contrato actual: cantidad de envíos
+        // cuyo estado fue actualizado.
         return enviosPreparados.Count;
     }
 }

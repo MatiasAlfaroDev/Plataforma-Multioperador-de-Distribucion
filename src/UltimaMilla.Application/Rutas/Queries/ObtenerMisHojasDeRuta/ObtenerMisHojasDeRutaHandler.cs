@@ -1,3 +1,4 @@
+
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Seguridad;
@@ -9,6 +10,7 @@ public sealed class ObtenerMisHojasDeRutaHandler(
     IRepartidorRepository repartidores,
     IHojaDeRutaRepository hojas,
     IEnvioRepository envios,
+    IRetiroRepository retiros,
     ITenantContext sesion)
 {
     public async Task<IReadOnlyList<MiHojaDeRutaDto>> Handle(
@@ -16,17 +18,24 @@ public sealed class ObtenerMisHojasDeRutaHandler(
         CancellationToken ct)
     {
         var usuarioId = sesion.UsuarioId
-            ?? throw new UnauthorizedAccessException("Hay que iniciar sesión.");
+            ?? throw new UnauthorizedAccessException(
+                "Hay que iniciar sesión.");
 
         var operadorId = sesion.OperadorId
-            ?? throw new InvalidOperationException("Primero hay que elegir un operador.");
+            ?? throw new InvalidOperationException(
+                "Primero hay que elegir un operador.");
 
-        // El usuario de la app es un repartidor solo si está vinculado a uno de este operador.
-        var repartidor = await repartidores.ObtenerPorUsuarioAsync(operadorId, usuarioId, ct)
+        var repartidor =
+            await repartidores.ObtenerPorUsuarioAsync(
+                operadorId, usuarioId, ct)
             ?? throw new NoEncontradoException(
-                "Tu usuario no está vinculado a ningún repartidor de este operador.");
+                "Tu usuario no está vinculado a un repartidor de este operador.");
 
-        var delDia = await hojas.ListarDelRepartidorAsync(operadorId, repartidor.Id, query.Fecha, ct);
+        var delDia = await hojas.ListarDelRepartidorAsync(
+            operadorId,
+            repartidor.Id,
+            query.Fecha,
+            ct);
 
         var resultado = new List<MiHojaDeRutaDto>();
 
@@ -34,30 +43,76 @@ public sealed class ObtenerMisHojasDeRutaHandler(
         {
             var paradas = new List<MiParadaDto>();
 
-            // Solo las paradas activas, en el orden en que se recorren.
-            foreach (var parada in hoja.Paradas.Where(p => p.Activa).OrderBy(p => p.Orden))
+            foreach (var parada in hoja.Paradas
+                .Where(p => p.Activa)
+                .OrderBy(p => p.Orden))
             {
-                var envio = await envios.ObtenerAsync(parada.EnvioId, ct);
-                if (envio is null)
-                    continue;
+                if (parada.EnvioId is Guid envioId)
+                {
+                    var envio = await envios.ObtenerAsync(
+                        envioId, ct)
+                        ?? throw new InvalidOperationException(
+                            $"No existe el envío {envioId} de la ruta.");
+                    if (envio.OperadorId != operadorId)
+                        throw new InvalidOperationException(
+                            "La hoja contiene un envío de otro operador.");
 
-                // Solo los bultos pendientes: los ya entregados en una entrega parcial no vuelven a cargarse (RF 32).
-                var pendientes = envio.Bultos
-                    .Where(b => b.Estado == EstadoBulto.Pendiente)
-                    .OrderBy(b => b.Identificacion)
-                    .ToList();
+                    // Solo los bultos pendientes de entrega.
+                    var pendientes = envio.Bultos
+                        .Where(b => b.Estado == EstadoBulto.Pendiente)
+                        .OrderBy(b => b.Identificacion)
+                        .ToList();
 
-                paradas.Add(new MiParadaDto(
-                    parada.Orden,
-                    envio.Id,
-                    envio.ReferenciaExterna,
-                    envio.Destinatario.Nombre,
-                    envio.Destinatario.Telefono,
-                    $"{envio.Direccion.Calle} {envio.Direccion.Numero}",
-                    envio.Direccion.Localidad,
-                    envio.Estado.ToString(),
-                    pendientes.Select(b => b.Identificacion).ToList(),
-                    pendientes.Select(b => new MiBultoDto(b.Id, b.Identificacion)).ToList()));
+                    paradas.Add(new MiParadaDto(
+                        parada.Orden,
+                        envio.Id,
+                        envio.ReferenciaExterna,
+                        envio.Destinatario.Nombre,
+                        envio.Destinatario.Telefono,
+                        $"{envio.Direccion.Calle} {envio.Direccion.Numero}",
+                        envio.Direccion.Localidad,
+                        envio.Estado.ToString(),
+                        pendientes
+                            .Select(b => b.Identificacion)
+                            .ToList(),
+                        pendientes
+                            .Select(b => new MiBultoDto(
+                                b.Id,
+                                b.Identificacion))
+                            .ToList()));
+                }
+                else if (parada.RetiroId is Guid retiroId)
+                {
+                    var retiro = await retiros.ObtenerAsync(retiroId, ct)
+                        ?? throw new InvalidOperationException(
+                            $"No existe el retiro {retiroId} de la ruta.");
+
+                    if (retiro.OperadorId != operadorId ||
+                        retiro.HojaDeRutaId != hoja.Id)
+                        throw new InvalidOperationException(
+                            "La hoja contiene un retiro inválido.");
+
+                    paradas.Add(new MiParadaDto(
+                        parada.Orden,
+                        null,
+                        retiro.Id.ToString(),
+                        "Retiro en domicilio",
+                        null,
+                        $"{retiro.DomicilioRetiro.Calle} {retiro.DomicilioRetiro.Numero}",
+                        retiro.DomicilioRetiro.Localidad,
+                        retiro.Estado.ToString(),
+                        retiro.Bultos
+                            .Select(b => b.Identificacion)
+                            .OrderBy(x => x)
+                            .ToList(),
+                        RetiroId: retiro.Id,
+                        TipoOperacion: "Retiro"));
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        "La hoja contiene una parada inválida.");
+                }
             }
 
             resultado.Add(new MiHojaDeRutaDto(

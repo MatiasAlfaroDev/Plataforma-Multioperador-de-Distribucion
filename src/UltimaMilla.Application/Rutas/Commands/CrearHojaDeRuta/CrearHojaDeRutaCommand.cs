@@ -1,4 +1,3 @@
-
 namespace UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 
 public sealed record CrearHojaDeRutaCommand(
@@ -10,4 +9,5 @@ public sealed record CrearHojaDeRutaCommand(
     TimeOnly HoraEntregaDesde,
     TimeOnly HoraEntregaHasta,
     int MaximoParadas,
-    IReadOnlyList<Guid> EnviosIds);
+    IReadOnlyList<Guid> EnviosIds,
+    IReadOnlyList<Guid>? RetirosIds = null);

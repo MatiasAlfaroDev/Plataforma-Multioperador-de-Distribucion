@@ -11,6 +11,7 @@ using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Common;
 using UltimaMilla.Domain.Notificaciones;
 using UltimaMilla.Domain.Avisos;
+using UltimaMilla.Domain.Retiros;
 
 namespace UltimaMilla.Infrastructure.Persistence;
 
@@ -54,6 +55,9 @@ public sealed class AppDbContext(
     public DbSet<DispositivoMovil> DispositivosMoviles => Set<DispositivoMovil>();
     public DbSet<SuscripcionAviso> SuscripcionesAviso => Set<SuscripcionAviso>();
     public DbSet<EntregaAviso> EntregasAviso => Set<EntregaAviso>();
+    public DbSet<Retiro> Retiros => Set<Retiro>();
+    public DbSet<BultoRetiro> BultosRetiro => Set<BultoRetiro>();
+    public DbSet<EventoRetiroMovil> EventosRetiroMovil => Set<EventoRetiroMovil>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configuración de las tablas de ASP.NET Core Identity.
@@ -142,6 +146,16 @@ public sealed class AppDbContext(
                 x.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<EntregaAviso>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<Retiro>()
+            .HasQueryFilter(r =>
+                AccesoInicializacion ||
+                r.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<EventoRetiroMovil>()
             .HasQueryFilter(x =>
                 AccesoInicializacion ||
                 x.OperadorId == OperadorActualId);

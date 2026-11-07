@@ -12,12 +12,14 @@ public sealed class VersionTarifariaRepository(AppDbContext db)
         Guid operadorId,
         string departamento,
         DateTimeOffset fecha,
-        CancellationToken ct)
+        CancellationToken ct,
+        TipoServicioTarifario tipoServicio = TipoServicioTarifario.Entrega)
     {
         return await db.VersionesTarifarias
             .AsNoTracking()
             .Where(v =>
                 v.OperadorId == operadorId &&
+                v.TipoServicio == tipoServicio &&
                 v.VigenciaDesde <= fecha &&
                 (v.VigenciaHasta == null || fecha < v.VigenciaHasta))
             .Join(
@@ -38,12 +40,14 @@ public sealed class VersionTarifariaRepository(AppDbContext db)
         Guid operadorId,
         Guid zonaCoberturaId,
         DateTimeOffset fecha,
-        CancellationToken ct)
+        CancellationToken ct,
+        TipoServicioTarifario tipoServicio = TipoServicioTarifario.Entrega)
     {
         return await db.VersionesTarifarias
             .Where(v =>
                 v.OperadorId == operadorId &&
                 v.ZonaCoberturaId == zonaCoberturaId &&
+                v.TipoServicio == tipoServicio &&
                 v.VigenciaDesde <= fecha &&
                 (v.VigenciaHasta == null || fecha < v.VigenciaHasta))
             .OrderByDescending(v => v.VigenciaDesde)

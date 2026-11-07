@@ -235,7 +235,7 @@ public sealed class ReporteEnviosRepository(
                 h.DespachadaEn,
                 p.LiberadaEn
             }))
-            .Where(x => envioIds.Contains(x.EnvioId))
+            .Where(x => x.EnvioId.HasValue && envioIds.Contains(x.EnvioId.Value))
             .ToListAsync(ct);
 
         var repartidores = await db.Repartidores

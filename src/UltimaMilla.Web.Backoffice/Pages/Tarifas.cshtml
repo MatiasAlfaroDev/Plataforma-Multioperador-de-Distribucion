@@ -1,13 +1,18 @@
+
 @page
 @model UltimaMilla.Web.Backoffice.Pages.TarifasModel
 @using UltimaMilla.Web.Backoffice.Services
+
 @{
     ViewData["Title"] = "Configuración de tarifas";
 }
 
+<h1>Configuración de tarifas</h1>
+
 <p class="nota">
-    Seleccioná una zona de tu operador para consultar
-    o modificar su tarifa vigente.
+    Administrá las tarifas de entrega y retiro a domicilio.
+    Podés crear una tarifa nueva o actualizar una existente
+    sin perder el historial de versiones.
 </p>
 
 @if (TempData["Mensaje"] is string mensaje)
@@ -25,15 +30,18 @@
     <p class="aviso error" role="alert">@Model.Error</p>
 }
 
-
 @if (Model.OperadorIdSesion != Guid.Empty)
 {
     <form method="get" class="filtro">
         <div>
-            <label for="zonaCoberturaId">Zona</label>
+            <label for="zonaCoberturaId">
+                Zona de cobertura
+            </label>
+
             <select id="zonaCoberturaId"
                     name="zonaCoberturaId"
-                    onchange="this.form.submit()">
+                    onchange="this.form.submit()"
+                    required>
                 <option value="">Elegí una zona</option>
 
                 @foreach (var zona in Model.Zonas)
@@ -46,7 +54,49 @@
             </select>
         </div>
 
-        <button type="submit">Ver tarifa</button>
+        <div>
+            <label for="tipoServicio">
+                Tipo de servicio
+            </label>
+
+            <select id="tipoServicio"
+                    name="tipoServicio"
+                    onchange="this.form.submit()">
+                <option value="Entrega"
+                        selected="@(Model.TipoServicio == "Entrega")">
+                    Entrega
+                </option>
+
+                <option value="RetiroDomicilio"
+                        selected="@(Model.TipoServicio == "RetiroDomicilio")">
+                    Retiro a domicilio
+                </option>
+            </select>
+        </div>
+
+        <div>
+            <label for="accion">
+                Operación
+            </label>
+
+            <select id="accion"
+                    name="accion"
+                    onchange="this.form.submit()">
+                <option value="editar"
+                        selected="@(Model.Accion == "editar")">
+                    Editar tarifa vigente
+                </option>
+
+                <option value="nueva"
+                        selected="@(Model.Accion == "nueva")">
+                    Nueva tarifa
+                </option>
+            </select>
+        </div>
+
+        <button type="submit">
+            Ver configuración
+        </button>
     </form>
 }
 
@@ -54,60 +104,238 @@
      Model.ZonaCoberturaId.HasValue &&
      Model.Error is null)
 {
-    <h2>Tarifa vigente</h2>
+    <h2>
+        @(Model.EsRetiro
+            ? "Tarifa de retiro a domicilio"
+            : "Tarifa de entrega")
+    </h2>
 
-    @if (!Model.TarifaEncontrada)
+    @if (Model.EsNuevaTarifa)
     {
-        <p>Esta zona todavía no tiene una tarifa vigente, así que no hay valores para modificar.</p>
+        @if (Model.TarifaEncontrada)
+        {
+            <p class="aviso">
+                Ya existe una tarifa vigente para esta zona
+                y tipo de servicio.
+            </p>
+
+            <p class="nota">
+                Para modificar sus precios, seleccioná
+                "Editar tarifa vigente". La actualización
+                creará una nueva versión.
+            </p>
+        }
+        else
+        {
+            <h3>Nueva tarifa</h3>
+
+            <p class="nota">
+                Configurá el nombre del cuadro tarifario y
+                los precios para este servicio.
+            </p>
+
+            <form method="post"
+                  asp-page-handler="Crear">
+
+                <input type="hidden"
+                       asp-for="ZonaCoberturaId" />
+
+                <input type="hidden"
+                       asp-for="TipoServicio" />
+
+                <div class="campos">
+                    <div>
+                        <label asp-for="Nombre">
+                            Nombre de la tarifa
+                        </label>
+
+                        <input asp-for="Nombre"
+                               maxlength="150"
+                               required
+                               placeholder="Ej.: Retiro a domicilio" />
+                    </div>
+
+                    <div>
+                        <label asp-for="PrecioBase">
+                            Precio base
+                        </label>
+
+                        <input asp-for="PrecioBase"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               required />
+                    </div>
+
+                    <div>
+                        <label asp-for="PrecioPorKg">
+                            Precio por kg
+                        </label>
+
+                        <input asp-for="PrecioPorKg"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               required />
+                    </div>
+
+                    <div>
+                        <label asp-for="PrecioPorMetroCubico">
+                            Precio por m³
+                        </label>
+
+                        <input asp-for="PrecioPorMetroCubico"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               required />
+                    </div>
+
+                    @if (!Model.EsRetiro)
+                    {
+                        <div>
+                            <label asp-for="RecargoUrgentePorcentaje">
+                                Recargo urgente (%)
+                            </label>
+
+                            <input asp-for="RecargoUrgentePorcentaje"
+                                   type="number"
+                                   min="0"
+                                   step="0.01" />
+                        </div>
+                    }
+
+                    <div>
+                        <label asp-for="BonificacionPorcentaje">
+                            Bonificación (%)
+                        </label>
+
+                        <input asp-for="BonificacionPorcentaje"
+                               type="number"
+                               min="0"
+                               max="100"
+                               step="0.01" />
+                    </div>
+                </div>
+
+                <div class="acciones">
+                    <button type="submit" class="primario">
+                        Crear tarifa
+                    </button>
+                </div>
+            </form>
+        }
     }
     else
     {
-        @if (Model.VigenciaDesde.HasValue)
+        @if (!Model.TarifaEncontrada)
         {
-            <p class="nota">Vigente desde el @Formato.Hora(Model.VigenciaDesde.Value)</p>
+            <p class="nota">
+                No existe una tarifa vigente para
+                esta zona y servicio.
+            </p>
+
+            <p>
+                Seleccioná "Nueva tarifa" para crearla.
+            </p>
         }
+        else
+        {
+            <h3>Tarifa vigente</h3>
 
-        <form method="post">
-            <input type="hidden" asp-for="ZonaCoberturaId" />
-            <input type="hidden" asp-for="CuadroTarifarioId" />
+            @if (Model.VigenciaDesde.HasValue)
+            {
+                <p class="nota">
+                    Vigente desde el
+                    @Formato.Hora(Model.VigenciaDesde.Value)
+                </p>
+            }
 
-            <div class="campos">
-                <div>
-                    <label asp-for="PrecioBase">Precio base</label>
-                    <input asp-for="PrecioBase" type="number" min="0" step="0.01" />
+            <p class="nota">
+                Al guardar los cambios se creará una nueva
+                versión tarifaria. La versión anterior
+                quedará conservada en el historial.
+            </p>
+
+            <form method="post"
+                  asp-page-handler="Actualizar">
+
+                <input type="hidden"
+                       asp-for="ZonaCoberturaId" />
+
+                <input type="hidden"
+                       asp-for="TipoServicio" />
+
+                <div class="campos">
+                    <div>
+                        <label asp-for="PrecioBase">
+                            Precio base
+                        </label>
+
+                        <input asp-for="PrecioBase"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               required />
+                    </div>
+
+                    <div>
+                        <label asp-for="PrecioPorKg">
+                            Precio por kg
+                        </label>
+
+                        <input asp-for="PrecioPorKg"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               required />
+                    </div>
+
+                    <div>
+                        <label asp-for="PrecioPorMetroCubico">
+                            Precio por m³
+                        </label>
+
+                        <input asp-for="PrecioPorMetroCubico"
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               required />
+                    </div>
+
+                    @if (!Model.EsRetiro)
+                    {
+                        <div>
+                            <label asp-for="RecargoUrgentePorcentaje">
+                                Recargo urgente (%)
+                            </label>
+
+                            <input asp-for="RecargoUrgentePorcentaje"
+                                   type="number"
+                                   min="0"
+                                   step="0.01" />
+                        </div>
+                    }
+
+                    <div>
+                        <label asp-for="BonificacionPorcentaje">
+                            Bonificación (%)
+                        </label>
+
+                        <input asp-for="BonificacionPorcentaje"
+                               type="number"
+                               min="0"
+                               max="100"
+                               step="0.01" />
+                    </div>
                 </div>
 
-                <div>
-                    <label asp-for="PrecioPorKg">Precio por kg</label>
-                    <input asp-for="PrecioPorKg" type="number" min="0" step="0.01" />
+                <div class="acciones">
+                    <button type="submit" class="primario">
+                        Guardar nueva versión
+                    </button>
                 </div>
-
-                <div>
-                    <label asp-for="PrecioPorMetroCubico">Precio por m³</label>
-                    <input asp-for="PrecioPorMetroCubico" type="number" min="0" step="0.01" />
-                </div>
-
-                <div>
-                    <label asp-for="RecargoUrgentePorcentaje">Recargo urgente (%)</label>
-                    <input asp-for="RecargoUrgentePorcentaje"
-                           type="number"
-                           min="0"
-                           step="0.01" />
-                </div>
-
-                <div>
-                    <label asp-for="BonificacionPorcentaje">Bonificación (%)</label>
-                    <input asp-for="BonificacionPorcentaje"
-                           type="number"
-                           min="0"
-                           max="100"
-                           step="0.01" />
-                </div>
-            </div>
-
-            <div class="acciones">
-                <button type="submit" class="primario">Guardar nueva tarifa</button>
-            </div>
-        </form>
+            </form>
+        }
     }
 }
