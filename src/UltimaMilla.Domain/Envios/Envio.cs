@@ -271,9 +271,13 @@ public class Envio : AuditableEntity, ITenantEntity
         string? justificacion = null,
         decimal? latitud = null,
         decimal? longitud = null,
-        IReadOnlyCollection<Guid>? bultosEntregados = null,
+        IReadOnlyCollection<Guid>? bultosEntregados = null,   
         IReadOnlyCollection<(Guid BultoId, MotivoNoEntrega Motivo, string Evidencia)>?
-            bultosNoEntregados = null)
+            bultosNoEntregados = null,
+        ModalidadDevolucion? modalidadDevolucion = null,
+        string? receptorDevolucion = null,
+        string? referenciaConstanciaDevolucion = null)
+
     {
         ArgumentNullException.ThrowIfNull(reglas);
 
@@ -449,14 +453,52 @@ public class Envio : AuditableEntity, ITenantEntity
                 // Se permite registrar el regreso físico al depósito.
                 // La decisión de devolverlo al comercio se realiza después.
                 break;
-
+                  
             case DisparadorEnvio.IniciarDevolucion:
-                if (IntentosRealizados < reglas.MaximoIntentosEntrega &&
-                    !UltimoMotivoRequiereDevolucion)
+                if (!_bultos.Any(b => b.Estado == EstadoBulto.Pendiente))
                 {
                     throw new InvalidOperationException(
-                        "Todavía no corresponde iniciar la devolución.");
+                        "El envío no tiene bultos pendientes para devolver.");
                 }
+
+                if (IntentosRealizados == 0)
+                {
+                    throw new InvalidOperationException(
+                        "La devolución requiere al menos un intento de entrega.");
+                }
+
+                if (IntentosRealizados < reglas.MaximoIntentosEntrega &&
+                    !UltimoMotivoRequiereDevolucion &&
+                    reglas.AccionBultosPendientes !=
+                        AccionBultosPendientes.DevolverAlComercio)
+                {
+                    throw new InvalidOperationException(
+                        "Las reglas operativas indican que corresponde una nueva visita.");
+                }
+
+                break;
+ 
+            case DisparadorEnvio.ConfirmarDevolucion:
+                if (!_bultos.Any(b => b.Estado == EstadoBulto.EnDevolucion))
+                {
+                    throw new InvalidOperationException(
+                        "El envío no tiene bultos en devolución.");
+                }
+
+                if (!modalidadDevolucion.HasValue ||
+                    !Enum.IsDefined(modalidadDevolucion.Value))
+                {
+                    throw new ArgumentException(
+                        "Debe indicar una modalidad de devolución válida.");
+                }
+
+                if (string.IsNullOrWhiteSpace(receptorDevolucion) ||
+                    string.IsNullOrWhiteSpace(referenciaConstanciaDevolucion))
+                {
+                    throw new ArgumentException(
+                        "Debe registrar el receptor y la constancia de recepción.");
+                }
+
                 break;
 
             case DisparadorEnvio.Reprogramar:
@@ -507,10 +549,13 @@ public class Envio : AuditableEntity, ITenantEntity
             origen,
             responsable,
             latitud,
-            longitud,
+            longitud,      
             disparador == DisparadorEnvio.DeclararExtraviado
                 ? justificacion
-                : null);
+                : null,
+            modalidadDevolucion: modalidadDevolucion,
+            receptorDevolucion: receptorDevolucion,
+            referenciaConstanciaDevolucion: referenciaConstanciaDevolucion);
 
         maquina.Fire(disparador);
         if (disparador == DisparadorEnvio.RegistrarEntregaParcial)
@@ -528,6 +573,25 @@ public class Envio : AuditableEntity, ITenantEntity
             {
                 bulto.Aplicar(
                     MaquinaEstadosBulto.Disparador.Entregar);
+            }
+        }
+
+        else if (disparador == DisparadorEnvio.IniciarDevolucion)
+        {
+            foreach (var bulto in _bultos.Where(
+                b => b.Estado == EstadoBulto.Pendiente))
+            {
+                bulto.Aplicar(
+                    MaquinaEstadosBulto.Disparador.IniciarDevolucion);
+            }
+        }
+        else if (disparador == DisparadorEnvio.ConfirmarDevolucion)
+        {
+            foreach (var bulto in _bultos.Where(
+                b => b.Estado == EstadoBulto.EnDevolucion))
+            {
+                bulto.Aplicar(
+                    MaquinaEstadosBulto.Disparador.ConfirmarDevolucion);
             }
         }
 

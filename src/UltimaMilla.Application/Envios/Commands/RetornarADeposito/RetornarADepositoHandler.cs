@@ -1,6 +1,7 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 
@@ -8,7 +9,8 @@ public sealed class RetornarADepositoHandler(
     IEnvioRepository envios,
     IVersionReglasOperativasRepository reglasRepository,
     IUnitOfWork unitOfWork,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ITenantContext tenantContext)
 {
     public async Task Handle(
         RetornarADepositoCommand command,
@@ -26,6 +28,12 @@ public sealed class RetornarADepositoHandler(
 
         var envio = await envios.ObtenerAsync(command.EnvioId, ct)
             ?? throw new NoEncontradoException("El envío no existe.");
+
+        if (envio.OperadorId != tenantContext.OperadorId)
+        {
+            throw new UnauthorizedAccessException(
+                "No tiene permisos para modificar envíos de otro operador.");
+        }
 
         if (envio.Estado != EstadoEnvio.NoEntregado &&
             envio.Estado != EstadoEnvio.EntregadoParcialmente)
@@ -51,6 +59,22 @@ public sealed class RetornarADepositoHandler(
                 .Distinct(StringComparer.OrdinalIgnoreCase).Count())
             throw new InvalidOperationException(
                 "Hay identificaciones escaneadas repetidas.");
+                        
+        if (!tenantContext.EstaAutenticado ||
+            !tenantContext.UsuarioId.HasValue ||
+            !tenantContext.OperadorId.HasValue)
+        {
+            throw new UnauthorizedAccessException(
+                "Debe iniciar sesión y seleccionar un operador.");
+        }
+
+        if (tenantContext.Perfil is not (
+            Perfiles.AdministradorOperador or
+            Perfiles.Operador))
+        {
+            throw new UnauthorizedAccessException(
+                "No tiene permisos para registrar retornos al depósito.");
+        }
 
         var recibidos = escaneados
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

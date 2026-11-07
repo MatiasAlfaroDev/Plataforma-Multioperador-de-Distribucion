@@ -75,6 +75,12 @@ builder.Services.AddHttpClient<EnviosApiClient>(c =>
         ?? "http://localhost:5080/"))
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
+builder.Services.AddHttpClient<ReportesApiClient>(c =>
+    c.BaseAddress = new Uri(
+        builder.Configuration["Api:BaseUrl"]
+        ?? "http://localhost:5080/"))
+    .AddHttpMessageHandler<CookieAutenticacionHandler>();
+
 builder.Services.AddHttpClient<TarifasApiClient>(c =>
     c.BaseAddress = new Uri(
         builder.Configuration["Api:BaseUrl"]

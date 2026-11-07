@@ -77,11 +77,24 @@ public sealed class BaseDeDatosLocal
                     longitud     REAL,
                     foto         TEXT,
                     documento    TEXT,
-                    firma        TEXT
+                    firma        TEXT,
+                    bultos_entregados    TEXT,
+                    bultos_no_entregados TEXT
 
                 );
                 """;
             await comando.ExecuteNonQueryAsync();
+
+            // Bultos pendientes de cada envío de la ruta (RF 32): para escanear en la parada cuáles se entregan.
+            var bultos = conexion.CreateCommand();
+            bultos.CommandText = """
+                CREATE TABLE IF NOT EXISTS bultos_ruta (
+                    bulto_id       TEXT PRIMARY KEY,
+                    identificacion TEXT NOT NULL,
+                    envio_id       TEXT NOT NULL
+                );
+                """;
+            await bultos.ExecuteNonQueryAsync();
 
             // Posiciones de la jornada (RF 23) que todavía no llegaron al servidor.
             var posiciones = conexion.CreateCommand();
@@ -101,6 +114,8 @@ public sealed class BaseDeDatosLocal
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "foto", "TEXT");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "documento", "TEXT");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "firma", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_entregados", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_no_entregados", "TEXT");
 
             _cadenaDeConexion = cadena;
         }

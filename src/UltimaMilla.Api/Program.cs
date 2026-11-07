@@ -59,6 +59,15 @@ using UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
 using UltimaMilla.Application.Mensajeria.Commands.ReintentarMensajesFallidos;
 using UltimaMilla.Application.Mensajeria.Queries.ListarMensajesFallidos;
 using UltimaMilla.Domain.Avisos;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResumenEnvios;
+using UltimaMilla.Application.Reportes.Queries.ObtenerMotivosNoEntrega;
+using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
+using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
+using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
+using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
+using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
+using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -283,6 +292,223 @@ api.MapPost("/envios", async (
     Perfiles.Comercio));
 
 
+ // GET /api/reportes/envios/resumen?desde=2026-11-01&hasta=2026-11-30
+ // Resumen de envíos por período para el operador autenticado.
+ api.MapGet("/reportes/envios/resumen", async (
+     DateOnly desde,
+     DateOnly hasta,
+     HttpContext context,
+     ObtenerResumenEnviosHandler handler,
+     CancellationToken ct) =>
+ {
+     if (!Guid.TryParse(
+             context.User.FindFirst("operador_id")?.Value,
+             out var operadorId) ||
+         operadorId == Guid.Empty)
+     {
+         return Results.Forbid();
+     }
+
+     if (hasta < desde || hasta == DateOnly.MaxValue)
+     {
+         return Results.BadRequest(new
+         {
+             mensaje = "El rango de fechas no es válido."
+         });
+     }
+
+     var resultado = await handler.Handle(
+         operadorId,
+         desde,
+         hasta,
+         ct);
+
+     return Results.Ok(resultado);
+ })
+ .RequireAuthorization(policy => policy.RequireRole(
+     Perfiles.AdministradorOperador,
+     Perfiles.Operador));
+
+
+api.MapGet("/reportes/motivos-no-entrega", async (
+    DateOnly desde,
+    DateOnly hasta,
+    HttpContext context,
+    ObtenerMotivosNoEntregaHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (hasta < desde || hasta == DateOnly.MaxValue)
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = "El rango de fechas no es válido."
+        });
+    }
+
+    var resultado = await handler.Handle(
+        operadorId,
+        desde,
+        hasta,
+        ct);
+
+    return Results.Ok(resultado);
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapGet("/reportes/actividad-comercial", async (
+    DateOnly desde,
+    DateOnly hasta,
+    HttpContext context,
+    ObtenerActividadComercialHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (hasta < desde || hasta == DateOnly.MaxValue)
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = "El rango de fechas no es válido."
+        });
+    }
+
+    var resultado = await handler.Handle(
+        operadorId,
+        desde,
+        hasta,
+        ct);
+
+    return Results.Ok(resultado);
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapGet("/reportes/repartidores", async (
+    DateOnly desde,
+    DateOnly hasta,
+    HttpContext context,
+    ObtenerResultadosRepartidoresHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (hasta < desde || hasta == DateOnly.MaxValue)
+        return Results.BadRequest("Rango de fechas no válido.");
+
+    return Results.Ok(await handler.Handle(
+        operadorId, desde, hasta, ct));
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapGet("/reportes/cumplimiento", async (
+    DateOnly desde,
+    DateOnly hasta,
+    HttpContext context,
+    ObtenerCumplimientoHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (hasta < desde || hasta == DateOnly.MaxValue)
+        return Results.BadRequest("Rango de fechas no válido.");
+
+    var resultado = await handler.Handle(
+        operadorId, desde, hasta, ct);
+
+    return Results.Ok(resultado);
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapGet("/reportes/liquidacion", async (
+    DateOnly desde,
+    DateOnly hasta,
+    HttpContext context,
+    ObtenerDetalleLiquidacionHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (hasta < desde || hasta == DateOnly.MaxValue)
+        return Results.BadRequest("Rango de fechas no válido.");
+
+    return Results.Ok(await handler.Handle(
+        operadorId, desde, hasta, ct));
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapGet("/reportes/puntualidad", async (
+    DateOnly desde,
+    DateOnly hasta,
+    HttpContext context,
+    ObtenerPuntualidadHandler handler,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (hasta < desde || hasta == DateOnly.MaxValue)
+        return Results.BadRequest("Rango de fechas no válido.");
+
+    return Results.Ok(await handler.Handle(
+        operadorId, desde, hasta, ct));
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+
 api.MapPost("/envios/importar-csv", async (
     HttpContext context,
     IAntiforgery antiforgery,
@@ -412,7 +638,81 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
             ct);
 
         return Results.NoContent();
-    });
+})
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+
+api.MapPost("/envios/{envioId:guid}/iniciar-devolucion",
+    async (
+        Guid envioId,
+        IniciarDevolucionRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        IniciarDevolucionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new IniciarDevolucionCommand(
+                envioId,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
+
+api.MapPost("/envios/{envioId:guid}/confirmar-devolucion",
+    async (
+        Guid envioId,
+        ConfirmarDevolucionRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ConfirmarDevolucionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        await handler.Handle(
+            new ConfirmarDevolucionCommand(
+                request.CuentaComercialId,
+                envioId,
+                request.IdentificacionesEscaneadas,
+                request.Responsable,
+                request.Modalidad,
+                request.Receptor,
+                request.ReferenciaConstancia),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorComercio,
+        Perfiles.Comercio));
 
 // Declarar un envío como extraviado.
 api.MapPost("/envios/{envioId:guid}/extravio",
@@ -947,3 +1247,6 @@ public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEs
 
 public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
 public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record IniciarDevolucionRequest( string Responsable);
+
+public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);

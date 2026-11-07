@@ -65,23 +65,57 @@ else
                         <td>@e.Direccion</td>
                         <td class="num">@e.CantidadBultos</td>
                         <td class="num">@Formato.Numero(e.PesoTotalKg)</td>
-                        <td>@Formato.Modalidad(e.Modalidad)</td>
+                        <td>@Formato.Modalidad(e.Modalidad)</td>                  
                         <td>
-                            @if (e.Estado == "Admitido")
+                            @switch (e.Estado)
                             {
-                                <span class="chip chip-acento">Admitido</span>
-                            }
-                            else if (e.Estado == "EnDeposito")
-                            {
-                                <span class="chip chip-alerta">En depósito</span>
-                            }
-                            else if (e.Estado == "AsignadoARuta")
-                            {
-                                <span class="chip chip-exito">Asignado a ruta</span>
-                            }
-                            else
-                            {
-                                <span class="nota">Sin asignar</span>
+                                case "Admitido":
+                                    <span class="chip chip-acento">Admitido</span>
+                                    break;
+
+                                case "EnDeposito":
+                                    <span class="chip chip-alerta">En depósito</span>
+                                    break;
+
+                                case "AsignadoARuta":
+                                    <span class="chip chip-exito">Asignado a ruta</span>
+                                    break;
+
+                                case "EnTransito":
+                                    <span class="chip chip-acento">En tránsito</span>
+                                    break;
+
+                                case "Entregado":
+                                    <span class="chip chip-exito">Entregado</span>
+                                    break;
+
+                                case "EntregadoParcialmente":
+                                    <span class="chip chip-alerta">Entregado parcialmente</span>
+                                    break;
+
+                                case "NoEntregado":
+                                    <span class="chip chip-alerta">No entregado</span>
+                                    break;
+
+                                case "Reprogramado":
+                                    <span class="chip chip-alerta">Reprogramado</span>
+                                    break;
+
+                                case "EnDevolucion":
+                                    <span class="chip chip-alerta">En devolución</span>
+                                    break;
+
+                                case "Devuelto":
+                                    <span class="chip chip-exito">Devuelto</span>
+                                    break;
+
+                                case "Extraviado":
+                                    <span class="chip chip-alerta">Extraviado</span>
+                                    break;
+
+                                default:
+                                    <span class="nota">@e.Estado</span>
+                                    break;
                             }
                         </td>
                         <td class="num">
