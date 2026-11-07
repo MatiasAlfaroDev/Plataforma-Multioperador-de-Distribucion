@@ -72,6 +72,11 @@ public static class DependencyInjection
         services.AddScoped<ISuscripcionAvisoRepository, SuscripcionAvisoRepository>();
         services.AddScoped<IEntregaAvisoRepository, EntregaAvisoRepository>();
         services.AddScoped<IReporteEnviosRepository, ReporteEnviosRepository>();
+        services.AddScoped<IRetiroRepository, RetiroRepository>();
+        services.AddScoped<ICuadroTarifarioRepository, CuadroTarifarioRepository>();
+        services.AddScoped<IEventoRetiroMovilRepository, EventoRetiroMovilRepository>();
+        services.AddScoped<IReporteRetirosRepository, ReporteRetirosRepository>();
+        services.AddScoped<IConsultaPublicaRetiroRepository, ConsultaPublicaRetiroRepository>();
 
         // Avisos a comercios (RNF 6.9): un solo intento por llamada; reintenta MassTransit en el Worker.
         services.AddHttpClient<IClienteAvisos, ClienteAvisos>(c => c.Timeout = TimeSpan.FromSeconds(10));

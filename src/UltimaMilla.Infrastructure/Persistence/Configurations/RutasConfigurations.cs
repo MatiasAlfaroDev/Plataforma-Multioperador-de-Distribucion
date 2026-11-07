@@ -134,30 +134,64 @@ public sealed class ParadaRutaConfiguration
 {
     public void Configure(EntityTypeBuilder<ParadaRuta> builder)
     {
-        builder.ToTable("paradas_ruta");
+        builder.ToTable("paradas_ruta", tabla =>
+        {
+            tabla.HasCheckConstraint(
+                "CK_paradas_ruta_referencia",
+                """
+                ("EnvioId" IS NOT NULL AND "RetiroId" IS NULL)
+                OR
+                ("EnvioId" IS NULL AND "RetiroId" IS NOT NULL)
+                """);
+        });
+
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id).ValueGeneratedNever();
+        builder.Property(x => x.Id)
+            .ValueGeneratedNever();
 
         builder.Property(x => x.LiberadaEn)
             .HasColumnName("liberada_en");
 
-        // Es una propiedad calculada, no una columna.
         builder.Ignore(x => x.Activa);
+        builder.Ignore(x => x.EsEntrega);
+        builder.Ignore(x => x.EsRetiro);
+
+        builder.Property(x => x.EnvioId)
+            .IsRequired(false);
+
+        builder.Property(x => x.RetiroId)
+            .IsRequired(false);
 
         builder.HasOne<Envio>()
             .WithMany()
             .HasForeignKey(x => x.EnvioId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => new { x.HojaDeRutaId, x.Orden })
+        builder.HasOne<UltimaMilla.Domain.Retiros.Retiro>()
+            .WithMany()
+            .HasForeignKey(x => x.RetiroId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Cada posición activa de una hoja tiene un orden único.
+        builder.HasIndex(x => new
+            {
+                x.HojaDeRutaId,
+                x.Orden
+            })
             .IsUnique()
             .HasFilter("\"liberada_en\" IS NULL");
 
-        // Impide que un mismo envío tenga dos
-        // asignaciones activas al mismo tiempo.
+        // Un envío no puede estar activo en dos rutas.
         builder.HasIndex(x => x.EnvioId)
             .IsUnique()
-            .HasFilter("\"liberada_en\" IS NULL");
+            .HasFilter(
+                "\"EnvioId\" IS NOT NULL AND \"liberada_en\" IS NULL");
+
+        // Un retiro no puede estar activo en dos rutas.
+        builder.HasIndex(x => x.RetiroId)
+            .IsUnique()
+            .HasFilter(
+                "\"RetiroId\" IS NOT NULL AND \"liberada_en\" IS NULL");
     }
 }

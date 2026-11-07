@@ -161,6 +161,12 @@ public sealed class VersionTarifariaConfiguration
             .HasForeignKey(v => v.ZonaCoberturaId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property(v => v.TipoServicio)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasDefaultValue(TipoServicioTarifario.Entrega)
+            .IsRequired();
+
         builder.HasIndex(v => new
         {
             v.OperadorId,

@@ -85,6 +85,11 @@ builder.Services.AddHttpClient<TarifasApiClient>(c =>
     c.BaseAddress = new Uri(
         builder.Configuration["Api:BaseUrl"]
         ?? "http://localhost:5080/"))
+    .ConfigurePrimaryHttpMessageHandler(() =>
+        new HttpClientHandler
+        {
+            UseCookies = false
+        })
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
 builder.Services.AddHttpClient<ReglasOperativasApiClient>(c =>

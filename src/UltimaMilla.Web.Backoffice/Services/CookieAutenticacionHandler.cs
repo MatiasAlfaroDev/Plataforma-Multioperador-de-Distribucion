@@ -14,18 +14,42 @@ public sealed class CookieAutenticacionHandler(
             ?? throw new InvalidOperationException(
                 "No hay una solicitud HTTP activa.");
 
-        var cookie = contexto.Request.Cookies["UltimaMilla.Auth"];
+        var cookieAutenticacion =
+            contexto.Request.Cookies["UltimaMilla.Auth"];
 
-        if (string.IsNullOrWhiteSpace(cookie))
+        if (string.IsNullOrWhiteSpace(cookieAutenticacion))
         {
             throw new UnauthorizedAccessException(
                 "No se encontró la cookie de autenticación.");
         }
 
+        // Conservamos cualquier cookie específica
+        // que el cliente haya agregado a la solicitud.
+        string cookiesExistentes = string.Empty;
+
+        if (request.Headers.TryGetValues(
+                "Cookie",
+                out var valores))
+        {
+            cookiesExistentes = string.Join("; ", valores);
+        }
+
+        var cookieSesion =
+            $"UltimaMilla.Auth={WebUtility.UrlEncode(cookieAutenticacion)}";
+
+        var cookiesCompletas =
+            string.IsNullOrWhiteSpace(cookiesExistentes)
+                ? cookieSesion
+                : $"{cookieSesion}; {cookiesExistentes}";
+
+        request.Headers.Remove("Cookie");
+
         request.Headers.TryAddWithoutValidation(
             "Cookie",
-            $"UltimaMilla.Auth={WebUtility.UrlEncode(cookie)}");
+            cookiesCompletas);
 
-        return await base.SendAsync(request, cancellationToken);
+        return await base.SendAsync(
+            request,
+            cancellationToken);
     }
 }

@@ -16,11 +16,13 @@ public sealed record MiHojaDeRutaDto(
 /// <param name="Bultos">Identificaciones que el repartidor escanea al cargar el vehículo (RF 19).</param>
 public sealed record MiParadaDto(
     int Orden,
-    Guid EnvioId,
+    Guid? EnvioId,
     string ReferenciaExterna,
     string Destinatario,
     string? TelefonoDestinatario,
     string Direccion,
     string Localidad,
     string Estado,
-    IReadOnlyList<string> Bultos);
+    IReadOnlyList<string> Bultos,
+    Guid? RetiroId = null,
+    string TipoOperacion = "Entrega");

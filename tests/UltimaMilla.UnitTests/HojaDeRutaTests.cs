@@ -207,7 +207,8 @@ public class HojaDeRutaTests
             new[] { primero.Id, segundo.Id },
             ruta.Paradas
                 .OrderBy(p => p.Orden)
-                .Select(p => p.EnvioId));
+                .Where(p => p.EnvioId.HasValue)
+                .Select(p => p.EnvioId.Value));
     }
     
     [Fact]

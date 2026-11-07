@@ -653,6 +653,13 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
 
+                    b.Property<string>("TipoServicio")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("Entrega");
+
                     b.Property<DateTimeOffset>("VigenciaDesde")
                         .HasColumnType("timestamp with time zone");
 
@@ -1330,6 +1337,180 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.ToTable("vehiculos", (string)null);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Retiros.BultoRetiro", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AltoCm")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AnchoCm")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Identificacion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("PesoKg")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)");
+
+                    b.Property<int>("ProfundidadCm")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RetiroId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RetiroId", "Identificacion")
+                        .IsUnique();
+
+                    b.ToTable("bultos_retiro", (string)null);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Retiros.EventoRetiroMovil", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.PrimitiveCollection<string[]>("IdentificacionesBultos")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<string>("MotivoFallo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RecibidoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferenciaFirma")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReferenciaFotografia")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("RetiroId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RetiroId");
+
+                    b.HasIndex("OperadorId", "RetiroId", "OcurridoEn");
+
+                    b.ToTable("eventos_retiro_movil", (string)null);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Retiros.Retiro", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CuentaComercialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateOnly>("FechaSolicitada")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("HojaDeRutaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeOnly>("HoraDesde")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("HoraHasta")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReferenciaFirma")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReferenciaFotografia")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("RetiradoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("SolicitadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("TarifaCalculada")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid?>("VersionTarifariaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CuentaComercialId");
+
+                    b.HasIndex("VersionTarifariaId");
+
+                    b.HasIndex("OperadorId", "SolicitadoEn");
+
+                    b.HasIndex("OperadorId", "CuentaComercialId", "Estado");
+
+                    b.ToTable("retiros", (string)null);
+                });
+
             modelBuilder.Entity("UltimaMilla.Domain.Rutas.HojaDeRuta", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1405,7 +1586,7 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("EnvioId")
+                    b.Property<Guid?>("EnvioId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("HojaDeRutaId")
@@ -1418,17 +1599,27 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<int>("Orden")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("RetiroId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EnvioId")
                         .IsUnique()
-                        .HasFilter("\"liberada_en\" IS NULL");
+                        .HasFilter("\"EnvioId\" IS NOT NULL AND \"liberada_en\" IS NULL");
+
+                    b.HasIndex("RetiroId")
+                        .IsUnique()
+                        .HasFilter("\"RetiroId\" IS NOT NULL AND \"liberada_en\" IS NULL");
 
                     b.HasIndex("HojaDeRutaId", "Orden")
                         .IsUnique()
                         .HasFilter("\"liberada_en\" IS NULL");
 
-                    b.ToTable("paradas_ruta", (string)null);
+                    b.ToTable("paradas_ruta", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_paradas_ruta_referencia", "(\"EnvioId\" IS NOT NULL AND \"RetiroId\" IS NULL)\r\nOR\r\n(\"EnvioId\" IS NULL AND \"RetiroId\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Rutas.PosicionRepartidor", b =>
@@ -1966,6 +2157,118 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Retiros.BultoRetiro", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Retiros.Retiro", null)
+                        .WithMany("Bultos")
+                        .HasForeignKey("RetiroId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Retiros.EventoRetiroMovil", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Retiros.Retiro", null)
+                        .WithMany()
+                        .HasForeignKey("RetiroId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Retiros.Retiro", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Organizacion.CuentaComercial", null)
+                        .WithMany()
+                        .HasForeignKey("CuentaComercialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UltimaMilla.Domain.Configuracion.VersionTarifaria", null)
+                        .WithMany()
+                        .HasForeignKey("VersionTarifariaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.OwnsOne("UltimaMilla.Domain.Envios.Direccion", "DomicilioDestino", b1 =>
+                        {
+                            b1.Property<Guid>("RetiroId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Calle")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("destino_calle");
+
+                            b1.Property<string>("Departamento")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)")
+                                .HasColumnName("destino_departamento");
+
+                            b1.Property<string>("Localidad")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("destino_localidad");
+
+                            b1.Property<string>("Numero")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
+                                .HasColumnName("destino_numero");
+
+                            b1.HasKey("RetiroId");
+
+                            b1.ToTable("retiros");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RetiroId");
+                        });
+
+                    b.OwnsOne("UltimaMilla.Domain.Envios.Direccion", "DomicilioRetiro", b1 =>
+                        {
+                            b1.Property<Guid>("RetiroId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Calle")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("retiro_calle");
+
+                            b1.Property<string>("Departamento")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)")
+                                .HasColumnName("retiro_departamento");
+
+                            b1.Property<string>("Localidad")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("retiro_localidad");
+
+                            b1.Property<string>("Numero")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
+                                .HasColumnName("retiro_numero");
+
+                            b1.HasKey("RetiroId");
+
+                            b1.ToTable("retiros");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RetiroId");
+                        });
+
+                    b.Navigation("DomicilioDestino")
+                        .IsRequired();
+
+                    b.Navigation("DomicilioRetiro")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("UltimaMilla.Domain.Rutas.HojaDeRuta", b =>
                 {
                     b.HasOne("UltimaMilla.Domain.Organizacion.Operador", null)
@@ -1992,14 +2295,18 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.HasOne("UltimaMilla.Domain.Envios.Envio", null)
                         .WithMany()
                         .HasForeignKey("EnvioId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("UltimaMilla.Domain.Rutas.HojaDeRuta", null)
                         .WithMany("Paradas")
                         .HasForeignKey("HojaDeRutaId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("UltimaMilla.Domain.Retiros.Retiro", null)
+                        .WithMany()
+                        .HasForeignKey("RetiroId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Rutas.PosicionRepartidor", b =>
@@ -2071,6 +2378,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Navigation("PruebaEntrega");
 
                     b.Navigation("ResultadosBultos");
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Retiros.Retiro", b =>
+                {
+                    b.Navigation("Bultos");
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Rutas.HojaDeRuta", b =>
