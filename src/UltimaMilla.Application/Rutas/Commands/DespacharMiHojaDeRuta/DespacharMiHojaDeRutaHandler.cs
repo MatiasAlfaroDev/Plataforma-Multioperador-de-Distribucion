@@ -4,6 +4,7 @@ using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Retiros;
+using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 
@@ -43,6 +44,21 @@ public sealed class DespacharMiHojaDeRutaHandler(
         {
             throw new UnauthorizedAccessException(
                 "La hoja de ruta es de otro repartidor.");
+        }
+
+        // Los bultos pendientes de los envíos de las paradas activas.
+        var esperados = new List<string>();
+
+        foreach (var parada in hoja.Paradas.Where(p => p.Activa))
+        {
+            var envio = await envios.ObtenerAsync(parada.EnvioId, ct)
+                ?? throw new NoEncontradoException(
+                    $"No existe el envío de la parada {parada.Orden}.");
+
+            esperados.AddRange(envio.Bultos
+                .Where(b => b.Estado == EstadoBulto.Pendiente)
+                .Select(b => b.Identificacion));
+        }
         }
 
         // Solo los paquetes de entrega se cargan al salir.

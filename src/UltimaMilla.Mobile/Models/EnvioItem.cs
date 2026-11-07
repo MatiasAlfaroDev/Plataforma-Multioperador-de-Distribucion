@@ -13,4 +13,7 @@ public sealed record EnvioItem(
     string Direccion,
     int CantidadBultos,
     decimal PesoTotalKg,
-    DateTimeOffset FechaAlta);
+    DateTimeOffset FechaAlta,
+    // Los bultos pendientes con su Id. Vienen en la hoja de ruta del repartidor; con otros
+    // perfiles (GET /api/envios) no vienen y el resultado se registra para el envío completo.
+    IReadOnlyList<BultoItem>? Bultos = null);

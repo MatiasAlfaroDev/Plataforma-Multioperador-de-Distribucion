@@ -34,6 +34,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     private readonly IFirma _firma;
     private readonly IBiometria _biometria;
     private readonly ISeguimiento _seguimiento;
+    private readonly IElegirBultos _elegirBultos;
 
     public EnviosViewModel(
         IEnviosApi api,
@@ -45,7 +46,8 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         ICaptura captura,
         IFirma firma,
         IBiometria biometria,
-        ISeguimiento seguimiento)
+        ISeguimiento seguimiento,
+        IElegirBultos elegirBultos)
     {
         _api = api;
         _ruta = ruta;
@@ -57,6 +59,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         _firma = firma;
         _biometria = biometria;
         _seguimiento = seguimiento;
+        _elegirBultos = elegirBultos;
     }
 
     /// <summary>Se está compartiendo la ubicación (desde el despacho hasta "Terminar jornada").</summary>
@@ -236,10 +239,63 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     [RelayCommand]
     private Task IrACargaAsync() => Shell.Current.GoToAsync("carga");
 
+    /// <summary>Resultado de la pantalla de bultos para la entrega: completa, parcial o cancelada.</summary>
+    private sealed record ResultadoBultos(
+        bool Cancelado, bool EsParcial, IReadOnlyList<Guid>? Entregados, IReadOnlyList<BultoNoEntregado>? NoEntregados)
+    {
+        public static readonly ResultadoBultos Completa = new(false, false, null, null);
+        public static readonly ResultadoBultos Cancelada = new(true, false, null, null);
+    }
+
+    private async Task<ResultadoBultos> ElegirBultosAsync(EnvioRuta envio)
+    {
+        var bultos = await _ruta.ListarBultosAsync(envio.Id);
+        if (bultos.Count <= 1)
+            return ResultadoBultos.Completa;
+
+        var seleccion = await _elegirBultos.ElegirAsync(envio.ReferenciaExterna, bultos);
+        if (seleccion is null)
+            return ResultadoBultos.Cancelada;
+
+        if (seleccion.Entregados.Count == 0)
+        {
+            await _dialogos.AvisarAsync("Entrega", "No marcaste ningún bulto. Si no se entrega nada, usá «No entregado».");
+            return ResultadoBultos.Cancelada;
+        }
+
+        if (seleccion.NoEntregados.Count == 0)
+            return ResultadoBultos.Completa;
+
+        // Una foto de evidencia para los bultos que quedan (por ejemplo, el bulto rechazado o dañado).
+        var evidencia = await _captura.SacarFotoAsync(Guid.NewGuid());
+        if (evidencia is null)
+        {
+            await _dialogos.AvisarAsync("Entrega parcial", "Los bultos que no se entregan necesitan una foto de evidencia.");
+            return ResultadoBultos.Cancelada;
+        }
+
+        var noEntregados = new List<BultoNoEntregado>();
+        foreach (var bulto in seleccion.NoEntregados)
+        {
+            var motivo = await _dialogos.ElegirAsync($"{bulto.Identificacion}: ¿por qué no se entrega?", MotivosNoEntrega);
+            if (motivo is null)
+                return ResultadoBultos.Cancelada;
+            noEntregados.Add(new BultoNoEntregado(bulto.Id, bulto.Identificacion, motivo, evidencia));
+        }
+
+        return new ResultadoBultos(false, true, seleccion.Entregados.Select(b => b.Id).ToList(), noEntregados);
+    }
+
     [RelayCommand]
     private async Task EntregarAsync(EnvioRuta envio)
     {
         if (!envio.PuedeRegistrar)
+            return;
+
+        // Entrega parcial (RF 32): si el envío tiene más de un bulto pendiente, se escanean los que se entregan.
+        // Para los que no, se elige un motivo del catálogo y se saca una foto de evidencia.
+        var seleccion = await ElegirBultosAsync(envio);
+        if (seleccion is { Cancelado: true })
             return;
 
         var receptor = await _dialogos.PedirTextoAsync("Entrega", $"{envio.ReferenciaExterna}: ¿quién recibe el paquete?");
@@ -277,10 +333,12 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         {
             Id = id,
             EnvioId = envio.Id,
-            Tipo = "Entregado",
+            Tipo = seleccion.EsParcial ? "EntregadoParcialmente" : "Entregado",
             Receptor = receptor,
             DocumentoReceptor = documento,
             ReferenciaFirma = firma,
+            BultosEntregados = seleccion.EsParcial ? seleccion.Entregados : null,
+            BultosNoEntregados = seleccion.EsParcial ? seleccion.NoEntregados : null,
             FechaHora = DateTimeOffset.UtcNow,
             Latitud = ubicacion.Value.Latitud,
             Longitud = ubicacion.Value.Longitud,

@@ -2,6 +2,7 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 
@@ -52,10 +53,15 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                         envioId, ct)
                         ?? throw new InvalidOperationException(
                             $"No existe el envío {envioId} de la ruta.");
-
                     if (envio.OperadorId != operadorId)
                         throw new InvalidOperationException(
                             "La hoja contiene un envío de otro operador.");
+
+                    // Solo los bultos pendientes de entrega.
+                    var pendientes = envio.Bultos
+                        .Where(b => b.Estado == EstadoBulto.Pendiente)
+                        .OrderBy(b => b.Identificacion)
+                        .ToList();
 
                     paradas.Add(new MiParadaDto(
                         parada.Orden,
@@ -66,15 +72,18 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                         $"{envio.Direccion.Calle} {envio.Direccion.Numero}",
                         envio.Direccion.Localidad,
                         envio.Estado.ToString(),
-                        envio.Bultos
+                        pendientes
                             .Select(b => b.Identificacion)
-                            .OrderBy(x => x)
+                            .ToList(),
+                        pendientes
+                            .Select(b => new MiBultoDto(
+                                b.Id,
+                                b.Identificacion))
                             .ToList()));
                 }
                 else if (parada.RetiroId is Guid retiroId)
                 {
-                    var retiro = await retiros.ObtenerAsync(
-                        retiroId, ct)
+                    var retiro = await retiros.ObtenerAsync(retiroId, ct)
                         ?? throw new InvalidOperationException(
                             $"No existe el retiro {retiroId} de la ruta.");
 

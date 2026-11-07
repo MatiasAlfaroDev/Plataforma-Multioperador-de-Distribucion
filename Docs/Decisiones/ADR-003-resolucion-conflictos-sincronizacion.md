@@ -73,6 +73,21 @@ repartidor lo descarta.**
 | Sesión vencida | La cookie de sesión expiró | **401** | "Rechazado: Sesión vencida", que se resuelve iniciando sesión de nuevo |
 | Sin conexión | Modo avión, API caída | Sin respuesta | "⏳ Guardado en el teléfono · falta enviarlo"; se reintenta solo |
 
+### Casos a nivel de bulto (cambio de requerimientos, RF 32)
+
+Con la entrega parcial (`EntregadoParcialmente`) cada bulto pendiente tiene su propio resultado: la app
+manda los Id de los bultos entregados y, para cada uno de los que quedan, motivo del catálogo y evidencia.
+La política no cambia: **el servidor decide y el teléfono registra hechos**. El evento se acepta o se
+rechaza **completo**: nunca se guarda una parte del resultado de una parada y otra no.
+
+| Caso | Ejemplo | Respuesta del servidor | Qué ve el repartidor |
+| :---- | :---- | :---- | :---- |
+| Bulto ya resuelto o ajeno | Un bulto informado ya no está pendiente en el servidor, o es de otro envío | **400**: "Todos los bultos indicados deben pertenecer al envío y estar pendientes" | "Rechazado" con el motivo; vuelve a descargar la ruta y registra de nuevo |
+| Resultado incompleto | No se informa algún bulto pendiente | **400**: "Debe informarse el resultado de todos los bultos pendientes" | "Rechazado" (la app arma las dos listas con todos los pendientes, así que no debería pasar) |
+| Motivo fuera del catálogo | Un bulto no entregado con un motivo que el operador no tiene | **404** con el motivo | "Rechazado" con el motivo |
+| Sin coordenadas o sin prueba | El GPS no dio posición, o falta la prueba que piden las reglas | **400** con el motivo | "Rechazado" con el motivo |
+| Evento sin listas | `Entregado` o `NoEntregado` (también versiones anteriores de la app) | Resultado del **envío completo**, como antes | Igual que antes: compatibilidad hacia atrás |
+
 ## Alternativas consideradas
 
 | Alternativa | Por qué se descartó |
@@ -114,8 +129,8 @@ repartidor lo descarta.**
 - Pruebas unitarias del Handler (`RegistrarEventoMovilHandlerTests`): el mismo evento dos veces no
   duplica nada; una segunda entrega con otro evento se rechaza; un envío inexistente da no
   encontrado; y se rechazan la entrega sin coordenadas, la entrega sin firma ni foto cuando las
-  reglas lo exigen, el intento fallido sin evidencia y el motivo ajeno al catálogo. **Falta** una
-  prueba para el envío que no está en tránsito.
+  reglas lo exigen, el intento fallido sin evidencia, el motivo ajeno al catálogo y el envío que no
+  está en tránsito.
 - **Demostración del escenario 3:** registrar *Entregado* en un envío **sin despachar**, con la app
   sin conexión; recuperar la conexión y sincronizar; la tarjeta muestra **"Rechazado: El envío debe
   estar en tránsito…"** y el botón **Descartar**; al descartar, el envío vuelve a *Por entregar*.

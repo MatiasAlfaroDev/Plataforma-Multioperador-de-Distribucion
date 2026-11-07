@@ -117,6 +117,10 @@ public class MisHojasDeRutaTests
         Assert.Equal(new[] { "PED-001", "PED-002" }, mia.Paradas.Select(p => p.ReferenciaExterna));
         Assert.Equal(primero.Bultos.Select(b => b.Identificacion).OrderBy(i => i), mia.Paradas[0].Bultos);
         Assert.Equal(2, mia.Paradas[0].Bultos.Count);
+        // El detalle trae el Id de cada bulto, en el mismo orden (lo usa la entrega parcial, RF 32).
+        Assert.Equal(
+            primero.Bultos.OrderBy(b => b.Identificacion).Select(b => b.Id),
+            mia.Paradas[0].DetalleBultos.Select(b => b.Id));
     }
 
     [Fact]
