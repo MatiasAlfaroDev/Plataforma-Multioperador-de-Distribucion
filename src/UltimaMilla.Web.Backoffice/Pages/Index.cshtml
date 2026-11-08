@@ -125,6 +125,11 @@ else
                         </td>
                         <td>@Formato.Hora(e.FechaAlta)</td>
                         <td class="text-right">
+                        <a asp-page="/DetalleEnvio"
+                            asp-route-id="@e.Id"
+                            class="btn-secundario py-1.5 text-sm">
+                                Ver detalle
+                        </a>
                             @if (e.Estado == "Admitido")
                             {
                                 <button type="button"

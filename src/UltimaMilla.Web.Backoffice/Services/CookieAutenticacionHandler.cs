@@ -22,10 +22,29 @@ public sealed class CookieAutenticacionHandler(
                 "No se encontró la cookie de autenticación.");
         }
 
+        var cookies = new List<string>
+        {
+            $"UltimaMilla.Auth={WebUtility.UrlEncode(cookie)}"
+        };
+
+        // Cookie antiforgery específica de la solicitud a la API.
+        if (request.Options.TryGetValue(
+            CookieAntiforgeryKey,
+            out string? cookieAntiforgery) &&
+            !string.IsNullOrWhiteSpace(cookieAntiforgery))
+        {
+            cookies.Add(cookieAntiforgery);
+        }
+
+        request.Headers.Remove("Cookie");
+
         request.Headers.TryAddWithoutValidation(
             "Cookie",
-            $"UltimaMilla.Auth={WebUtility.UrlEncode(cookie)}");
+            string.Join("; ", cookies));
 
         return await base.SendAsync(request, cancellationToken);
     }
+
+    public static readonly HttpRequestOptionsKey<string>
+        CookieAntiforgeryKey = new("CookieAntiforgery");
 }

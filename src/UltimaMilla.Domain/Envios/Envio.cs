@@ -631,6 +631,23 @@ public class Envio : AuditableEntity, ITenantEntity
         _eventos.Add(evento);
     }
 
+    public bool PuedeIniciarDevolucion(
+    VersionReglasOperativas reglas)
+{
+    ArgumentNullException.ThrowIfNull(reglas);
+
+    return Estado == EstadoEnvio.EnDeposito
+        && VersionReglasOperativasId == reglas.Id
+        && reglas.OperadorId == OperadorId
+        && _bultos.Any(b => b.Estado == EstadoBulto.Pendiente)
+        && IntentosRealizados > 0
+        && (
+            IntentosRealizados >= reglas.MaximoIntentosEntrega
+            || UltimoMotivoRequiereDevolucion
+            || reglas.AccionBultosPendientes ==
+                AccionBultosPendientes.DevolverAlComercio
+        );
+}
     private EstadoEnvio ObtenerEstadoDestino(DisparadorEnvio disparador)
     {
         return disparador switch

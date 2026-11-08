@@ -51,6 +51,7 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
 using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
+using UltimaMilla.Application.Envios.Queries.ObtenerDetalleEnvio;
 
 namespace UltimaMilla.Application;
 
@@ -64,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<CrearEnvioHandler>();
         services.AddScoped<ImportarEnviosCsvHandler>();
         services.AddScoped<ListarEnviosHandler>();
+        services.AddScoped<ObtenerDetalleEnvioHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();
         services.AddScoped<RetornarADepositoHandler>();

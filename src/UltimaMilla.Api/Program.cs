@@ -68,6 +68,8 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
 using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
+using UltimaMilla.Application.Envios.Queries.ObtenerDetalleEnvio;
+
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -328,6 +330,20 @@ api.MapPost("/envios", async (
  .RequireAuthorization(policy => policy.RequireRole(
      Perfiles.AdministradorOperador,
      Perfiles.Operador));
+
+api.MapGet("/envios/{envioId:guid}",
+    async (
+        Guid envioId,
+        ObtenerDetalleEnvioHandler handler,
+        CancellationToken ct) =>
+    {
+        var resultado = await handler.Handle(
+            new ObtenerDetalleEnvioQuery(envioId),
+            ct);
+
+        return Results.Ok(resultado);
+    })
+    .RequireAuthorization();
 
 
 api.MapGet("/reportes/motivos-no-entrega", async (
