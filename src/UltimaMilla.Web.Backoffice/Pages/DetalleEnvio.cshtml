@@ -88,6 +88,57 @@ else if (Model.Envio is { } envio)
         </table>
     </div>
 
+    @if (envio.Estado is "NoEntregado" or "EntregadoParcialmente")
+{
+    <section class="mt-6">
+        <h2>Retornar al depósito</h2>
+
+        <p class="nota">
+            Registrá los bultos pendientes que regresaron
+            al depósito después del intento de entrega.
+        </p>
+
+        <form method="post"
+              asp-page-handler="RetornarDeposito"
+              asp-route-id="@envio.Id">
+
+            @Html.AntiForgeryToken()
+
+            <div class="modal-campo">
+                <label for="responsableRetorno">
+                    Responsable de recepción
+                </label>
+
+                <input type="text"
+                       id="responsableRetorno"
+                       name="responsable"
+                       maxlength="150"
+                       required />
+            </div>
+
+            <fieldset>
+                <legend>Bultos recibidos</legend>
+
+                @foreach (var bulto in envio.Bultos
+                    .Where(b => b.Estado == "Pendiente"))
+                {
+                    <label class="checkbox">
+                        <input type="checkbox"
+                               name="identificaciones"
+                               value="@bulto.Identificacion" />
+
+                        @bulto.Identificacion
+                    </label>
+                }
+            </fieldset>
+
+            <button type="submit" class="primario">
+                Confirmar retorno al depósito
+            </button>
+        </form>
+    </section>
+}
+
     <h2>Historial de eventos</h2>
 
     @if (envio.Eventos.Count == 0)

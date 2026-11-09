@@ -208,4 +208,22 @@ public sealed class EnviosApiClient(HttpClient http)
                 respuesta.StatusCode);
         }
     }
+
+    public async Task RetornarADepositoAsync(
+        Guid envioId,
+        IReadOnlyList<string> identificaciones,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await http.PostAsJsonAsync(
+            $"api/envios/{envioId}/retorno-deposito",
+            new
+            {
+                IdentificacionesEscaneadas = identificaciones,
+                Responsable = responsable
+            },
+            ct);
+
+        respuesta.EnsureSuccessStatusCode();
+    }
 }

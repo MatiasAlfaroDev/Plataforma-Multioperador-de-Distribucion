@@ -192,6 +192,7 @@
                             <th>Localidad</th>
                             <th>Peso</th>
                             <th>Compromiso actual</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
 
@@ -288,10 +289,81 @@
                             <td class="num">@hoja.PesoAsignadoKg kg</td>
 
                             <td class="codigo">@hoja.Id</td>
+
+                           <td>
+                                @if (hoja.Despachada)
+                                {
+                                    <span class="estado-despachada">
+                                        Despachada
+                                    </span>
+                                }
+                                else
+                                {
+                                    <form method="post"
+                                        asp-page-handler="Despachar"
+                                        asp-route-hojaId="@hoja.Id">
+
+                                        @Html.AntiForgeryToken()
+
+                                        <button type="button"
+                                                class="btn-primario"
+                                                onclick="abrirConfirmacionDespacho(this)">
+                                            Despachar
+                                        </button>
+                                    </form>
+                                }
+                            </td>
                         </tr>
                     }
                 </tbody>
             </table>
+
+            <dialog id="confirmarDespacho" class="modal-despacho">
+    <h2>Confirmar despacho</h2>
+
+    <p>
+        ¿Confirmás que querés despachar esta hoja de ruta?
+    </p>
+
+    <p class="nota">
+        Los envíos asignados pasarán al estado En tránsito.
+    </p>
+
+    <div class="acciones-modal">
+        <button type="button"
+                class="btn-secundario"
+                onclick="cerrarConfirmacionDespacho()">
+            Cancelar
+        </button>
+
+        <button type="button"
+                class="btn-primario"
+                onclick="confirmarDespacho()">
+            Confirmar despacho
+        </button>
+    </div>
+</dialog>
+
+<script>
+    let formularioDespacho = null;
+
+    function abrirConfirmacionDespacho(boton) {
+        formularioDespacho = boton.closest("form");
+
+        document.getElementById("confirmarDespacho").showModal();
+    }
+
+    function cerrarConfirmacionDespacho() {
+        document.getElementById("confirmarDespacho").close();
+        formularioDespacho = null;
+    }
+
+    function confirmarDespacho() {
+        if (formularioDespacho) {
+            formularioDespacho.requestSubmit();
+        }
+    }
+</script>
         </div>
     }
 }

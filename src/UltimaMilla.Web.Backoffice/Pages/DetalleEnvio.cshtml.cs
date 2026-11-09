@@ -75,4 +75,58 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         return Page();
     }
 }
+
+        public async Task<IActionResult> OnPostRetornarDepositoAsync(
+            Guid id,
+            string responsable,
+            List<string> identificaciones,
+            CancellationToken ct)
+        {
+            if (id == Guid.Empty)
+                return BadRequest();
+
+            if (string.IsNullOrWhiteSpace(responsable))
+            {
+                Error = "Debe indicar el responsable.";
+            }
+            else if (identificaciones is null ||
+                    identificaciones.Count == 0)
+            {
+                Error = "Debe seleccionar los bultos recibidos.";
+            }
+            else
+            {
+                try
+                {
+                    await api.RetornarADepositoAsync(
+                        id,
+                        identificaciones,
+                        responsable.Trim(),
+                        ct);
+
+                    return RedirectToPage("/DetalleEnvio", new { id });
+                }
+                catch (HttpRequestException ex)
+                {
+                    Error = ex.StatusCode switch
+                    {
+                        System.Net.HttpStatusCode.BadRequest =>
+                            "No se pudo registrar el retorno. Verificá los bultos y el estado del envío.",
+
+                        System.Net.HttpStatusCode.Forbidden =>
+                            "No tenés permisos para registrar este retorno.",
+
+                        _ => "Ocurrió un error al retornar el envío al depósito."
+                    };
+                }
+            }
+
+            // Recuperamos el detalle para mostrar nuevamente
+            // el formulario junto al mensaje de error.
+            var error = Error;
+            var resultado = await OnGetAsync(id, ct);
+            Error = error ?? Error;
+
+            return resultado;
+        }
 }

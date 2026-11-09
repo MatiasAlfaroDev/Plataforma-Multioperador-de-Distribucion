@@ -455,28 +455,16 @@ public class Envio : AuditableEntity, ITenantEntity
                 break;
                   
             case DisparadorEnvio.IniciarDevolucion:
-                if (!_bultos.Any(b => b.Estado == EstadoBulto.Pendiente))
                 {
-                    throw new InvalidOperationException(
-                        "El envío no tiene bultos pendientes para devolver.");
-                }
+                    var motivoBloqueo = ObtenerMotivoBloqueoDevolucion(reglas);
 
-                if (IntentosRealizados == 0)
-                {
-                    throw new InvalidOperationException(
-                        "La devolución requiere al menos un intento de entrega.");
-                }
+                    if (motivoBloqueo is not null)
+                    {
+                        throw new InvalidOperationException(motivoBloqueo);
+                    }
 
-                if (IntentosRealizados < reglas.MaximoIntentosEntrega &&
-                    !UltimoMotivoRequiereDevolucion &&
-                    reglas.AccionBultosPendientes !=
-                        AccionBultosPendientes.DevolverAlComercio)
-                {
-                    throw new InvalidOperationException(
-                        "Las reglas operativas indican que corresponde una nueva visita.");
+                    break;
                 }
-
-                break;
  
             case DisparadorEnvio.ConfirmarDevolucion:
                 if (!_bultos.Any(b => b.Estado == EstadoBulto.EnDevolucion))
@@ -631,22 +619,47 @@ public class Envio : AuditableEntity, ITenantEntity
         _eventos.Add(evento);
     }
 
-    public bool PuedeIniciarDevolucion(
+public bool PuedeIniciarDevolucion(
     VersionReglasOperativas reglas)
 {
     ArgumentNullException.ThrowIfNull(reglas);
 
-    return Estado == EstadoEnvio.EnDeposito
-        && VersionReglasOperativasId == reglas.Id
-        && reglas.OperadorId == OperadorId
-        && _bultos.Any(b => b.Estado == EstadoBulto.Pendiente)
-        && IntentosRealizados > 0
-        && (
-            IntentosRealizados >= reglas.MaximoIntentosEntrega
-            || UltimoMotivoRequiereDevolucion
-            || reglas.AccionBultosPendientes ==
-                AccionBultosPendientes.DevolverAlComercio
-        );
+    return ObtenerMotivoBloqueoDevolucion(reglas) is null;
+}
+
+private string? ObtenerMotivoBloqueoDevolucion(
+    VersionReglasOperativas reglas)
+{
+    if (VersionReglasOperativasId != reglas.Id ||
+        reglas.OperadorId != OperadorId)
+    {
+        return "Las reglas no corresponden a este envío.";
+    }
+
+    if (Estado != EstadoEnvio.EnDeposito)
+    {
+        return "El envío debe estar en depósito para iniciar su devolución.";
+    }
+
+    if (!_bultos.Any(b => b.Estado == EstadoBulto.Pendiente))
+    {
+        return "El envío no tiene bultos pendientes para devolver.";
+    }
+
+    if (IntentosRealizados == 0)
+    {
+        return "La devolución requiere al menos un intento de entrega.";
+    }
+
+    if (IntentosRealizados < reglas.MaximoIntentosEntrega &&
+        !UltimoMotivoRequiereDevolucion &&
+        reglas.AccionBultosPendientes !=
+            AccionBultosPendientes.DevolverAlComercio)
+    {
+        return "Las reglas operativas indican que corresponde una nueva visita.";
+    }
+
+    return null;
 }
     private EstadoEnvio ObtenerEstadoDestino(DisparadorEnvio disparador)
     {

@@ -2,6 +2,7 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Configuracion;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 
@@ -44,7 +45,8 @@ public sealed record HojaDeRutaDto(
     Guid RepartidorId,
     Guid VehiculoId,
     int CantidadParadas,
-    decimal PesoAsignadoKg);
+    decimal PesoAsignadoKg,
+    bool Despachada);
 
 public sealed class ConsultarHojasDeRutaHandler(
     IRepartidorRepository repartidores,
@@ -236,7 +238,8 @@ public sealed class ConsultarHojasDeRutaHandler(
                 x.RepartidorId,
                 x.VehiculoId,
                 x.Paradas.Count(p => p.Activa),
-                x.PesoAsignadoKg))
+                x.PesoAsignadoKg,
+                x.Estado == EstadoHojaDeRuta.Despachada))
             .ToList();
     }
 }

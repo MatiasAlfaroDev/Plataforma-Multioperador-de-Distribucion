@@ -121,6 +121,47 @@ public sealed class HojasDeRutaModel(
         }
     }
 
+    public async Task<IActionResult> OnPostDespacharAsync(
+    Guid hojaId,
+    CancellationToken ct)
+{
+    if (OperadorIdSesion == Guid.Empty)
+    {
+        Error = "No hay un operador seleccionado.";
+        await CargarAsync(ct);
+        return Page();
+    }
+
+    if (hojaId == Guid.Empty)
+    {
+        Error = "Debe seleccionar una hoja de ruta válida.";
+        await CargarAsync(ct);
+        return Page();
+    }
+
+    try
+    {
+        var cantidad = await api.DespacharAsync(
+            OperadorIdSesion,
+            hojaId,
+            ct);
+
+        TempData["Exito"] =
+            $"Hoja de ruta despachada correctamente. " +
+            $"{cantidad} envío(s) actualizado(s).";
+
+        return RedirectToPage("/HojasDeRuta");
+    }
+    catch (Exception ex) when (
+        ex is HttpRequestException ||
+        ex is InvalidOperationException)
+    {
+        Error = ex.Message;
+        await CargarAsync(ct);
+        return Page();
+    }
+}
+
    private async Task CargarAsync(CancellationToken ct)
 {
     try
