@@ -587,6 +587,7 @@ api.MapGet("/envios", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
+    Perfiles.AdministradorComercio,
     Perfiles.Comercio));
 
 // POST /api/envios/{id}/eventos-movil → sincronización de la app del repartidor (entregado / no entregado).

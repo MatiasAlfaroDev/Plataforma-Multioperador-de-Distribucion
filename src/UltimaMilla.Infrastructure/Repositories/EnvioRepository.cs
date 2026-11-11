@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Infrastructure.Persistence;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Infrastructure.Repositories;
 
@@ -72,4 +73,47 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
             e => e.TokenSeguimientoHash == tokenHash,
             ct);
 }
+
+    public async Task<IReadOnlyList<Envio>> ListarPorCuentasComercialesAsync(
+        IReadOnlyCollection<Guid> cuentasComercialesIds,
+        CancellationToken ct)
+    {
+        if (cuentasComercialesIds.Count == 0)
+            return Array.Empty<Envio>();
+
+        return await db.Envios
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(e => e.Bultos)
+            .Where(e =>
+                cuentasComercialesIds.Contains(e.CuentaComercialId))
+            .OrderByDescending(e => e.FechaAlta)
+            .ToListAsync(ct);
+    }
+
+        public Task<Envio?> ObtenerPorComercioAsync(
+        Guid envioId,
+        Guid comercioId,
+        CancellationToken ct)
+    {
+        return db.Envios
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(e => e.Bultos)
+            .Include(e => e.Intentos)
+                .ThenInclude(i => i.ResultadosBultos)
+            .Include(e => e.Eventos)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(e =>
+                e.Id == envioId &&
+                db.CuentasComerciales
+                    .IgnoreQueryFilters()
+                    .Any(c =>
+                        c.Id == e.CuentaComercialId &&
+                        c.OperadorId == e.OperadorId &&
+                        c.ComercioId == comercioId &&
+                        c.Activa &&
+                        c.Estado == EstadoCuentaComercial.Confirmada),
+                ct);
+    }
 }

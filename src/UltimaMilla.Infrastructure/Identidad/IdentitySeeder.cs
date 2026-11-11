@@ -86,6 +86,38 @@ public static class IdentitySeeder
             Perfiles.Comercio,
             DbSeeder.LogisticaSurId,
             Guid.Parse("33333333-0000-0000-0000-000000000002"));
+        
+                // Administrador demo de Moda Express.
+        var administradorModa = await CrearUsuarioAsync(
+            "admin@modaexpress.test",
+            "Administrador Moda Express",
+            Perfiles.Comercio,
+            DbSeeder.RapiEnviosId,
+            Guid.Parse("33333333-0000-0000-0000-000000000003"));
+        
+        var modaExpressId = Guid.Parse(
+    "22222222-0000-0000-0000-000000000002");
+
+var vinculacionModa = await db.UsuariosComercios
+    .FirstOrDefaultAsync(uc =>
+        uc.UsuarioId == administradorModa.Id &&
+        uc.ComercioId == modaExpressId, ct);
+
+if (vinculacionModa is null)
+{
+    db.UsuariosComercios.Add(new UsuarioComercio
+    {
+        UsuarioId = administradorModa.Id,
+        ComercioId = modaExpressId,
+        Perfil = Perfiles.AdministradorComercio,
+        Activa = true
+    });
+}
+else
+{
+    vinculacionModa.Perfil = Perfiles.AdministradorComercio;
+    vinculacionModa.Activa = true;
+}
 
         // Repartidores de demo: inician sesión en la app y quedan vinculados al
         // "Repartidor de prueba" de su operador (el que sembró DbSeeder).

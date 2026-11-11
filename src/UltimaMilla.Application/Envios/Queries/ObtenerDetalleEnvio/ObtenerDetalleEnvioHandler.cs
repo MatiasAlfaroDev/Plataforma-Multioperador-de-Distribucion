@@ -36,37 +36,36 @@ public sealed class ObtenerDetalleEnvioHandler(
             "No tiene permisos para consultar envíos.");
     }
 
-    var envio = await envios.ObtenerAsync(query.EnvioId, ct)
-        ?? throw new NoEncontradoException("El envío no existe.");
+    UltimaMilla.Domain.Envios.Envio? envio;
 
-    if (esOperador)
-    {
-        if (tenantContext.OperadorId is not Guid operadorId ||
-            envio.OperadorId != operadorId)
-        {
-            throw new NoEncontradoException("El envío no existe.");
-        }
-    }
+if (esComercio)
+{
+    var comercioId = tenantContext.ComercioId
+        ?? throw new UnauthorizedAccessException(
+            "No se pudo identificar el comercio autenticado.");
 
-    if (esComercio)
-    {
-        if (tenantContext.ComercioId is not Guid comercioId)
-        {
-            throw new UnauthorizedAccessException(
-                "No se pudo identificar el comercio autenticado.");
-        }
+    envio = await envios.ObtenerPorComercioAsync(
+        query.EnvioId,
+        comercioId,
+        ct);
+}
+else
+{
+    var operadorId = tenantContext.OperadorId
+        ?? throw new UnauthorizedAccessException(
+            "No se pudo identificar el operador.");
 
-        var cuenta = await cuentas.ObtenerPorOperadorYComercioAsync(
-            envio.OperadorId,
-            comercioId,
-            ct);
+    envio = await envios.ObtenerAsync(query.EnvioId, ct);
 
-        if (cuenta is null ||
-            cuenta.Id != envio.CuentaComercialId)
-        {
-            throw new NoEncontradoException("El envío no existe.");
-        }
-    }
+    if (envio is not null && envio.OperadorId != operadorId)
+        envio = null;
+}
+
+if (envio is null)
+{
+    throw new NoEncontradoException(
+        "El envío no existe.");
+}
     var puedeIniciarDevolucion = false;
 
 if (esOperador &&
