@@ -1,6 +1,7 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Application.Envios.Commands.Reprogramacion;
 
@@ -9,6 +10,7 @@ public sealed class ConfirmarReprogramacionHandler(
     IEnvioRepository envios,
     IVersionReglasOperativasRepository reglasRepository,
     IUnitOfWork unitOfWork,
+    ITenantContext tenantContext,
     TimeProvider reloj)
 {
     public async Task Handle(
@@ -28,9 +30,20 @@ public sealed class ConfirmarReprogramacionHandler(
             ?? throw new NoEncontradoException(
                 "La solicitud de reprogramación no existe.");
 
+        var operadorId = tenantContext.OperadorId
+            ?? throw new UnauthorizedAccessException(
+                "No se pudo identificar el operador.");
+
+        if (solicitud.OperadorId != operadorId)
+        {
+            throw new NoEncontradoException(
+                "La solicitud no existe para el operador seleccionado.");
+        }
+
         if (solicitud.Estado != EstadoSolicitudReprogramacion.Pendiente)
             throw new InvalidOperationException(
                 "La solicitud ya fue procesada.");
+
 
         var envio = await envios.ObtenerAsync(solicitud.EnvioId, ct)
             ?? throw new NoEncontradoException(

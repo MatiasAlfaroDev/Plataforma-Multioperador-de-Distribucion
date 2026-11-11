@@ -23,7 +23,8 @@ public sealed record EnvioItem(
     int CantidadBultos,
     decimal PesoTotalKg,
     decimal? TarifaCalculada,
-    DateTimeOffset FechaAlta);
+    DateTimeOffset FechaAlta,
+    int IntentosRealizados);
 
 /// <summary>Detalle completo de un envío.</summary>
 public sealed record DetalleEnvioItem(
@@ -72,6 +73,8 @@ public sealed record DetalleEventoItem(
 
 /// <summary>Respuesta del endpoint antiforgery.</summary>
 public sealed record TokenAntiforgeryItem(string Token);
+
+public sealed record SolicitudCreadaItem(Guid SolicitudId);
 
 public sealed class EnviosApiClient(HttpClient http)
 {
@@ -226,4 +229,112 @@ public sealed class EnviosApiClient(HttpClient http)
 
         respuesta.EnsureSuccessStatusCode();
     }
+
+
+        private async Task<HttpResponseMessage> PostProtegidoAsync(
+            string ruta,
+            object datos,
+            CancellationToken ct)
+        {
+            using var respuestaToken = await http.GetAsync(
+                "api/antiforgery/token", ct);
+
+            respuestaToken.EnsureSuccessStatusCode();
+
+            var datosToken = await respuestaToken.Content
+                .ReadFromJsonAsync<TokenAntiforgeryItem>(
+                    cancellationToken: ct);
+
+            if (string.IsNullOrWhiteSpace(datosToken?.Token))
+            {
+                throw new InvalidOperationException(
+                    "No se pudo obtener el token de seguridad.");
+            }
+
+            using var solicitud = new HttpRequestMessage(
+                HttpMethod.Post, ruta);
+
+            solicitud.Headers.TryAddWithoutValidation(
+                "X-CSRF-TOKEN", datosToken.Token);
+
+            if (respuestaToken.Headers.TryGetValues(
+                "Set-Cookie", out var cookies))
+            {
+                var cookieAntiforgery = cookies
+                    .Select(c => c.Split(';')[0])
+                    .FirstOrDefault(c =>
+                        c.StartsWith(
+                            ".AspNetCore.Antiforgery.",
+                            StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrWhiteSpace(cookieAntiforgery))
+                {
+                    solicitud.Options.Set(
+                        CookieAutenticacionHandler.CookieAntiforgeryKey,
+                        cookieAntiforgery);
+                }
+            }
+
+            solicitud.Content = JsonContent.Create(datos);
+
+            return await http.SendAsync(solicitud, ct);
+        }
+
+    public async Task<Guid> SolicitarReprogramacionAsync(
+        Guid envioId,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            "api/solicitudes-reprogramacion",
+            new { EnvioId = envioId },
+            ct);
+
+        await VerificarRespuestaReprogramacionAsync(
+            respuesta, ct);
+
+        var resultado = await respuesta.Content
+            .ReadFromJsonAsync<SolicitudCreadaItem>(
+                cancellationToken: ct);
+
+        return resultado?.SolicitudId
+            ?? throw new InvalidOperationException(
+                "La API no devolvió el identificador de la solicitud.");
+    }
+
+
+    public async Task ConfirmarReprogramacionAsync(
+        Guid solicitudId,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/solicitudes-reprogramacion/{solicitudId}/confirmar",
+            new { Responsable = responsable },
+            ct);
+
+        await VerificarRespuestaReprogramacionAsync(
+            respuesta, ct);
+    }
+
+
+    private static async Task VerificarRespuestaReprogramacionAsync(
+        HttpResponseMessage respuesta,
+        CancellationToken ct)
+    {
+        if (respuesta.IsSuccessStatusCode)
+            return;
+
+        var detalle = await respuesta.Content.ReadAsStringAsync(ct);
+
+        throw new HttpRequestException(
+            string.IsNullOrWhiteSpace(detalle)
+                ? $"Error de reprogramación (HTTP {(int)respuesta.StatusCode})."
+                : $"La API respondió: {detalle}",
+            null,
+            respuesta.StatusCode);
+    }
+
+
+
+
 }

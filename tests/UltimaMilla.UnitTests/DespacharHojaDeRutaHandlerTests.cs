@@ -323,6 +323,29 @@ public class DespacharHojaDeRutaHandlerTests
                     e.CuentaComercialId == cuentaComercialId.Value))
                 .ToList());
 
+
+        public Task<IReadOnlyList<Envio>> ListarPorCuentasComercialesAsync(
+            IReadOnlyCollection<Guid> cuentasComercialesIds,
+            CancellationToken ct)
+        {
+            IReadOnlyList<Envio> resultado = lista
+                .Where(e => cuentasComercialesIds.Contains(e.CuentaComercialId))
+                .ToList();
+
+            return Task.FromResult(resultado);
+        }
+
+        public Task<Envio?> ObtenerPorComercioAsync(
+            Guid envioId,
+            Guid comercioId,
+            CancellationToken ct)
+        {
+            // Esta prueba no utiliza esta consulta.
+            throw new NotSupportedException(
+                "Esta prueba no utiliza la consulta de envíos por comercio.");
+        }
+
+
         public Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
             Guid operadorId,
             CancellationToken ct)
@@ -417,7 +440,7 @@ public class DespacharHojaDeRutaHandlerTests
             Guardados++;
             return Task.FromResult(1);
         }
-        
+
         public Task EjecutarEnTransaccionAsync(
             Func<CancellationToken, Task> operacion,
             CancellationToken ct)

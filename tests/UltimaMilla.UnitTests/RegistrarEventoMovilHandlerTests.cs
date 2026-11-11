@@ -413,6 +413,22 @@ public class RegistrarEventoMovilHandlerTests
             Lista.Add(envio);
             return Task.CompletedTask;
         }
+        public Task<IReadOnlyList<Envio>> ListarPorCuentasComercialesAsync(
+            IReadOnlyCollection<Guid> cuentasComercialesIds,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza esta consulta.");
+        }
+
+        public Task<Envio?> ObtenerPorComercioAsync(
+            Guid envioId,
+            Guid comercioId,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza esta consulta.");
+        }
 
         public Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(e => e.Id == id));

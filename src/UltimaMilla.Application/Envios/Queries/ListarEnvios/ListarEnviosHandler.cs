@@ -79,7 +79,8 @@ public sealed class ListarEnviosHandler(
                     e.Bultos.Count,
                     e.PesoTotalKg,
                     e.TarifaCalculada,
-                    e.FechaAlta);
+                    e.FechaAlta,
+                    e.IntentosRealizados);
             }).ToList();
         }
 
@@ -126,7 +127,9 @@ public sealed class ListarEnviosHandler(
                 e.Bultos.Count,
                 e.PesoTotalKg,
                 e.TarifaCalculada,
-                e.FechaAlta);
+                e.FechaAlta,
+                e.IntentosRealizados);
+
         }).ToList();
 
         await cache.GuardarAsync(

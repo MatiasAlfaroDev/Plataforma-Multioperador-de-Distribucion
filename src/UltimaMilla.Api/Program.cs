@@ -811,6 +811,36 @@ api.MapPost("/envios/{envioId:guid}/reaparicion",
         Perfiles.Operador));
 
 // Solicitudes de reprogramación pendientes para Backoffice.
+
+// Solicitar la reprogramación de un envío desde Backoffice.
+api.MapPost("/solicitudes-reprogramacion",
+    async (
+        HttpContext context,
+        IAntiforgery antiforgery,
+        SolicitarReprogramacionCommand command,
+        SolicitarReprogramacionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido",
+                detail: "La solicitud no contiene un token antifalsificación válido.");
+        }
+
+        var solicitudId = await handler.Handle(command, ct);
+
+        return Results.Ok(new
+        {
+            SolicitudId = solicitudId,
+            Mensaje = "Solicitud de reprogramación creada correctamente."
+        });
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
 api.MapGet("/solicitudes-reprogramacion/pendientes",
     async (
         ListarSolicitudesReprogramacionHandler handler,

@@ -307,6 +307,23 @@ public class AvisosTests
         public Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(id == envio.Id ? envio : null);
 
+        public Task<IReadOnlyList<Envio>> ListarPorCuentasComercialesAsync(
+            IReadOnlyCollection<Guid> cuentasComercialesIds,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza esta consulta.");
+        }
+
+        public Task<Envio?> ObtenerPorComercioAsync(
+            Guid envioId,
+            Guid comercioId,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza esta consulta.");
+        }
+
         public Task<bool> ExisteReferenciaAsync(Guid cuentaComercialId, string referenciaExterna, CancellationToken ct) =>
             Task.FromResult(false);
 

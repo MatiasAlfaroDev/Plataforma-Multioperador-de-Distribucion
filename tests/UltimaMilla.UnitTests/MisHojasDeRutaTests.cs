@@ -361,6 +361,29 @@ public class MisHojasDeRutaTests
             return Task.CompletedTask;
         }
 
+
+        public Task<IReadOnlyList<Envio>> ListarPorCuentasComercialesAsync(
+            IReadOnlyCollection<Guid> cuentasComercialesIds,
+            CancellationToken ct)
+        {
+            IReadOnlyList<Envio> resultado = lista
+                .Where(e => cuentasComercialesIds.Contains(e.CuentaComercialId))
+                .ToList();
+
+            return Task.FromResult(resultado);
+        }
+
+        public Task<Envio?> ObtenerPorComercioAsync(
+            Guid envioId,
+            Guid comercioId,
+            CancellationToken ct)
+        {
+            // Esta prueba no utiliza esta consulta.
+            throw new NotSupportedException(
+                "Esta prueba no utiliza la consulta de envíos por comercio.");
+        }
+
+
         public Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(lista.FirstOrDefault(e => e.Id == id));
 

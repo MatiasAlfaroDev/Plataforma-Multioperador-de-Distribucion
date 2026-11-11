@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using UltimaMilla.Web.Backoffice.Services;
@@ -71,4 +70,51 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
             return Page();
         }
     }
+
+    public async Task<IActionResult> OnPostReprogramarAsync(
+        Guid envioId,
+        string responsable,
+        CancellationToken ct)
+    {
+        if (envioId == Guid.Empty || string.IsNullOrWhiteSpace(responsable))
+        {
+            await CargarDatosAsync(ct);
+            Error = "Seleccioná un envío e ingresá el responsable de la reprogramación.";
+            return Page();
+        }
+
+        Guid? solicitudId = null;
+
+        try
+        {
+            solicitudId = await api.SolicitarReprogramacionAsync(envioId, ct);
+            await api.ConfirmarReprogramacionAsync(
+                solicitudId.Value, responsable.Trim(), ct);
+
+            TempData["MensajeExito"] = "El envío fue reprogramado correctamente. Ya podés asignarlo a una nueva ruta.";
+            return RedirectToPage();
+        }
+        catch (HttpRequestException ex)
+        {
+            await CargarDatosAsync(ct);
+            var etapa = solicitudId.HasValue
+                ? $"La solicitud {solicitudId.Value} fue creada, pero no se pudo confirmar. No vuelvas a solicitarla: revisá la solicitud pendiente."
+                : "No se pudo crear la solicitud de reprogramación.";
+            Error = $"{etapa} Detalle: {ex.Message}";
+            return Page();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await CargarDatosAsync(ct);
+            Error = ex.Message;
+            return Page();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            await CargarDatosAsync(ct);
+            Error = "La sesión no está disponible. Iniciá sesión nuevamente.";
+            return Page();
+        }
+    }
+
 }
