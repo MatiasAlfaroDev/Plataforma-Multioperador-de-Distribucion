@@ -1,5 +1,6 @@
 
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Retiros;
 
 namespace UltimaMilla.Domain.Avisos;
 
@@ -22,6 +23,15 @@ public static class TiposAviso
     public const string EnvioDevuelto = "envio.devuelto";
     public const string EnvioExtraviado = "envio.extraviado";
 
+    // Avisos de retiros a domicilio (RF41).
+    public const string RetiroSolicitado = "retiro.solicitado";
+    public const string RetiroAsignadoARuta = "retiro.asignado_a_ruta";
+    public const string RetiroRetirado = "retiro.retirado";
+    public const string RetiroNoRetirado = "retiro.no_retirado";
+    public const string RetiroEnDeposito = "retiro.en_deposito";
+    public const string RetiroEntregadoAlComercio =
+        "retiro.entregado_al_comercio";
+
     /// <summary>
     /// Todos los tipos de aviso disponibles.
     /// </summary>
@@ -37,7 +47,13 @@ public static class TiposAviso
         EnvioReprogramado,
         EnvioEnDevolucion,
         EnvioDevuelto,
-        EnvioExtraviado
+        EnvioExtraviado,
+        RetiroSolicitado,
+        RetiroAsignadoARuta,
+        RetiroRetirado,
+        RetiroNoRetirado,
+        RetiroEnDeposito,
+        RetiroEntregadoAlComercio
     ];
 
     /// <summary>
@@ -56,6 +72,30 @@ public static class TiposAviso
         EstadoEnvio.EnDevolucion => EnvioEnDevolucion,
         EstadoEnvio.Devuelto => EnvioDevuelto,
         EstadoEnvio.Extraviado => EnvioExtraviado,
+        _ => null
+    };
+
+    public static string? DeEstadoRetiro(EstadoRetiro estado) =>
+    estado switch
+    {
+        EstadoRetiro.Solicitado =>
+            RetiroSolicitado,
+
+        EstadoRetiro.AsignadoARuta =>
+            RetiroAsignadoARuta,
+
+        EstadoRetiro.Retirado =>
+            RetiroRetirado,
+
+        EstadoRetiro.NoRetirado =>
+            RetiroNoRetirado,
+
+        EstadoRetiro.EnDeposito =>
+            RetiroEnDeposito,
+
+        EstadoRetiro.EntregadoAlComercio =>
+            RetiroEntregadoAlComercio,
+
         _ => null
     };
 }

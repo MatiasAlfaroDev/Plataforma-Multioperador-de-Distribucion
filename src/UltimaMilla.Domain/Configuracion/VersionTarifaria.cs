@@ -8,6 +8,7 @@ public class VersionTarifaria : AuditableEntity, ITenantEntity
     public Guid OperadorId { get; private set; }
     public Guid CuadroTarifarioId { get; private set; }
     public Guid ZonaCoberturaId { get; private set; }
+    public TipoServicioTarifario TipoServicio { get; private set; }
 
     public decimal PrecioBase { get; private set; }
     public decimal PrecioPorKg { get; private set; }
@@ -30,7 +31,8 @@ public class VersionTarifaria : AuditableEntity, ITenantEntity
         decimal precioPorMetroCubico,
         decimal recargoUrgentePorcentaje,
         decimal bonificacionPorcentaje,
-        DateTimeOffset vigenciaDesde)
+        DateTimeOffset vigenciaDesde,
+        TipoServicioTarifario tipoServicio = TipoServicioTarifario.Entrega)
     {
         if (operadorId == Guid.Empty)
             throw new ArgumentException("El operador es obligatorio.", nameof(operadorId));
@@ -48,6 +50,11 @@ public class VersionTarifaria : AuditableEntity, ITenantEntity
         if (bonificacionPorcentaje < 0 || bonificacionPorcentaje > 100)
             throw new ArgumentException("La bonificación debe estar entre 0 y 100.");
 
+        if (!Enum.IsDefined(tipoServicio))
+            throw new ArgumentException(
+                "El tipo de servicio tarifario no es válido.",
+                nameof(tipoServicio));
+
         return new VersionTarifaria
         {
             Id = Guid.NewGuid(),
@@ -59,7 +66,8 @@ public class VersionTarifaria : AuditableEntity, ITenantEntity
             PrecioPorMetroCubico = precioPorMetroCubico,
             RecargoUrgentePorcentaje = recargoUrgentePorcentaje,
             BonificacionPorcentaje = bonificacionPorcentaje,
-            VigenciaDesde = vigenciaDesde
+            VigenciaDesde = vigenciaDesde,
+            TipoServicio = tipoServicio,
         };
     }
 

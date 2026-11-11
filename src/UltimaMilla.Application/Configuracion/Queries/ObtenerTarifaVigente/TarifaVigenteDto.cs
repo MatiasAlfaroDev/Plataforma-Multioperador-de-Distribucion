@@ -9,4 +9,5 @@ public sealed record TarifaVigenteDto(
     decimal PrecioPorMetroCubico,
     decimal RecargoUrgentePorcentaje,
     decimal BonificacionPorcentaje,
-    DateTimeOffset VigenciaDesde);
+    DateTimeOffset VigenciaDesde,
+    string TipoServicio);

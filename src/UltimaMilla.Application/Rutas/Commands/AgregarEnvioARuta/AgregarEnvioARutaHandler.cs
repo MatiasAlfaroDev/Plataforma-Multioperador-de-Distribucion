@@ -1,6 +1,8 @@
+
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Retiros;
 using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
@@ -8,12 +10,13 @@ namespace UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 public sealed class AgregarEnvioARutaHandler(
     IHojaDeRutaRepository hojas,
     IEnvioRepository envios,
+    IRetiroRepository retiros,
     IZonaCoberturaRepository zonas,
     IVersionReglasOperativasRepository reglasRepository,
     IUnitOfWork unitOfWork,
     TimeProvider reloj)
 {
-    public async Task<IReadOnlyList<HorarioParada>> Handle(
+    public async Task<IReadOnlyList<HorarioOperacionRuta>> Handle(
         AgregarEnvioARutaCommand command,
         CancellationToken ct)
     {
@@ -45,11 +48,14 @@ public sealed class AgregarEnvioARutaHandler(
                 "La hoja no tiene hora de salida.");
 
         if (hoja.Paradas.Any(p =>
-                p.EnvioId == command.EnvioId && p.Activa))
+            p.EnvioId == command.EnvioId && p.Activa))
+        {
             throw new InvalidOperationException(
                 "El envío ya pertenece a esta hoja.");
+        }
 
-        var nuevo = await envios.ObtenerAsync(command.EnvioId, ct)
+        var nuevo = await envios.ObtenerAsync(
+            command.EnvioId, ct)
             ?? throw new NoEncontradoException(
                 "El envío no existe.");
 
@@ -59,8 +65,10 @@ public sealed class AgregarEnvioARutaHandler(
 
         if (nuevo.Estado != EstadoEnvio.EnDeposito &&
             nuevo.Estado != EstadoEnvio.Reprogramado)
+        {
             throw new InvalidOperationException(
                 "El envío no está disponible para asignación.");
+        }
 
         if (nuevo.VersionReglasOperativasId is not Guid versionId)
             throw new InvalidOperationException(
@@ -74,54 +82,83 @@ public sealed class AgregarEnvioARutaHandler(
                 "No se encontraron las reglas operativas del envío.");
 
         var zonasOperador = await zonas.ListarPorOperadorAsync(
-            command.OperadorId,
-            ct);
+            command.OperadorId, ct);
 
-        var seleccion = new List<EnvioParaPlanificar>();
-
-        EnvioParaPlanificar PrepararZona(Envio envio)
+        UltimaMilla.Domain.Configuracion.ZonaCobertura
+            ObtenerZona(string localidad)
         {
             var compatibles = zonasOperador
-                .Where(z => z.Activa &&
-                    z.CubreDireccion(envio.Direccion.Localidad, null))
+                .Where(z =>
+                    z.Activa &&
+                    z.CubreDireccion(localidad, null))
                 .ToList();
 
             if (compatibles.Count != 1)
                 throw new InvalidOperationException(
-                    $"El envío {envio.ReferenciaExterna} " +
-                    "no tiene una zona de cobertura única.");
+                    "La dirección no tiene una zona de cobertura única.");
 
-            return new EnvioParaPlanificar(envio, compatibles[0]);
+            return compatibles[0];
         }
 
-        // Recuperamos los envíos ya asignados a esta hoja.
+        var seleccionEnvios = new List<EnvioParaPlanificar>();
+        var seleccionRetiros = new List<RetiroParaPlanificar>();
+
+        // Recuperar todas las operaciones activas de la ruta.
         foreach (var parada in hoja.Paradas.Where(p => p.Activa))
         {
-            var existente = await envios.ObtenerAsync(parada.EnvioId, ct)
-                ?? throw new NoEncontradoException(
-                    $"No existe el envío {parada.EnvioId}.");
+            if (parada.EnvioId is Guid envioId)
+            {
+                var existente = await envios.ObtenerAsync(envioId, ct)
+                    ?? throw new NoEncontradoException(
+                        $"No existe el envío {envioId}.");
 
-            if (existente.OperadorId != command.OperadorId ||
-                existente.Estado != EstadoEnvio.AsignadoARuta)
+                if (existente.OperadorId != command.OperadorId ||
+                    existente.Estado != EstadoEnvio.AsignadoARuta)
+                {
+                    throw new InvalidOperationException(
+                        "Una entrega activa tiene un estado inválido.");
+                }
+
+                seleccionEnvios.Add(new EnvioParaPlanificar(
+                    existente,
+                    ObtenerZona(existente.Direccion.Localidad)));
+            }
+            else if (parada.RetiroId is Guid retiroId)
+            {
+                var retiro = await retiros.ObtenerAsync(retiroId, ct)
+                    ?? throw new NoEncontradoException(
+                        $"No existe el retiro {retiroId}.");
+
+                if (retiro.OperadorId != command.OperadorId ||
+                    retiro.Estado != EstadoRetiro.AsignadoARuta ||
+                    retiro.HojaDeRutaId != hoja.Id)
+                {
+                    throw new InvalidOperationException(
+                        "Un retiro activo tiene un estado inválido.");
+                }
+
+                seleccionRetiros.Add(new RetiroParaPlanificar(
+                    retiro,
+                    ObtenerZona(retiro.DomicilioRetiro.Localidad)));
+            }
+            else
             {
                 throw new InvalidOperationException(
-                    "Una parada activa contiene un envío inválido.");
+                    "La hoja contiene una parada inválida.");
             }
-
-            seleccion.Add(PrepararZona(existente));
         }
 
-        var nuevoConZona = PrepararZona(nuevo);
+        var zonaNueva = ObtenerZona(nuevo.Direccion.Localidad);
 
-        if (!nuevoConZona.Zona.OfreceFranja(
-                command.HoraEntregaDesde,
-                command.HoraEntregaHasta))
+        if (!zonaNueva.OfreceFranja(
+            command.HoraEntregaDesde,
+            command.HoraEntregaHasta))
         {
             throw new InvalidOperationException(
                 "La zona no ofrece la franja seleccionada.");
         }
 
-        // Se conserva un compromiso existente si coincide.
+        // Mantener las reglas de compromiso de entrega existentes.
         if (nuevo.Estado == EstadoEnvio.EnDeposito)
         {
             var tieneCompromiso =
@@ -172,23 +209,23 @@ public sealed class AgregarEnvioARutaHandler(
                 inicioNuevaEntrega);
         }
 
-        seleccion.Add(nuevoConZona);
+        seleccionEnvios.Add(new EnvioParaPlanificar(
+            nuevo,
+            zonaNueva));
 
-        // Valida TODA la hoja antes de agregar la nueva parada.
+        // El cálculo considera todas las entregas y retiros.
         var horarios = PlanificacionHojaDeRuta.Calcular(
             hoja,
-            seleccion);
+            seleccionEnvios,
+            seleccionRetiros);
 
         var ahora = reloj.GetUtcNow();
 
         await unitOfWork.EjecutarEnTransaccionAsync(
             async transaccionCt =>
             {
-                // Agrega el envío y reserva su parada.
                 hoja.AgregarEnvio(nuevo);
 
-                // Mueve temporalmente las paradas activas
-                // para evitar colisiones con el índice único.
                 hoja.PrepararRenumeracionParadas();
 
                 nuevo.Aplicar(
@@ -198,13 +235,13 @@ public sealed class AgregarEnvioARutaHandler(
                     "Backoffice",
                     "Despachador");
 
-                // Primera fase: persiste las paradas con órdenes temporales.
-                await unitOfWork.GuardarCambiosAsync(transaccionCt);
+                await unitOfWork.GuardarCambiosAsync(
+                    transaccionCt);
 
-                // Segunda fase: establece el orden calculado para la ruta.
-                hoja.ActualizarOrdenParadas(horarios);
+                hoja.ActualizarOrdenOperaciones(horarios);
 
-                await unitOfWork.GuardarCambiosAsync(transaccionCt);
+                await unitOfWork.GuardarCambiosAsync(
+                    transaccionCt);
             },
             ct);
 

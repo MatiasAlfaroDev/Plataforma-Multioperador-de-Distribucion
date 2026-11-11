@@ -7,6 +7,7 @@ using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Rutas;
+using UltimaMilla.Domain.Retiros;
 
 namespace UltimaMilla.UnitTests;
 
@@ -54,6 +55,7 @@ public class DespacharHojaDeRutaHandlerTests
         _handler = new DespacharHojaDeRutaHandler(
             _hojas,
             new EnviosEnMemoria(_envios),
+            new RetirosEnMemoria(new List<Retiro>()),
             new ReglasEnMemoria(_versiones),
             _unidad,
             new RelojFijo(Alta.AddHours(1)));

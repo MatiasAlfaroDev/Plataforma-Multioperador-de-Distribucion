@@ -5,6 +5,8 @@ namespace UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
 
 public sealed class ActualizarTarifaHandler(
     IVersionTarifariaRepository tarifas,
+    ICuadroTarifarioRepository cuadros,
+    IZonaCoberturaRepository zonas,
     IUnitOfWork unitOfWork,
     TimeProvider reloj)
 {
@@ -12,36 +14,120 @@ public sealed class ActualizarTarifaHandler(
         ActualizarTarifaCommand command,
         CancellationToken ct)
     {
-        var ahora = reloj.GetUtcNow();
+        ArgumentNullException.ThrowIfNull(command);
 
-        var versionActual = await tarifas.ObtenerVigentePorZonaAsync(
-            command.OperadorId,
-            command.ZonaCoberturaId,
-            ahora,
-            ct);
-
-        // Si existe una versión anterior, cerramos su vigencia.
-        if (versionActual is not null)
+        if (command.OperadorId == Guid.Empty ||
+            command.CuadroTarifarioId == Guid.Empty ||
+            command.ZonaCoberturaId == Guid.Empty)
         {
-            versionActual.FinalizarVigencia(ahora);
+            throw new ArgumentException(
+                "El operador, el cuadro y la zona son obligatorios.");
         }
 
-        // Creamos una nueva versión con los nuevos valores.
-        var nuevaVersion = VersionTarifaria.Crear(
-            command.OperadorId,
-            command.CuadroTarifarioId,
-            command.ZonaCoberturaId,
-            command.PrecioBase,
-            command.PrecioPorKg,
-            command.PrecioPorMetroCubico,
-            command.RecargoUrgentePorcentaje,
-            command.BonificacionPorcentaje,
-            ahora);
+        if (!Enum.TryParse<TipoServicioTarifario>(
+                command.TipoServicio,
+                ignoreCase: true,
+                out var tipoServicio) ||
+            !Enum.IsDefined(tipoServicio))
+        {
+            throw new ArgumentException(
+                "El tipo de servicio debe ser Entrega o RetiroDomicilio.");
+        }
 
-        await tarifas.AgregarAsync(nuevaVersion, ct);
+        if (command.PrecioBase < 0 ||
+            command.PrecioPorKg < 0 ||
+            command.PrecioPorMetroCubico < 0 ||
+            command.RecargoUrgentePorcentaje < 0 ||
+            command.BonificacionPorcentaje is < 0 or > 100)
+        {
+            throw new ArgumentException(
+                "Los precios o porcentajes no son válidos.");
+        }
 
-        await unitOfWork.GuardarCambiosAsync(ct);
+        if (tipoServicio == TipoServicioTarifario.RetiroDomicilio &&
+            command.RecargoUrgentePorcentaje != 0)
+        {
+            throw new ArgumentException(
+                "El retiro a domicilio no admite recargo urgente.");
+        }
 
-        return nuevaVersion.Id;
+        var ahora = reloj.GetUtcNow();
+        Guid nuevaVersionId = Guid.Empty;
+
+        await unitOfWork.EjecutarEnTransaccionAsync(
+            async transaccionCt =>
+            {
+                var zona = await zonas.ObtenerAsync(
+                    command.OperadorId,
+                    command.ZonaCoberturaId,
+                    transaccionCt);
+
+                if (zona is null ||
+                    !zona.Activa ||
+                    zona.OperadorId != command.OperadorId)
+                {
+                    throw new InvalidOperationException(
+                        "La zona no existe o está inactiva.");
+                }
+
+                var cuadro = await cuadros.ObtenerAsync(
+                    command.OperadorId,
+                    command.CuadroTarifarioId,
+                    transaccionCt);
+
+                if (cuadro is null || !cuadro.Activo)
+                {
+                    throw new InvalidOperationException(
+                        "El cuadro tarifario no existe o está inactivo.");
+                }
+
+                var versionActual =
+                    await tarifas.ObtenerVigentePorZonaAsync(
+                        command.OperadorId,
+                        command.ZonaCoberturaId,
+                        ahora,
+                        transaccionCt,
+                        tipoServicio);
+
+                if (versionActual is null)
+                {
+                    throw new InvalidOperationException(
+                        "No existe una tarifa vigente para actualizar. " +
+                        "Primero debe crearse.");
+                }
+
+                if (versionActual.CuadroTarifarioId != cuadro.Id)
+                {
+                    throw new InvalidOperationException(
+                        "El cuadro tarifario no corresponde " +
+                        "a la tarifa vigente seleccionada.");
+                }
+
+                versionActual.FinalizarVigencia(ahora);
+
+                var nuevaVersion = VersionTarifaria.Crear(
+                    command.OperadorId,
+                    cuadro.Id,
+                    zona.Id,
+                    command.PrecioBase,
+                    command.PrecioPorKg,
+                    command.PrecioPorMetroCubico,
+                    command.RecargoUrgentePorcentaje,
+                    command.BonificacionPorcentaje,
+                    ahora,
+                    tipoServicio);
+
+                await tarifas.AgregarAsync(
+                    nuevaVersion,
+                    transaccionCt);
+
+                await unitOfWork.GuardarCambiosAsync(
+                    transaccionCt);
+
+                nuevaVersionId = nuevaVersion.Id;
+            },
+            ct);
+
+        return nuevaVersionId;
     }
 }

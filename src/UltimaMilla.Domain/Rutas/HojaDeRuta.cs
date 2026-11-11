@@ -2,6 +2,7 @@
 using UltimaMilla.Domain.Common;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
+using UltimaMilla.Domain.Retiros;
 
 namespace UltimaMilla.Domain.Rutas;
 
@@ -134,6 +135,142 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
         PesoAsignadoKg += envio.PesoPendienteKg;
         VolumenAsignadoM3 += envio.VolumenPendienteMetrosCubicos;
+    }
+
+    public void AgregarRetiro(Retiro retiro)
+    {
+        ArgumentNullException.ThrowIfNull(retiro);
+
+        VerificarEditable();
+
+        if (retiro.OperadorId != OperadorId)
+        {
+            throw new InvalidOperationException(
+                "El retiro pertenece a otro operador.");
+        }
+
+        if (retiro.Estado != EstadoRetiro.Solicitado)
+        {
+            throw new InvalidOperationException(
+                "El retiro no está disponible para asignación.");
+        }
+
+        if (retiro.FechaSolicitada != Fecha)
+        {
+            throw new InvalidOperationException(
+                "La fecha solicitada del retiro no coincide con la ruta.");
+        }
+
+        if (_paradas.Any(p =>
+            p.RetiroId == retiro.Id && p.Activa))
+        {
+            throw new InvalidOperationException(
+                "El retiro ya está incluido en esta hoja de ruta.");
+        }
+
+        if (_paradas.Count(p => p.Activa) >= MaximoParadas)
+        {
+            throw new InvalidOperationException(
+                "Se alcanzó el máximo de paradas.");
+        }
+
+        var siguienteOrden = _paradas.Count == 0
+            ? 1
+            : _paradas.Max(p => p.Orden) + 1;
+
+        var parada = ParadaRuta.CrearRetiro(
+            Id,
+            retiro.Id,
+            siguienteOrden);
+
+        _paradas.Add(parada);
+    }
+
+    public void FinalizarParadaRetiro(
+        Retiro retiro,
+        DateTimeOffset fecha)
+    {
+        ArgumentNullException.ThrowIfNull(retiro);
+
+        if (retiro.OperadorId != OperadorId)
+        {
+            throw new InvalidOperationException(
+                "El retiro pertenece a otro operador.");
+        }
+
+        if (retiro.HojaDeRutaId != Id)
+        {
+            throw new InvalidOperationException(
+                "El retiro no pertenece a esta hoja de ruta.");
+        }
+
+        if (retiro.Estado != EstadoRetiro.Retirado &&
+            retiro.Estado != EstadoRetiro.NoRetirado)
+        {
+            throw new InvalidOperationException(
+                "El retiro todavía no tiene un resultado registrado.");
+        }
+
+        var parada = _paradas.SingleOrDefault(
+            p => p.RetiroId == retiro.Id && p.Activa);
+
+        if (parada is null)
+        {
+            throw new InvalidOperationException(
+                "No existe una parada activa para este retiro.");
+        }
+
+        parada.Liberar(fecha);
+    }
+
+    public void ActualizarOrdenOperaciones(
+        IReadOnlyList<HorarioOperacionRuta> horarios)
+    {
+        VerificarEditable();
+        ArgumentNullException.ThrowIfNull(horarios);
+
+        var activas = _paradas
+            .Where(p => p.Activa)
+            .ToList();
+
+        if (horarios.Count != activas.Count)
+            throw new InvalidOperationException(
+                "La planificación no coincide con las paradas activas.");
+
+        if (horarios
+            .Select(h => (h.Tipo, h.ReferenciaId))
+            .Distinct()
+            .Count() != horarios.Count)
+        {
+            throw new InvalidOperationException(
+                "La planificación contiene operaciones repetidas.");
+        }
+
+        foreach (var parada in activas)
+        {
+            var existe = horarios.Any(h =>
+                (h.Tipo == TipoOperacionRuta.Entrega &&
+                parada.EnvioId == h.ReferenciaId) ||
+                (h.Tipo == TipoOperacionRuta.Retiro &&
+                parada.RetiroId == h.ReferenciaId));
+
+            if (!existe)
+                throw new InvalidOperationException(
+                    "La planificación omite una parada activa.");
+        }
+
+        for (var i = 0; i < horarios.Count; i++)
+        {
+            var horario = horarios[i];
+
+            var parada = activas.Single(p =>
+                (horario.Tipo == TipoOperacionRuta.Entrega &&
+                p.EnvioId == horario.ReferenciaId) ||
+                (horario.Tipo == TipoOperacionRuta.Retiro &&
+                p.RetiroId == horario.ReferenciaId));
+
+            parada.CambiarOrden(i + 1);
+        }
     }
 
     public void QuitarEnvio(Envio envio, DateTimeOffset fecha)

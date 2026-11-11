@@ -52,6 +52,14 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 using UltimaMilla.Application.Envios.Queries.ObtenerDetalleEnvio;
+using UltimaMilla.Application.Retiros.Commands.CrearRetiro;
+using UltimaMilla.Application.Configuracion.Commands.CrearTarifa;
+using UltimaMilla.Application.Retiros.Queries;
+using UltimaMilla.Application.Rutas.Commands.AgregarRetiroARuta;
+using UltimaMilla.Application.Retiros.Commands.GestionarRetiro;
+using UltimaMilla.Application.Retiros.Commands.RegistrarEventoRetiro;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResumenRetiros;
+using UltimaMilla.Application.Avisos.Commands.RegistrarAvisosRetiro;
 
 namespace UltimaMilla.Application;
 
@@ -99,6 +107,14 @@ public static class DependencyInjection
         services.AddScoped<RegistrarPosicionesHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();
         services.AddScoped<EnviarNotificacionDePruebaHandler>();
+        services.AddScoped<CrearRetiroHandler>();
+        services.AddScoped<CrearTarifaHandler>();
+        services.AddScoped<ConsultarRetirosHandler>();
+        services.AddScoped<AgregarRetiroARutaHandler>();
+        services.AddScoped<GestionarRetiroHandler>();
+        services.AddScoped<RegistrarEventoRetiroHandler>();
+        services.AddScoped<ObtenerResumenRetirosHandler>();
+        services.AddScoped<RegistrarAvisosRetiroHandler>();
 
         // Avisos a comercios (RNF 6.9): RegistrarAvisos y EntregarAviso los invoca el Worker.
         services.AddScoped<RegistrarAvisosHandler>();
