@@ -17,8 +17,25 @@ public interface IEnvioRepository
         Guid operadorId,
         Guid? cuentaComercialId,
         CancellationToken ct);
+    
+    /// <summary>
+    /// Lista los envíos asociados a las cuentas comerciales
+    /// autorizadas de un comercio.
+    /// </summary>
+    Task<IReadOnlyList<Envio>> ListarPorCuentasComercialesAsync(
+        IReadOnlyCollection<Guid> cuentasComercialesIds,
+        CancellationToken ct);
 
     Task<IReadOnlyList<Envio>> ListarParaPlanificacionAsync(
         Guid operadorId,
         CancellationToken ct);
+
+    Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct);
+
+    Task<Envio?> ObtenerPorComercioAsync(
+    Guid envioId,
+    Guid comercioId,
+    CancellationToken ct);
 }

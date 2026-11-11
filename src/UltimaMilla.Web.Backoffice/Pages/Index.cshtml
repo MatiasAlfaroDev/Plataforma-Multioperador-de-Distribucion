@@ -7,6 +7,9 @@
 
     var hayRecepciones = Model.Envios.Any(
         e => e.Estado == "Admitido");
+
+    var hayReprogramaciones = Model.Envios.Any(
+        e => e.Estado == "EnDeposito" && e.IntentosRealizados > 0);
 }
 
 <div class="encabezado">
@@ -21,6 +24,11 @@
     <div class="aviso error" role="alert">
         @Model.Error
     </div>
+}
+
+@if (TempData["MensajeExito"] is string mensajeExito)
+{
+    <div class="aviso" role="status">@mensajeExito</div>
 }
 
 @if (Model.Envios.Count == 0)
@@ -65,7 +73,7 @@ else
                         <td>@e.Direccion</td>
                         <td class="num">@e.CantidadBultos</td>
                         <td class="num">@Formato.Numero(e.PesoTotalKg)</td>
-                        <td>@Formato.Modalidad(e.Modalidad)</td>                  
+                        <td>@Formato.Modalidad(e.Modalidad)</td>
                         <td>
                             @switch (e.Estado)
                             {
@@ -125,6 +133,11 @@ else
                         </td>
                         <td>@Formato.Hora(e.FechaAlta)</td>
                         <td class="text-right">
+                        <a asp-page="/DetalleEnvio"
+                            asp-route-id="@e.Id"
+                            class="btn-secundario py-1.5 text-sm">
+                                Ver detalle
+                        </a>
                             @if (e.Estado == "Admitido")
                             {
                                 <button type="button"
@@ -136,14 +149,36 @@ else
                                     Recibir en depósito
                                 </button>
                             }
-                            else if (e.Estado == "EnDeposito")
+
+                            else if (e.Estado == "EnDeposito" &&
+                                    e.IntentosRealizados == 0)
                             {
-                               <a asp-page="/HojasDeRuta"
+                                <a asp-page="/HojasDeRuta"
                                 asp-route-envioId="@e.Id"
                                 class="accion-asignar btn-secundario py-1.5 text-sm">
                                     Asignar a ruta
                                 </a>
                             }
+                            else if (e.Estado == "EnDeposito" &&
+                                    e.IntentosRealizados > 0)
+                            {
+                                <button type="button"
+                                        class="abrir-reprogramacion primario py-1.5 text-sm"
+                                        data-envio-id="@e.Id"
+                                        data-referencia="@e.ReferenciaExterna"
+                                        data-intentos="@e.IntentosRealizados">
+                                    Reprogramar
+                                </button>
+                            }
+                            else if (e.Estado == "Reprogramado")
+                            {
+                                <a asp-page="/HojasDeRuta"
+                                asp-route-envioId="@e.Id"
+                                class="accion-asignar btn-secundario py-1.5 text-sm">
+                                    Asignar a ruta
+                                </a>
+                            }
+
                             else if (e.Estado == "AsignadoARuta")
                             {
                                 <span class="accion-estado nota">Asignado a ruta</span>
@@ -292,3 +327,72 @@ else
             });
     </script>
 }
+
+@if (hayReprogramaciones)
+{
+    <dialog id="modalReprogramacion"
+            class="modal-recepcion w-[min(32rem,calc(100vw-2rem))] m-auto"
+            aria-labelledby="tituloReprogramacion">
+        <form method="post" asp-page-handler="Reprogramar" id="formReprogramacion">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="envioId" id="reprogramacionEnvioId" />
+
+            <div class="modal-encabezado flex items-start justify-between gap-4">
+                <h2 id="tituloReprogramacion" class="mt-0 font-display text-xl font-bold tracking-tight">
+                    Reprogramar envío
+                </h2>
+                <button type="button" id="cerrarReprogramacion"
+                        class="cerrar-modal border-0 bg-transparent p-1 text-xl text-suave"
+                        aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="modal-info mt-4 grid gap-1 rounded-xl bg-hundido px-4 py-3 text-sm">
+                <p><strong>Envío:</strong> <span id="reprogramacionReferencia"></span></p>
+                <p><strong>Intentos realizados:</strong> <span id="reprogramacionIntentos"></span></p>
+                <p class="nota">La API verificará las reglas operativas antes de permitir la reprogramación.</p>
+            </div>
+
+            <div class="modal-campo">
+                <label for="responsableReprogramacion">Responsable de reprogramación</label>
+                <input type="text" id="responsableReprogramacion"
+                       name="responsable" maxlength="150"
+                       placeholder="Nombre del responsable" required />
+            </div>
+
+            <div class="modal-acciones acciones justify-end">
+                <button type="button" id="cancelarReprogramacion" class="boton-cancelar">
+                    Cancelar
+                </button>
+                <button type="submit" class="primario" id="confirmarReprogramacion">
+                    Confirmar reprogramación
+                </button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>
+        (() => {
+            const modal = document.getElementById("modalReprogramacion");
+            const form = document.getElementById("formReprogramacion");
+            document.querySelectorAll(".abrir-reprogramacion").forEach(boton => {
+                boton.addEventListener("click", () => {
+                    form.reset();
+                    document.getElementById("reprogramacionEnvioId").value = boton.dataset.envioId;
+                    document.getElementById("reprogramacionReferencia").textContent = boton.dataset.referencia;
+                    document.getElementById("reprogramacionIntentos").textContent = boton.dataset.intentos;
+                    modal.showModal();
+                });
+            });
+            document.getElementById("cerrarReprogramacion")
+                .addEventListener("click", () => modal.close());
+            document.getElementById("cancelarReprogramacion")
+                .addEventListener("click", () => modal.close());
+            form.addEventListener("submit", () => {
+                const boton = document.getElementById("confirmarReprogramacion");
+                boton.disabled = true;
+                boton.textContent = "Procesando...";
+            });
+        })();
+    </script>
+}
+

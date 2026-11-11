@@ -27,7 +27,7 @@ public sealed class CrearEnvioHandler(
     TimeProvider reloj,
     ICacheService cache)
 {
-    public async Task<Guid> Handle(
+    public async Task<CrearEnvioResultado> Handle(
     CrearEnvioCommand command,
     CancellationToken ct)
 {
@@ -170,6 +170,10 @@ if (!cuenta.Activa ||
 
         await cache.EliminarAsync(claveComercio, ct);
 
-        return envio.Id;
-    }
+        return new CrearEnvioResultado(
+        envio.Id,
+        envio.TokenSeguimientoOriginal
+            ?? throw new InvalidOperationException(
+                "No se generó el token de seguimiento."));
+        }
 }

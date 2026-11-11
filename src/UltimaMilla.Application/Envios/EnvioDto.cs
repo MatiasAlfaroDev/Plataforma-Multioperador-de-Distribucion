@@ -1,6 +1,10 @@
+
 namespace UltimaMilla.Application.Envios;
 
-/// <summary>Datos de un envío que salen de Application. No expone la entidad del dominio.</summary>
+/// <summary>
+/// Datos de un envío que salen de Application.
+/// No expone la entidad del dominio.
+/// </summary>
 public sealed record EnvioDto(
     Guid Id,
     string ReferenciaExterna,
@@ -14,4 +18,5 @@ public sealed record EnvioDto(
     int CantidadBultos,
     decimal PesoTotalKg,
     decimal? TarifaCalculada,
-    DateTimeOffset FechaAlta);
+    DateTimeOffset FechaAlta,
+    int IntentosRealizados);

@@ -216,13 +216,13 @@ public sealed class ImportarEnviosCsvHandler(
 
             try
             {
-                var id = await crearEnvio.Handle(comando, ct);
+                var resultado = await crearEnvio.Handle(comando, ct);
 
                 resultados.Add(new ResultadoEnvioImportado(
                     grupo.Key,
                     primera.Numero,
                     EstadoImportacionCsv.Creado,
-                    id,
+                    resultado.EnvioId,
                     null));
             }
             catch (ConflictoException)

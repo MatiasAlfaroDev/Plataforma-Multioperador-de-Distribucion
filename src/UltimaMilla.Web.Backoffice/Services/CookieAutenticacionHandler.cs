@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+
 using System.Net;
 
 namespace UltimaMilla.Web.Backoffice.Services;
@@ -6,6 +6,9 @@ namespace UltimaMilla.Web.Backoffice.Services;
 public sealed class CookieAutenticacionHandler(
     IHttpContextAccessor httpContextAccessor) : DelegatingHandler
 {
+    public static readonly HttpRequestOptionsKey<string>
+        CookieAntiforgeryKey = new("CookieAntiforgery");
+
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
@@ -23,33 +26,36 @@ public sealed class CookieAutenticacionHandler(
                 "No se encontró la cookie de autenticación.");
         }
 
-        // Conservamos cualquier cookie específica
-        // que el cliente haya agregado a la solicitud.
-        string cookiesExistentes = string.Empty;
-
-        if (request.Headers.TryGetValues(
-                "Cookie",
-                out var valores))
+        var cookies = new List<string>
         {
-            cookiesExistentes = string.Join("; ", valores);
+            $"UltimaMilla.Auth={WebUtility.UrlEncode(cookieAutenticacion)}"
+        };
+
+        // Conservar las cookies agregadas por otros clientes HTTP.
+        if (request.Headers.TryGetValues("Cookie", out var existentes))
+        {
+            foreach (var valor in existentes)
+            {
+                if (!string.IsNullOrWhiteSpace(valor))
+                    cookies.Add(valor);
+            }
         }
 
-        var cookieSesion =
-            $"UltimaMilla.Auth={WebUtility.UrlEncode(cookieAutenticacion)}";
-
-        var cookiesCompletas =
-            string.IsNullOrWhiteSpace(cookiesExistentes)
-                ? cookieSesion
-                : $"{cookieSesion}; {cookiesExistentes}";
+        // Agregar la cookie antiforgery utilizada por la API.
+        if (request.Options.TryGetValue(
+                CookieAntiforgeryKey,
+                out string? cookieAntiforgery) &&
+            !string.IsNullOrWhiteSpace(cookieAntiforgery))
+        {
+            cookies.Add(cookieAntiforgery);
+        }
 
         request.Headers.Remove("Cookie");
 
         request.Headers.TryAddWithoutValidation(
             "Cookie",
-            cookiesCompletas);
+            string.Join("; ", cookies));
 
-        return await base.SendAsync(
-            request,
-            cancellationToken);
+        return await base.SendAsync(request, cancellationToken);
     }
 }

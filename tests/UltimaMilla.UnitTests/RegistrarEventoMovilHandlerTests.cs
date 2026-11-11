@@ -413,6 +413,22 @@ public class RegistrarEventoMovilHandlerTests
             Lista.Add(envio);
             return Task.CompletedTask;
         }
+        public Task<IReadOnlyList<Envio>> ListarPorCuentasComercialesAsync(
+            IReadOnlyCollection<Guid> cuentasComercialesIds,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza esta consulta.");
+        }
+
+        public Task<Envio?> ObtenerPorComercioAsync(
+            Guid envioId,
+            Guid comercioId,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException(
+                "Esta prueba no utiliza esta consulta.");
+        }
 
         public Task<Envio?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(e => e.Id == id));
@@ -443,6 +459,13 @@ public class RegistrarEventoMovilHandlerTests
             throw new NotSupportedException(
                 "Esta prueba no utiliza la consulta de planificación.");
         }
+
+        public Task<Envio?> ObtenerPorTokenSeguimientoAsync(
+    string tokenHash,
+    CancellationToken ct)
+{
+    return Task.FromResult<Envio?>(null);
+}
     }
 
     private sealed class EventosEnMemoria : IEventoMovilRepository

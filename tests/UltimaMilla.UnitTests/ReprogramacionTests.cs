@@ -5,6 +5,7 @@ using UltimaMilla.Application.Envios.Commands.Reprogramacion;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.UnitTests;
 
@@ -293,6 +294,7 @@ internal sealed class EscenarioReprogramacion
     private readonly IVersionReglasOperativasRepository _reglas;
     private readonly IUnitOfWork _unidadDeTrabajo;
     private readonly TimeProvider _reloj;
+    private readonly SesionFalsa _tenantContext;
 
     public EscenarioReprogramacion(int maximoIntentos = 3)
     {
@@ -324,6 +326,7 @@ internal sealed class EscenarioReprogramacion
         Envio.AsignarReglasOperativas(Reglas.Id);
 
         _reloj = new RelojFijo(Ahora);
+        _tenantContext = new SesionFalsa { OperadorId = Envio.OperadorId };
 
         _envios = CrearSimulacion<IEnvioRepository>(
             (metodo, argumentos) => metodo.Name switch
@@ -386,6 +389,7 @@ internal sealed class EscenarioReprogramacion
             _solicitudes,
             _reglas,
             _unidadDeTrabajo,
+            _tenantContext,
             _reloj);
 
     public ConfirmarReprogramacionHandler CrearConfirmarHandler() =>
@@ -394,7 +398,20 @@ internal sealed class EscenarioReprogramacion
             _envios,
             _reglas,
             _unidadDeTrabajo,
+            _tenantContext,
             _reloj);
+
+    public void CambiarOperadorAutenticado(Guid operadorId) =>
+        _tenantContext.OperadorId = operadorId;
+
+    private sealed class SesionFalsa : ITenantContext
+    {
+        public Guid? UsuarioId { get; set; } = Guid.NewGuid();
+        public Guid? OperadorId { get; set; }
+        public Guid? ComercioId => null;
+        public string? Perfil => Perfiles.Operador;
+        public bool EstaAutenticado => UsuarioId.HasValue;
+    }
 
     public SolicitudReprogramacion CrearSolicitudPendiente()
     {

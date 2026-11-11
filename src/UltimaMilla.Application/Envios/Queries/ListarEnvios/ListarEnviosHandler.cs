@@ -1,7 +1,7 @@
-
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Application.Abstractions.Caching;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Application.Envios.Queries.ListarEnvios;
 
@@ -16,62 +16,51 @@ public sealed class ListarEnviosHandler(
         CancellationToken ct)
     {
         if (!tenantContext.EstaAutenticado ||
-            !tenantContext.UsuarioId.HasValue ||
-            !tenantContext.OperadorId.HasValue)
+            !tenantContext.UsuarioId.HasValue)
         {
             throw new UnauthorizedAccessException(
-                "Debe iniciar sesión y seleccionar un operador.");
+                "Debe iniciar sesión.");
         }
 
-        if (tenantContext.Perfil is not (
-            Perfiles.AdministradorOperador or
-            Perfiles.Operador or
-            Perfiles.Comercio))
+        var perfil = tenantContext.Perfil;
+
+        var esOperador = perfil is
+            Perfiles.AdministradorOperador or Perfiles.Operador;
+
+        var esComercio = perfil is
+            Perfiles.AdministradorComercio or Perfiles.Comercio;
+
+        if (!esOperador && !esComercio)
         {
             throw new UnauthorizedAccessException(
                 "No tiene permisos para consultar envíos.");
         }
 
-        var operadorId = tenantContext.OperadorId.Value;
-
-        // El operador siempre se obtiene de la sesión,
-        // nunca del parámetro enviado por el cliente.
-        Guid? cuentaComercialId = null;
-
-        if (tenantContext.Perfil == Perfiles.Comercio)
+        if (esComercio)
         {
-            cuentaComercialId = tenantContext.ComercioId
+            var comercioId = tenantContext.ComercioId
                 ?? throw new UnauthorizedAccessException(
-                    "No tiene una cuenta comercial seleccionada.");
-        }
+                    "No se pudo identificar el comercio.");
 
-        // La clave se construye con el contexto autenticado,
-        // nunca con identificadores enviados por el cliente.
-        var claveCache = cuentaComercialId.HasValue
-            ? $"envios:operador:{operadorId}:cuenta:{cuentaComercialId.Value}"
-            : $"envios:operador:{operadorId}";
+            var vinculaciones = await cuentas.ListarPorComercioAsync(
+                comercioId, ct);
 
-        var resultadoCache = await cache.ObtenerAsync<List<EnvioDto>>(
-            claveCache,
-            ct);
+            var autorizadas = vinculaciones
+                .Where(c =>
+                    c.Activa &&
+                    c.Estado == EstadoCuentaComercial.Confirmada)
+                .ToList();
 
-        if (resultadoCache is not null)
-        {
-            return resultadoCache;
-        }
+            var cuentasIds = autorizadas
+                .Select(c => c.Id)
+                .ToArray();
 
-        var lista = await envios.ListarAsync(
-            operadorId,
-            cuentaComercialId,
-            ct);
+            var lista = await envios.ListarPorCuentasComercialesAsync(
+                cuentasIds, ct);
 
-        var cuentasPorId = (await cuentas.ListarResumenAsync(
-            operadorId,
-            cuentaComercialId,
-            ct))
-            .ToDictionary(c => c.Id);
-        var resultado = lista
-         .Select(e =>
+            var cuentasPorId = autorizadas.ToDictionary(c => c.Id);
+
+            return lista.Select(e =>
             {
                 cuentasPorId.TryGetValue(
                     e.CuentaComercialId,
@@ -90,15 +79,65 @@ public sealed class ListarEnviosHandler(
                     e.Bultos.Count,
                     e.PesoTotalKg,
                     e.TarifaCalculada,
-                    e.FechaAlta);
-            })
-            .ToList();
+                    e.FechaAlta,
+                    e.IntentosRealizados);
+            }).ToList();
+        }
+
+        // Backoffice: se conserva el aislamiento por operador.
+        var operadorId = tenantContext.OperadorId
+            ?? throw new UnauthorizedAccessException(
+                "Debe seleccionar un operador.");
+
+        var claveCache = $"envios:operador:{operadorId}";
+
+        var resultadoCache =
+            await cache.ObtenerAsync<List<EnvioDto>>(claveCache, ct);
+
+        if (resultadoCache is not null)
+            return resultadoCache;
+
+        var enviosOperador = await envios.ListarAsync(
+            operadorId,
+            null,
+            ct);
+
+        var cuentasPorOperador = (await cuentas.ListarResumenAsync(
+            operadorId,
+            null,
+            ct))
+            .ToDictionary(c => c.Id);
+
+        var resultado = enviosOperador.Select(e =>
+        {
+            cuentasPorOperador.TryGetValue(
+                e.CuentaComercialId,
+                out var cuenta);
+
+            return new EnvioDto(
+                e.Id,
+                e.ReferenciaExterna,
+                e.OperadorId,
+                cuenta?.OperadorNombre ?? "(desconocido)",
+                cuenta?.ComercioNombre ?? "(desconocido)",
+                e.Modalidad.ToString(),
+                e.Estado.ToString(),
+                e.Destinatario.Nombre,
+                e.Direccion.ToString(),
+                e.Bultos.Count,
+                e.PesoTotalKg,
+                e.TarifaCalculada,
+                e.FechaAlta,
+                e.IntentosRealizados);
+
+        }).ToList();
 
         await cache.GuardarAsync(
             claveCache,
             resultado,
             TimeSpan.FromSeconds(30),
             ct);
+
         return resultado;
     }
 }

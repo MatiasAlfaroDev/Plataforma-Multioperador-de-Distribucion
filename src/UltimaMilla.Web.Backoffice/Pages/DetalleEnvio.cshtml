@@ -1,0 +1,213 @@
+@page "{id:guid}"
+@model DetalleEnvioModel
+@using UltimaMilla.Web.Backoffice.Services
+
+@{
+    ViewData["Title"] = "Detalle de envío";
+}
+
+<div class="encabezado">
+    <div>
+        <a asp-page="/Index">Volver a envíos</a>
+        <h1>Detalle de envío</h1>
+    </div>
+</div>
+
+@if (Model.Error is not null)
+{
+    <div class="aviso error" role="alert">
+        @Model.Error
+    </div>
+}
+else if (Model.Envio is { } envio)
+{
+    <h2>Información general</h2>
+
+    <div class="tabla">
+        <table>
+            <tbody>
+                <tr>
+                    <th>Referencia</th>
+                    <td>@envio.ReferenciaExterna</td>
+                </tr>
+                <tr>
+                    <th>Estado</th>
+                    <td>@envio.Estado</td>
+                </tr>
+                <tr>
+                    <th>Destinatario</th>
+                    <td>@envio.Destinatario</td>
+                </tr>
+                <tr>
+                    <th>Dirección</th>
+                    <td>@envio.Direccion</td>
+                </tr>
+                <tr>
+                    <th>Modalidad</th>
+                    <td>@Formato.Modalidad(envio.Modalidad)</td>
+                </tr>
+                <tr>
+                    <th>Fecha de alta</th>
+                    <td>@Formato.Hora(envio.FechaAlta)</td>
+                </tr>
+                <tr>
+                    <th>Intentos de entrega</th>
+                    <td>@envio.IntentosRealizados</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Bultos</h2>
+
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>Identificación</th>
+                    <th>Estado</th>
+                    <th>Peso (kg)</th>
+                    <th>Dimensiones (cm)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var bulto in envio.Bultos)
+                {
+                    <tr>
+                        <td class="codigo">@bulto.Identificacion</td>
+                        <td>@bulto.Estado</td>
+                        <td>@Formato.Numero(bulto.PesoKg)</td>
+                        <td>
+                            @bulto.AltoCm ×
+                            @bulto.AnchoCm ×
+                            @bulto.ProfundidadCm
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (envio.Estado is "NoEntregado" or "EntregadoParcialmente")
+{
+    <section class="mt-6">
+        <h2>Retornar al depósito</h2>
+
+        <p class="nota">
+            Registrá los bultos pendientes que regresaron
+            al depósito después del intento de entrega.
+        </p>
+
+        <form method="post"
+              asp-page-handler="RetornarDeposito"
+              asp-route-id="@envio.Id">
+
+            @Html.AntiForgeryToken()
+
+            <div class="modal-campo">
+                <label for="responsableRetorno">
+                    Responsable de recepción
+                </label>
+
+                <input type="text"
+                       id="responsableRetorno"
+                       name="responsable"
+                       maxlength="150"
+                       required />
+            </div>
+
+            <fieldset>
+                <legend>Bultos recibidos</legend>
+
+                @foreach (var bulto in envio.Bultos
+                    .Where(b => b.Estado == "Pendiente"))
+                {
+                    <label class="checkbox">
+                        <input type="checkbox"
+                               name="identificaciones"
+                               value="@bulto.Identificacion" />
+
+                        @bulto.Identificacion
+                    </label>
+                }
+            </fieldset>
+
+            <button type="submit" class="primario">
+                Confirmar retorno al depósito
+            </button>
+        </form>
+    </section>
+}
+
+    <h2>Historial de eventos</h2>
+
+    @if (envio.Eventos.Count == 0)
+    {
+        <p class="nota">Todavía no hay eventos registrados.</p>
+    }
+    else
+    {
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Estado anterior</th>
+                        <th>Estado nuevo</th>
+                        <th>Responsable</th>
+                        <th>Origen</th>
+                        <th>Justificación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var evento in envio.Eventos)
+                    {
+                        <tr>
+                            <td>@Formato.Hora(evento.OcurridoEn)</td>
+                            <td>@evento.EstadoAnterior</td>
+                            <td>@evento.EstadoNuevo</td>
+                            <td>@evento.Responsable</td>
+                            <td>@evento.Origen</td>
+                            <td>@(evento.Justificacion ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+@if (envio.PuedeIniciarDevolucion)
+{
+    <section class="mt-6">
+        <h2>Acciones disponibles</h2>
+
+        <form method="post"
+              asp-page-handler="IniciarDevolucion"
+              asp-route-id="@envio.Id">
+
+            @Html.AntiForgeryToken()
+
+            <div class="modal-campo">
+                <label for="responsableDevolucion">
+                    Responsable
+                </label>
+
+                <input type="text"
+                       id="responsableDevolucion"
+                       name="responsable"
+                       required
+                       maxlength="150"
+                       placeholder="Nombre del responsable" />
+            </div>
+
+            <button type="submit" class="primario">
+                Iniciar devolución
+            </button>
+        </form>
+
+        <p class="nota">
+            La devolución solo se iniciará si se cumplen
+            las reglas operativas del envío.
+        </p>
+    </section>
+}
+}

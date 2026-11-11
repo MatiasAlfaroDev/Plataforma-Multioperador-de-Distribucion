@@ -51,6 +51,7 @@ using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Infrastructure.Caching;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
 using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
+using UltimaMilla.Application.Envios.Queries.ConsultarSeguimientoPublico;
 using UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
 using UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
 using UltimaMilla.Application.Avisos.Queries.ListarAvisos;
@@ -67,6 +68,7 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
 using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
+using UltimaMilla.Application.Envios.Queries.ObtenerDetalleEnvio;
 using UltimaMilla.Application.Retiros.Commands.CrearRetiro;
 using UltimaMilla.Application.Configuracion.Commands.CrearTarifa;
 using UltimaMilla.Application.Retiros.Queries;
@@ -156,6 +158,7 @@ builder.Services.AddOpenTelemetry()
     })
     .UseOtlpExporter();
 builder.Services.AddScoped<CrearZonaHandler>();
+builder.Services.AddScoped<ConsultarSeguimientoPublicoHandler>();
 var soloInicializar = builder.Configuration.GetValue<bool>(
     "Inicializacion:SoloInicializar");
 
@@ -235,6 +238,21 @@ app.MapGet("/api/antiforgery/token", (
 
 var api = app.MapGroup("/api");
 
+// GET /api/seguimiento/{token}
+// Consulta pública de seguimiento para destinatarios.
+api.MapGet("/seguimiento/{token}", async (
+    string token,
+    ConsultarSeguimientoPublicoHandler handler,
+    CancellationToken ct) =>
+{
+    var seguimiento = await handler.Handle(token, ct);
+
+    return seguimiento is null
+        ? Results.NotFound()
+        : Results.Ok(seguimiento);
+})
+.AllowAnonymous();
+
 api.MapGet("/operadores", async (ListarOperadoresHandler handler, CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ListarOperadoresQuery(), ct)));
 
@@ -268,11 +286,15 @@ api.MapPost("/envios", async (
             detail: "La solicitud no contiene un token antifalsificación válido.");
     }
 
-    var id = await handler.Handle(command, ct);
+    var resultado = await handler.Handle(command, ct);
 
     return Results.Created(
-        $"/api/envios/{id}",
-        new { id });
+        $"/api/envios/{resultado.EnvioId}",
+        new
+        {
+            id = resultado.EnvioId,
+            tokenSeguimiento = resultado.TokenSeguimiento
+        });
 })
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
@@ -317,6 +339,20 @@ api.MapPost("/envios", async (
  .RequireAuthorization(policy => policy.RequireRole(
      Perfiles.AdministradorOperador,
      Perfiles.Operador));
+
+api.MapGet("/envios/{envioId:guid}",
+    async (
+        Guid envioId,
+        ObtenerDetalleEnvioHandler handler,
+        CancellationToken ct) =>
+    {
+        var resultado = await handler.Handle(
+            new ObtenerDetalleEnvioQuery(envioId),
+            ct);
+
+        return Results.Ok(resultado);
+    })
+    .RequireAuthorization();
 
 
 api.MapGet("/reportes/motivos-no-entrega", async (
@@ -560,6 +596,7 @@ api.MapGet("/envios", async (
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador,
+    Perfiles.AdministradorComercio,
     Perfiles.Comercio));
 
 // POST /api/envios/{id}/eventos-movil → sincronización de la app del repartidor (entregado / no entregado).
@@ -1011,6 +1048,36 @@ api.MapPost("/envios/{envioId:guid}/reaparicion",
         Perfiles.Operador));
 
 // Solicitudes de reprogramación pendientes para Backoffice.
+
+// Solicitar la reprogramación de un envío desde Backoffice.
+api.MapPost("/solicitudes-reprogramacion",
+    async (
+        HttpContext context,
+        IAntiforgery antiforgery,
+        SolicitarReprogramacionCommand command,
+        SolicitarReprogramacionHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido",
+                detail: "La solicitud no contiene un token antifalsificación válido.");
+        }
+
+        var solicitudId = await handler.Handle(command, ct);
+
+        return Results.Ok(new
+        {
+            SolicitudId = solicitudId,
+            Mensaje = "Solicitud de reprogramación creada correctamente."
+        });
+    })
+    .RequireAuthorization(policy => policy.RequireRole(
+        Perfiles.AdministradorOperador,
+        Perfiles.Operador));
+
 api.MapGet("/solicitudes-reprogramacion/pendientes",
     async (
         ListarSolicitudesReprogramacionHandler handler,

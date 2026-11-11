@@ -42,7 +42,8 @@ public sealed record HojaRutaApiDto(
     Guid RepartidorId,
     Guid VehiculoId,
     int CantidadParadas,
-    decimal PesoAsignadoKg);
+    decimal PesoAsignadoKg,
+    bool Despachada);
 
 public sealed record FranjaRutaApiDto(
     TimeOnly HoraDesde,
@@ -85,6 +86,36 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
         return await http.GetFromJsonAsync<List<HojaRutaApiDto>>(
             $"api/hojas-de-ruta?operadorId={operadorId}", ct) ?? [];
     }
+    public async Task<int> DespacharAsync(
+    Guid operadorId,
+    Guid hojaId,
+    CancellationToken ct)
+{
+    using var respuesta = await http.PostAsync(
+        $"api/hojas-de-ruta/{hojaId}/despachar?operadorId={operadorId}",
+        null,
+        ct);
+
+    if (!respuesta.IsSuccessStatusCode)
+    {
+        var contenido = await respuesta.Content.ReadAsStringAsync(ct);
+
+        throw new InvalidOperationException(
+            $"No se pudo despachar la hoja de ruta. " +
+            $"HTTP {(int)respuesta.StatusCode}: {contenido}");
+    }
+
+    var resultado = await respuesta.Content
+        .ReadFromJsonAsync<DespachoRespuesta>(cancellationToken: ct);
+
+    return resultado?.EnviosActualizados
+        ?? throw new InvalidOperationException(
+            "La API no devolvió la cantidad de envíos despachados.");
+}
+
+private sealed record DespachoRespuesta(
+    Guid HojaDeRutaId,
+    int EnviosActualizados);
 
     public async Task<Guid> CrearAsync(
         CrearHojaRutaApiRequest solicitud,
