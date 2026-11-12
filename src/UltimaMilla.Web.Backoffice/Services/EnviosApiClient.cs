@@ -231,6 +231,27 @@ public sealed class EnviosApiClient(HttpClient http)
     }
 
 
+    // RF 41: el tablero de operación incorpora los retiros a domicilio.
+    public async Task<IReadOnlyList<RetiroTableroItem>> ListarRetirosAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<List<RetiroTableroItem>>("api/retiros", ct) ?? [];
+
+    /// <summary>accion: recibir-deposito, entregar-comercio o reprogramar.</summary>
+    public async Task GestionarRetiroAsync(Guid retiroId, string accion, CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync($"api/retiros/{retiroId}/{accion}", new { }, ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var detalle = await respuesta.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException(
+                string.IsNullOrWhiteSpace(detalle)
+                    ? $"La API rechazó la operación (HTTP {(int)respuesta.StatusCode})."
+                    : $"La API respondió: {detalle}",
+                null,
+                respuesta.StatusCode);
+        }
+    }
+
         private async Task<HttpResponseMessage> PostProtegidoAsync(
             string ruta,
             object datos,
@@ -338,3 +359,16 @@ public sealed class EnviosApiClient(HttpClient http)
 
 
 }
+
+// GET /api/retiros (lo que usa el tablero).
+public sealed record RetiroDireccionItem(string Calle, string Numero, string Localidad, string Departamento);
+
+public sealed record RetiroBultoItem(Guid Id, string Identificacion);
+
+public sealed record RetiroTableroItem(
+    Guid Id,
+    string Motivo,
+    DateOnly FechaSolicitada,
+    string Estado,
+    RetiroDireccionItem DomicilioRetiro,
+    List<RetiroBultoItem> Bultos);
