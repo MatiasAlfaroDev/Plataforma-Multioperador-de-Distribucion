@@ -52,6 +52,7 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         {
             d.Property(x => x.Nombre).HasColumnName("destinatario_nombre").HasMaxLength(200).IsRequired();
             d.Property(x => x.Telefono).HasColumnName("destinatario_telefono").HasMaxLength(30);
+            d.Property(x => x.Email).HasColumnName("destinatario_email").HasMaxLength(200);
         });
         builder.Navigation(e => e.Destinatario).IsRequired();
 

@@ -21,6 +21,10 @@ public sealed class NuevoEnvioModel
     [StringLength(30)]
     public string? DestinatarioTelefono { get; set; }
 
+    [EmailAddress(ErrorMessage = "El correo no es válido.")]
+    [StringLength(200)]
+    public string? DestinatarioEmail { get; set; }
+
     [Required(ErrorMessage = "La calle es obligatoria.")]
     public string Calle { get; set; } = string.Empty;
 

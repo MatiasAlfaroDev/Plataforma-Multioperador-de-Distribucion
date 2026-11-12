@@ -5,6 +5,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using UltimaMilla.Application;
+using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Infrastructure.Correo;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Infrastructure;
 using UltimaMilla.Infrastructure.Mensajeria;
@@ -28,7 +30,9 @@ builder.Services.AddInfrastructure(connectionString, rabbitMq, x =>
 {
     x.AddConsumer<GenerarAvisosConsumer, GenerarAvisosDefinition>();
     x.AddConsumer<EntregarAvisoConsumer, EntregarAvisoDefinition>();
+    x.AddConsumer<EnviarEnlaceSeguimientoConsumer, EnviarEnlaceSeguimientoDefinition>();
 });
+builder.Services.AddSingleton<IEnviadorCorreo, SmtpEnviadorCorreo>();
 
 // Un TenantDelMensaje por mensaje; AppDbContext lo recibe como ITenantContext.
 builder.Services.AddScoped<TenantDelMensaje>();

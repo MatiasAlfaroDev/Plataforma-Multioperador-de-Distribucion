@@ -1995,6 +1995,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                             b1.Property<Guid>("EnvioId")
                                 .HasColumnType("uuid");
 
+                            b1.Property<string>("Email")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("destinatario_email");
+
                             b1.Property<string>("Nombre")
                                 .IsRequired()
                                 .HasMaxLength(200)
