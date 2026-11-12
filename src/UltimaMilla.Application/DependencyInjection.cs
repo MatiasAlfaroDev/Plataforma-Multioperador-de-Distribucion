@@ -30,6 +30,7 @@ using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Notificaciones.Commands.RegistrarDispositivo;
+using UltimaMilla.Application.Notificaciones.Commands.AvisarAsignacion;
 using UltimaMilla.Application.Notificaciones.Commands.EnviarNotificacionDePrueba;
 using UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
 using UltimaMilla.Application.Avisos.Commands.EntregarAviso;
@@ -107,6 +108,7 @@ public static class DependencyInjection
         services.AddScoped<RegistrarPosicionesHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();
         services.AddScoped<EnviarNotificacionDePruebaHandler>();
+        services.AddScoped<AvisarAsignacionHandler>();
         services.AddScoped<CrearRetiroHandler>();
         services.AddScoped<CrearTarifaHandler>();
         services.AddScoped<ConsultarRetirosHandler>();

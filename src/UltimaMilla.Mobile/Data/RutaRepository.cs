@@ -64,8 +64,9 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
             var upsert = conexion.CreateCommand();
             upsert.Transaction = tx;
             upsert.CommandText = """
-                INSERT INTO envios_ruta (id, operador_id, referencia, destinatario, direccion, comercio, modalidad, bultos, estado_servidor)
-                VALUES ($id, $op, $ref, $dest, $dir, $com, $mod, $bultos, $estado)
+                INSERT INTO envios_ruta (id, operador_id, referencia, destinatario, direccion, comercio, modalidad, bultos, estado_servidor,
+                                         tipo, bultos_retiro)
+                VALUES ($id, $op, $ref, $dest, $dir, $com, $mod, $bultos, $estado, $tipo, $bultosRetiro)
                 ON CONFLICT(id) DO UPDATE SET
                     referencia = excluded.referencia,
                     destinatario = excluded.destinatario,
@@ -73,7 +74,9 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
                     comercio = excluded.comercio,
                     modalidad = excluded.modalidad,
                     bultos = excluded.bultos,
-                    estado_servidor = excluded.estado_servidor
+                    estado_servidor = excluded.estado_servidor,
+                    tipo = excluded.tipo,
+                    bultos_retiro = excluded.bultos_retiro
                 """;
             upsert.Parameters.AddWithValue("$id", e.Id.ToString());
             upsert.Parameters.AddWithValue("$op", operadorId.ToString());
@@ -84,6 +87,10 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
             upsert.Parameters.AddWithValue("$mod", e.Modalidad);
             upsert.Parameters.AddWithValue("$bultos", e.CantidadBultos);
             upsert.Parameters.AddWithValue("$estado", e.Estado);
+            upsert.Parameters.AddWithValue("$tipo", e.TipoOperacion);
+            // Los bultos de un retiro se guardan como texto JSON: se escanean en el domicilio, también sin conexión (RF 40).
+            upsert.Parameters.AddWithValue("$bultosRetiro",
+                e.IdentificacionesRetiro is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(e.IdentificacionesRetiro));
             await upsert.ExecuteNonQueryAsync();
 
             // Bultos pendientes del envío (RF 32). Si la API no los mandó, se dejan los que había.
@@ -154,7 +161,8 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
                    estado_servidor, resultado_local, pendiente,
                    (SELECT p.ultimo_error FROM eventos_pendientes p
                     WHERE p.envio_id = envios_ruta.id AND p.ultimo_error IS NOT NULL
-                    ORDER BY p.fecha_hora DESC LIMIT 1) AS ultimo_error
+                    ORDER BY p.fecha_hora DESC LIMIT 1) AS ultimo_error,
+                   tipo, bultos_retiro
             FROM envios_ruta
             WHERE operador_id = $op
             ORDER BY (resultado_local IS NOT NULL), referencia  -- primero lo que falta entregar
@@ -178,7 +186,9 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
                 EstadoServidor = lector.GetString(8),
                 ResultadoLocal = lector.IsDBNull(9) ? null : lector.GetString(9),
                 PendienteDeSincronizar = lector.GetInt32(10) == 1,
-                UltimoError = lector.IsDBNull(11) ? null : lector.GetString(11)
+                UltimoError = lector.IsDBNull(11) ? null : lector.GetString(11),
+                TipoOperacion = lector.IsDBNull(12) ? "Entrega" : lector.GetString(12),
+                BultosRetiro = lector.IsDBNull(13) ? [] : System.Text.Json.JsonSerializer.Deserialize<List<string>>(lector.GetString(13)) ?? []
             });
         }
         return lista;

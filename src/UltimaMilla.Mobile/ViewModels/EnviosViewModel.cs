@@ -24,6 +24,16 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         "Zona inaccesible"
     ];
 
+    // Motivos de un retiro en domicilio que no se pudo hacer (RF 40).
+    private static readonly string[] MotivosNoRetiro =
+    [
+        "Comprador ausente",
+        "Dirección incorrecta o inexistente",
+        "El comprador no entregó los bultos",
+        "Bultos distintos a los declarados",
+        "Zona inaccesible"
+    ];
+
     private readonly IEnviosApi _api;
     private readonly RutaRepository _ruta;
     private readonly EventosPendientesRepository _eventos;
@@ -292,6 +302,13 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         if (!envio.PuedeRegistrar)
             return;
 
+        // En una parada de retiro (RF 39) el botón dice "Retirado".
+        if (envio.EsRetiro)
+        {
+            await RetirarAsync(envio);
+            return;
+        }
+
         // Entrega parcial (RF 32): si el envío tiene más de un bulto pendiente, se escanean los que se entregan.
         // Para los que no, se elige un motivo del catálogo y se saca una foto de evidencia.
         var seleccion = await ElegirBultosAsync(envio);
@@ -352,6 +369,12 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         if (!envio.PuedeRegistrar)
             return;
 
+        if (envio.EsRetiro)
+        {
+            await NoRetirarAsync(envio);
+            return;
+        }
+
         var motivo = await _dialogos.ElegirAsync($"{envio.ReferenciaExterna}: motivo de no entrega", MotivosNoEntrega);
         if (motivo is null)
             return;
@@ -377,6 +400,82 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             Latitud = ubicacion?.Latitud,
             Longitud = ubicacion?.Longitud,
             ReferenciaFoto = foto
+        });
+    }
+
+    /// <summary>
+    /// Retiro en domicilio (RF 40): se escanean TODOS los bultos declarados, se saca una foto de su estado
+    /// y firma quien los entrega. Igual que la entrega, se guarda primero en el teléfono (funciona sin conexión).
+    /// </summary>
+    private async Task RetirarAsync(EnvioRuta retiro)
+    {
+        if (retiro.BultosRetiro.Count == 0)
+        {
+            await _dialogos.AvisarAsync("Retiro", "No hay bultos guardados para este retiro. Actualizá la ruta con conexión.");
+            return;
+        }
+
+        // El Id no se usa en un retiro: el servidor compara por identificación.
+        var bultos = retiro.BultosRetiro.Select(codigo => new BultoItem(Guid.Empty, codigo)).ToList();
+        var seleccion = await _elegirBultos.ElegirAsync(retiro.ReferenciaExterna, bultos, esRetiro: true);
+        if (seleccion is null)
+            return;
+
+        // El servidor exige que se retiren exactamente los bultos declarados por el comercio.
+        if (seleccion.NoEntregados.Count > 0)
+        {
+            var faltan = string.Join(", ", seleccion.NoEntregados.Select(b => b.Identificacion));
+            await _dialogos.AvisarAsync("Retiro",
+                $"Faltan escanear: {faltan}. Si no te entregan todos los bultos, registrá «No retirado».");
+            return;
+        }
+
+        var entrega = await _dialogos.PedirTextoAsync("Retiro", $"{retiro.ReferenciaExterna}: ¿quién entrega los bultos?");
+        if (entrega is null)
+            return;
+
+        var id = Guid.NewGuid();
+        var firma = await _firma.PedirFirmaAsync(id, entrega);
+        if (firma is null)
+        {
+            await _dialogos.AvisarAsync("Retiro", "El retiro necesita la firma de quien entrega los bultos.");
+            return;
+        }
+
+        await _dialogos.AvisarAsync("Retiro", "Ahora sacale una foto a los bultos, que se vea en qué estado están.");
+        var foto = await _captura.SacarFotoAsync(id);
+        if (foto is null)
+        {
+            await _dialogos.AvisarAsync("Retiro", "El retiro necesita una foto del estado de los bultos.");
+            return;
+        }
+
+        await RegistrarAsync(new EventoPendiente
+        {
+            Id = id,
+            EnvioId = retiro.Id,
+            Tipo = "Retirado",
+            Receptor = entrega,
+            BultosRetirados = seleccion.Entregados.Select(b => b.Identificacion).ToList(),
+            ReferenciaFirma = firma,
+            ReferenciaFoto = foto,
+            FechaHora = DateTimeOffset.UtcNow
+        });
+    }
+
+    private async Task NoRetirarAsync(EnvioRuta retiro)
+    {
+        var motivo = await _dialogos.ElegirAsync($"{retiro.ReferenciaExterna}: ¿por qué no se pudo retirar?", MotivosNoRetiro);
+        if (motivo is null)
+            return;
+
+        await RegistrarAsync(new EventoPendiente
+        {
+            Id = Guid.NewGuid(),
+            EnvioId = retiro.Id,
+            Tipo = "NoRetirado",
+            Motivo = motivo,
+            FechaHora = DateTimeOffset.UtcNow
         });
     }
 

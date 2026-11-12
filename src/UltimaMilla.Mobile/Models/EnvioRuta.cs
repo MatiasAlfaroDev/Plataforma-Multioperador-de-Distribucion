@@ -16,6 +16,17 @@ public sealed class EnvioRuta
     public string Modalidad { get; set; } = string.Empty;
     public int CantidadBultos { get; set; }
 
+    /// <summary>"Entrega" o "Retiro" (RF 39: hojas de ruta mixtas).</summary>
+    public string TipoOperacion { get; set; } = "Entrega";
+
+    /// <summary>En un retiro: las identificaciones de los bultos a retirar (RF 40).</summary>
+    public IReadOnlyList<string> BultosRetiro { get; set; } = [];
+
+    public bool EsRetiro => TipoOperacion == "Retiro";
+
+    public string TextoBotonExito => EsRetiro ? "Retirado" : "Entregado";
+    public string TextoBotonFallo => EsRetiro ? "No retirado" : "No entregado";
+
     /// <summary>Estado según la API la última vez que se descargó la ruta.</summary>
     public string EstadoServidor { get; set; } = string.Empty;
 
@@ -29,14 +40,17 @@ public sealed class EnvioRuta
     
     // Un registro rechazado por el servidor no cuenta: gana lo que dice el servidor.
     // La entrega parcial cuenta como parada resuelta (entregó algo); los bultos pendientes vuelven en otra ruta.
-    public bool EsEntregado => (ResultadoLocal is "Entregado" or "EntregadoParcialmente") && !Rechazado;
-    public bool EsNoEntregado => ResultadoLocal == "NoEntregado" && !Rechazado;
+    // Para el resumen del día, un retiro hecho cuenta como parada resuelta con éxito y uno no hecho como fallida.
+    public bool EsEntregado => (ResultadoLocal is "Entregado" or "EntregadoParcialmente" or "Retirado") && !Rechazado;
+    public bool EsNoEntregado => (ResultadoLocal is "NoEntregado" or "NoRetirado") && !Rechazado;
 
     public string EstadoMostrado => ResultadoLocal switch
     {
         null => EstadoServidor,
         "NoEntregado" => PendienteDeSincronizar ? "No entregado · pendiente de sincronizar" : "No entregado",
         "EntregadoParcialmente" => PendienteDeSincronizar ? "Entrega parcial · pendiente de sincronizar" : "Entrega parcial",
+        "Retirado" => PendienteDeSincronizar ? "Retirado · pendiente de sincronizar" : "Retirado",
+        "NoRetirado" => PendienteDeSincronizar ? "No retirado · pendiente de sincronizar" : "No retirado",
         _ => PendienteDeSincronizar ? "Entregado · pendiente de sincronizar" : "Entregado"
     };
 
@@ -47,9 +61,11 @@ public sealed class EnvioRuta
         Rechazado ? "Rechazado"
         : ResultadoLocal switch
         {
-            null => "Por entregar",
+            null => EsRetiro ? "Por retirar" : "Por entregar",
             "NoEntregado" => "No entregado",
             "EntregadoParcialmente" => "Entrega parcial",
+            "Retirado" => "Retirado",
+            "NoRetirado" => "No retirado",
             _ => "Entregado"
         };
 
@@ -59,7 +75,7 @@ public sealed class EnvioRuta
         : ResultadoLocal switch
         {
             null => Paleta.De("Primary"),
-            "NoEntregado" => Paleta.De("Peligro"),
+            "NoEntregado" or "NoRetirado" => Paleta.De("Peligro"),
             "EntregadoParcialmente" => Paleta.De("Alerta"),
             _ => Paleta.De("Exito")
         };
@@ -70,7 +86,7 @@ public sealed class EnvioRuta
         : ResultadoLocal switch
         {
             null => Paleta.De("AcentoSuave"),
-            "NoEntregado" => Paleta.De("PeligroSuave"),
+            "NoEntregado" or "NoRetirado" => Paleta.De("PeligroSuave"),
             "EntregadoParcialmente" => Paleta.De("AlertaSuave"),
             _ => Paleta.De("ExitoSuave")
         };
@@ -96,5 +112,6 @@ public sealed class EnvioRuta
 
     public string DetalleBultos =>
         $"{CantidadBultos} {(CantidadBultos == 1 ? "bulto" : "bultos")}"
+        + (EsRetiro ? " a retirar" : string.Empty)
         + (string.IsNullOrEmpty(Modalidad) ? string.Empty : $" · {Modalidad}");
 }

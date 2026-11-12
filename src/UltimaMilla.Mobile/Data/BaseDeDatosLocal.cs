@@ -79,7 +79,8 @@ public sealed class BaseDeDatosLocal
                     documento    TEXT,
                     firma        TEXT,
                     bultos_entregados    TEXT,
-                    bultos_no_entregados TEXT
+                    bultos_no_entregados TEXT,
+                    bultos_retirados     TEXT
 
                 );
                 """;
@@ -116,6 +117,10 @@ public sealed class BaseDeDatosLocal
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "firma", "TEXT");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_entregados", "TEXT");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_no_entregados", "TEXT");
+            // Retiros en domicilio (RF 39 y 40): las paradas de la ruta pueden ser entregas o retiros.
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_retirados", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "envios_ruta", "tipo", "TEXT NOT NULL DEFAULT 'Entrega'");
+            await AgregarColumnaSiFaltaAsync(conexion, "envios_ruta", "bultos_retiro", "TEXT");
 
             _cadenaDeConexion = cadena;
         }

@@ -16,7 +16,7 @@ public sealed class EventoPendiente
 
     public Guid EnvioId { get; set; }
 
-    /// <summary>"Entregado" o "NoEntregado".</summary>
+    /// <summary>"Entregado", "EntregadoParcialmente" o "NoEntregado"; en un retiro, "Retirado" o "NoRetirado".</summary>
     public string Tipo { get; set; } = string.Empty;
 
     /// <summary>Motivo del catálogo, solo para "NoEntregado".</summary>
@@ -46,6 +46,12 @@ public sealed class EventoPendiente
 
     /// <summary>Entrega parcial (RF 32): los bultos que no se entregaron, cada uno con motivo y evidencia.</summary>
     public IReadOnlyList<BultoNoEntregado>? BultosNoEntregados { get; set; }
+
+    /// <summary>Retiro (RF 40): identificaciones de los bultos escaneados en el domicilio.</summary>
+    public IReadOnlyList<string>? BultosRetirados { get; set; }
+
+    /// <summary>"Retirado" o "NoRetirado": el evento es de un retiro y EnvioId es el Id del retiro.</summary>
+    public bool EsRetiro => Tipo is "Retirado" or "NoRetirado";
 
     public int Intentos { get; set; }
     public string? UltimoError { get; set; }

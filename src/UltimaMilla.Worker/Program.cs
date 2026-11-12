@@ -28,6 +28,7 @@ builder.Services.AddInfrastructure(connectionString, rabbitMq, x =>
 {
     x.AddConsumer<GenerarAvisosConsumer, GenerarAvisosDefinition>();
     x.AddConsumer<EntregarAvisoConsumer, EntregarAvisoDefinition>();
+    x.AddConsumer<AvisarAsignacionConsumer, AvisarAsignacionDefinition>();
 });
 
 // Un TenantDelMensaje por mensaje; AppDbContext lo recibe como ITenantContext.

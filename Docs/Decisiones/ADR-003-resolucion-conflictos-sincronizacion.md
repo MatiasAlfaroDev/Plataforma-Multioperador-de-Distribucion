@@ -88,6 +88,24 @@ rechaza **completo**: nunca se guarda una parte del resultado de una parada y ot
 | Sin coordenadas o sin prueba | El GPS no dio posición, o falta la prueba que piden las reglas | **400** con el motivo | "Rechazado" con el motivo |
 | Evento sin listas | `Entregado` o `NoEntregado` (también versiones anteriores de la app) | Resultado del **envío completo**, como antes | Igual que antes: compatibilidad hacia atrás |
 
+### Retiros en domicilio (cambio de requerimientos, RF 39 y 40)
+
+Las hojas de ruta pasan a ser mixtas. La app guarda cada parada de retiro en la misma tabla que las
+entregas (con su tipo y los bultos declarados), así que el retiro también se registra **sin conexión** y
+viaja por la misma cola: `Retirado` (bultos escaneados, foto de su estado y firma de quien los entrega)
+o `NoRetirado` (motivo), a `POST /api/retiros/{id}/eventos-movil`. Se aplica la misma política:
+
+| Caso | Ejemplo | Respuesta del servidor | Qué ve el repartidor |
+| :---- | :---- | :---- | :---- |
+| Evento repetido | Se cortó la conexión después de que el servidor lo guardó | **409**: se toma como éxito (idempotencia por `idEvento`) | "Enviado al servidor" |
+| Bultos distintos a los declarados | Lo escaneado no coincide con lo que el servidor tiene declarado para el retiro | **400**: "Los bultos escaneados no coinciden con los declarados para el retiro" | "Rechazado" con el motivo; puede descartarlo y registrar "No retirado" |
+| Retiro ya resuelto o reasignado | Otro repartidor lo tomó, o ya no está "Asignado a ruta" | **400**, **403** o **404** con el motivo | "Rechazado" con el motivo |
+| Hoja sin despachar | Se registró antes de salir del depósito | **400**: "La hoja de ruta todavía no fue despachada" | "Rechazado"; despachar y registrar de nuevo |
+
+La app exige escanear **todos** los bultos declarados antes de guardar un retiro: si falta alguno, el
+caso es "No retirado" (el servidor no acepta retiros parciales). Los bultos de los retiros no se escanean
+al cargar el vehículo, porque todavía están en los domicilios.
+
 ## Alternativas consideradas
 
 | Alternativa | Por qué se descartó |

@@ -24,9 +24,9 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         insertar.Transaction = tx;
         insertar.CommandText = """
             INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora, latitud, longitud, foto, documento, firma,
-                                            bultos_entregados, bultos_no_entregados)
+                                            bultos_entregados, bultos_no_entregados, bultos_retirados)
             VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha, $lat, $lon, $foto, $documento, $firma,
-                    $bultosEntregados, $bultosNoEntregados)
+                    $bultosEntregados, $bultosNoEntregados, $bultosRetirados)
             """;
         insertar.Parameters.AddWithValue("$id", evento.Id.ToString());
         insertar.Parameters.AddWithValue("$envio", evento.EnvioId.ToString());
@@ -42,6 +42,8 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         // Las listas de bultos se guardan como texto JSON en una sola columna.
         insertar.Parameters.AddWithValue("$bultosEntregados",
             evento.BultosEntregados is null ? DBNull.Value : JsonSerializer.Serialize(evento.BultosEntregados));
+        insertar.Parameters.AddWithValue("$bultosRetirados",
+            evento.BultosRetirados is null ? DBNull.Value : JsonSerializer.Serialize(evento.BultosRetirados));
         insertar.Parameters.AddWithValue("$bultosNoEntregados",
             evento.BultosNoEntregados is null ? DBNull.Value : JsonSerializer.Serialize(evento.BultosNoEntregados));
         await insertar.ExecuteNonQueryAsync();
@@ -63,7 +65,7 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         var comando = conexion.CreateCommand();
         comando.CommandText = """
             SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error, latitud, longitud, foto, documento, firma,
-                   bultos_entregados, bultos_no_entregados
+                   bultos_entregados, bultos_no_entregados, bultos_retirados
             FROM eventos_pendientes
             ORDER BY fecha_hora
             """;
@@ -88,7 +90,8 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
                 DocumentoReceptor = lector.IsDBNull(11) ? null : lector.GetString(11),
                 ReferenciaFirma = lector.IsDBNull(12) ? null : lector.GetString(12),
                 BultosEntregados = lector.IsDBNull(13) ? null : JsonSerializer.Deserialize<List<Guid>>(lector.GetString(13)),
-                BultosNoEntregados = lector.IsDBNull(14) ? null : JsonSerializer.Deserialize<List<BultoNoEntregado>>(lector.GetString(14))
+                BultosNoEntregados = lector.IsDBNull(14) ? null : JsonSerializer.Deserialize<List<BultoNoEntregado>>(lector.GetString(14)),
+                BultosRetirados = lector.IsDBNull(15) ? null : JsonSerializer.Deserialize<List<string>>(lector.GetString(15))
             });
         }
         return lista;
