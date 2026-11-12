@@ -160,7 +160,8 @@ public partial class CargaVehiculoViewModel : ObservableObject
 
         if (value is not null)
         {
-            foreach (var parada in value.Paradas.OrderBy(p => p.Orden))
+            // RF 39: los bultos de un retiro se suben en el domicilio, no en el depósito.
+            foreach (var parada in value.Paradas.Where(p => p.TipoOperacion != "Retiro").OrderBy(p => p.Orden))
                 foreach (var bulto in parada.Bultos)
                     Bultos.Add(new BultoCarga(Normalizar(bulto), parada.ReferenciaExterna, parada.Destinatario));
 
