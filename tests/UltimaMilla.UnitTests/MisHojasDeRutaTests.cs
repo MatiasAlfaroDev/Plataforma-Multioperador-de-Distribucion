@@ -1,5 +1,6 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
+using UltimaMilla.Application.Notificaciones.Commands.AvisarAsignacion;
 using UltimaMilla.Application.Rutas;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
@@ -7,6 +8,7 @@ using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Notificaciones;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Rutas;
 using UltimaMilla.Domain.Retiros;
@@ -228,6 +230,81 @@ public class MisHojasDeRutaTests
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _despachar.Handle(new DespacharMiHojaDeRutaCommand(hojaAjena.Id, ["PED-AJENO-1"]), CancellationToken.None));
+    }
+
+    // ----- Push al repartidor cuando le asignan un envío (reasignación urgente) -----
+
+    private AvisarAsignacionHandler Avisar(DispositivosEnMemoria dispositivos, NotificadorFalso notificador) =>
+        new(new HojasEnMemoria(_hojas), new RepartidoresEnMemoria(_repartidores), new EnviosEnMemoria(_envios),
+            dispositivos, notificador, _sesion, _unidad);
+
+    [Fact]
+    public async Task Al_asignar_un_envio_le_llega_un_push_al_telefono_del_repartidor_de_esa_hoja()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-URG", bultos: 1);
+        var dispositivos = new DispositivosEnMemoria();
+        dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-ana", "Android", Alta));
+        var notificador = new NotificadorFalso();
+
+        var resultado = await Avisar(dispositivos, notificador).Handle(new AvisarAsignacionCommand(envio.Id), CancellationToken.None);
+
+        Assert.Equal(1, resultado.Enviadas);
+        var (token, aviso) = Assert.Single(notificador.Enviados);
+        Assert.Equal("token-ana", token);
+        Assert.Contains("PED-URG", aviso.Cuerpo);
+        Assert.Equal(envio.Id.ToString(), aviso.Datos!["envioId"]);
+    }
+
+    [Fact]
+    public async Task No_le_avisa_a_otro_repartidor()
+    {
+        var otro = Repartidor.Crear(_operadorId, "Otro", "098");
+        var usuarioOtro = Guid.NewGuid();
+        otro.VincularUsuario(usuarioOtro);
+        _repartidores.Add(otro);
+        var hojaAjena = HojaDeRuta.Crear(_operadorId, otro, _vehiculo, Hoy, 5);
+        _hojas.Add(hojaAjena);
+        var envio = AgregarEnvio(hojaAjena, "PED-AJENO", bultos: 1);
+
+        var dispositivos = new DispositivosEnMemoria();
+        dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-ana", "Android", Alta));
+        dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, usuarioOtro, "token-otro", "Android", Alta));
+        var notificador = new NotificadorFalso();
+
+        await Avisar(dispositivos, notificador).Handle(new AvisarAsignacionCommand(envio.Id), CancellationToken.None);
+
+        Assert.Equal("token-otro", Assert.Single(notificador.Enviados).Token);
+    }
+
+    [Fact]
+    public async Task Un_token_que_Firebase_ya_no_reconoce_se_da_de_baja()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-URG", bultos: 1);
+        var dispositivos = new DispositivosEnMemoria();
+        dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-viejo", "Android", Alta));
+        var notificador = new NotificadorFalso();
+        notificador.Invalidos.Add("token-viejo");
+
+        var resultado = await Avisar(dispositivos, notificador).Handle(new AvisarAsignacionCommand(envio.Id), CancellationToken.None);
+
+        Assert.Equal(1, resultado.TokensEliminados);
+        Assert.Empty(dispositivos.Lista);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Si_el_envio_ya_no_esta_en_ninguna_hoja_no_avisa()
+    {
+        var dispositivos = new DispositivosEnMemoria();
+        dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-ana", "Android", Alta));
+        var notificador = new NotificadorFalso();
+
+        var resultado = await Avisar(dispositivos, notificador).Handle(new AvisarAsignacionCommand(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.Equal(0, resultado.Enviadas);
+        Assert.Empty(notificador.Enviados);
     }
 
     // ----- Ayudas -----
@@ -452,5 +529,39 @@ public class MisHojasDeRutaTests
 {
     return Task.FromResult<Envio?>(null);
 }
+    }
+
+    private sealed class DispositivosEnMemoria : IDispositivoMovilRepository
+    {
+        public List<DispositivoMovil> Lista { get; } = [];
+
+        public Task<DispositivoMovil?> ObtenerPorTokenAsync(string token, CancellationToken ct) =>
+            Task.FromResult(Lista.FirstOrDefault(d => d.Token == token));
+
+        public Task<IReadOnlyList<DispositivoMovil>> ListarPorUsuarioAsync(Guid usuarioId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<DispositivoMovil>>(Lista.Where(d => d.UsuarioId == usuarioId).ToList());
+
+        public Task AgregarAsync(DispositivoMovil dispositivo, CancellationToken ct)
+        {
+            Lista.Add(dispositivo);
+            return Task.CompletedTask;
+        }
+
+        public void Eliminar(DispositivoMovil dispositivo) => Lista.Remove(dispositivo);
+    }
+
+    private sealed class NotificadorFalso : INotificadorPush
+    {
+        public HashSet<string> Invalidos { get; } = [];
+        public List<(string Token, NotificacionPush Notificacion)> Enviados { get; } = [];
+
+        public Task<ResultadoPush> EnviarAsync(string token, NotificacionPush notificacion, CancellationToken ct)
+        {
+            if (Invalidos.Contains(token))
+                return Task.FromResult(ResultadoPush.TokenInvalido);
+
+            Enviados.Add((token, notificacion));
+            return Task.FromResult(ResultadoPush.Enviado);
+        }
     }
 }
