@@ -20,7 +20,7 @@ public class ActualizarReglasOperativasHandlerTests
         var motivos = new MotivosEnMemoria();
 
         var handler = new ActualizarReglasOperativasHandler(
-            repositorio, motivos, unidad, new RelojFijo(Ahora));
+            repositorio, motivos, unidad, new RelojFijo(Ahora), new CacheNula());
 
         var command = new ActualizarReglasOperativasCommand(
             operadorId,
@@ -90,7 +90,7 @@ public class ActualizarReglasOperativasHandlerTests
             CancellationToken.None);
 
         var handler = new ActualizarReglasOperativasHandler(
-            repositorio, motivos, unidad, new RelojFijo(Ahora));
+            repositorio, motivos, unidad, new RelojFijo(Ahora), new CacheNula());
 
         var command = new ActualizarReglasOperativasCommand(
             operadorId, 2, 12, false, 5);
@@ -248,4 +248,12 @@ public class ActualizarReglasOperativasHandlerTests
         public override DateTimeOffset GetUtcNow() => ahora;
     }
 
+
+    private sealed class CacheNula : UltimaMilla.Application.Abstractions.Caching.ICacheService
+    {
+        public Task<T?> ObtenerAsync<T>(string clave, CancellationToken ct = default) => Task.FromResult<T?>(default);
+        public Task GuardarAsync<T>(string clave, T valor, TimeSpan duracion, CancellationToken ct = default) => Task.CompletedTask;
+        public Task EliminarAsync(string clave, CancellationToken ct = default) => Task.CompletedTask;
+        public Task EliminarPorPrefijoAsync(string prefijo, CancellationToken ct = default) => Task.CompletedTask;
+    }
 }
