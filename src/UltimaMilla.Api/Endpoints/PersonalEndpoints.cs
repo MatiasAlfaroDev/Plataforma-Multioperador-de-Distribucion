@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Antiforgery;
+using UltimaMilla.Api.Seguridad;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Application.Common;
@@ -132,6 +134,32 @@ public static class PersonalEndpoints
 
             await db.SaveChangesAsync(ct);
             return Results.Created("/api/comercio/usuarios", new { usuario.Id, request.Perfil });
+        });
+
+        // RF 37: clave de API del usuario para que el sistema del comercio cree envíos y retiros sin navegador.
+        // Se muestra una sola vez; generar otra invalida la anterior.
+        comercio.MapPost("/clave-api", async (
+            HttpContext context,
+            IAntiforgery antiforgery,
+            ITenantContext tenant,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            if (!await antiforgery.IsRequestValidAsync(context))
+                return TokenInvalido();
+
+            var comercioId = tenant.ComercioId ?? throw new UnauthorizedAccessException();
+            var usuarioId = tenant.UsuarioId ?? throw new UnauthorizedAccessException();
+
+            var vinculo = await db.UsuariosComercios
+                .FirstOrDefaultAsync(uc => uc.UsuarioId == usuarioId && uc.ComercioId == comercioId && uc.Activa, ct)
+                ?? throw new UnauthorizedAccessException();
+
+            var clave = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            vinculo.ClaveApiHash = ClaveApiAuthenticationHandler.Hash(clave);
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { clave, encabezado = ClaveApiAuthenticationHandler.Encabezado });
         });
 
         return app;

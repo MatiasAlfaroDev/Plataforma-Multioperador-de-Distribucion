@@ -1846,6 +1846,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Activa")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ClaveApiHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("ComercioId")
                         .HasColumnType("uuid");
 
@@ -1858,6 +1862,9 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClaveApiHash")
+                        .IsUnique();
 
                     b.HasIndex("ComercioId");
 

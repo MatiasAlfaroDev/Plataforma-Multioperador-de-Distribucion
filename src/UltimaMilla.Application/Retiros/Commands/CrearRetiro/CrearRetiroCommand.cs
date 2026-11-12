@@ -4,7 +4,8 @@ public sealed record CrearRetiroCommand(
     Guid CuentaComercialId,
     string Motivo,
     DireccionRetiroCommand DomicilioRetiro,
-    DireccionRetiroCommand DomicilioDestino,
+    // Opcional: si no viene, el retiro va a la dirección de recepción de la cuenta.
+    DireccionRetiroCommand? DomicilioDestino,
     DateOnly Fecha,
     TimeOnly HoraDesde,
     TimeOnly HoraHasta,

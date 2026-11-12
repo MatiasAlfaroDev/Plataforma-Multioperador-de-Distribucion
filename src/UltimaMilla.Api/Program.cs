@@ -36,6 +36,7 @@ using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using UltimaMilla.Infrastructure.Identidad;
@@ -91,8 +92,17 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, rabbitMq);
 
+// Con X-Api-Key autentica la clave del comercio (RF 37); si no, la cookie de siempre.
+const string CookieOClave = "CookieOClaveApi";
+
 builder.Services
-    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddAuthentication(CookieOClave)
+    .AddPolicyScheme(CookieOClave, CookieOClave, options =>
+        options.ForwardDefaultSelector = context =>
+            context.Request.Headers.ContainsKey(ClaveApiAuthenticationHandler.Encabezado)
+                ? ClaveApiAuthenticationHandler.Esquema
+                : IdentityConstants.ApplicationScheme)
+    .AddScheme<AuthenticationSchemeOptions, ClaveApiAuthenticationHandler>(ClaveApiAuthenticationHandler.Esquema, null)
     .AddCookie(IdentityConstants.ApplicationScheme, options =>
     {
         options.Cookie.Name = "UltimaMilla.Auth";
@@ -296,7 +306,8 @@ api.MapPost("/envios", async (
     CrearEnvioHandler handler,
     CancellationToken ct) =>
 {
-    if (!await antiforgery.IsRequestValidAsync(context))
+    if (!ClaveApiAuthenticationHandler.EsLlamadaConClave(context) &&
+        !await antiforgery.IsRequestValidAsync(context))
     {
         return Results.Problem(
             statusCode: StatusCodes.Status400BadRequest,
@@ -733,7 +744,8 @@ api.MapPost("/retiros", async (
     CrearRetiroHandler handler,
     CancellationToken ct) =>
 {
-    if (!await antiforgery.IsRequestValidAsync(context))
+    if (!ClaveApiAuthenticationHandler.EsLlamadaConClave(context) &&
+        !await antiforgery.IsRequestValidAsync(context))
     {
         return Results.Problem(
             statusCode: StatusCodes.Status400BadRequest,

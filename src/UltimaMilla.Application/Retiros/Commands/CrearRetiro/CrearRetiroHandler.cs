@@ -124,11 +124,11 @@ public sealed class CrearRetiroHandler(
                 command.DomicilioRetiro.Numero,
                 command.DomicilioRetiro.Localidad,
                 command.DomicilioRetiro.Departamento),
-            new Direccion(
-                command.DomicilioDestino.Calle,
-                command.DomicilioDestino.Numero,
-                command.DomicilioDestino.Localidad,
-                command.DomicilioDestino.Departamento),
+            command.DomicilioDestino is { } destino
+                ? new Direccion(destino.Calle, destino.Numero, destino.Localidad, destino.Departamento)
+                : cuenta.DireccionRecepcion
+                    ?? throw new InvalidOperationException(
+                        "Indicá el domicilio de destino o configurá la dirección de recepción del comercio para este operador."),
             command.Fecha,
             command.HoraDesde,
             command.HoraHasta,

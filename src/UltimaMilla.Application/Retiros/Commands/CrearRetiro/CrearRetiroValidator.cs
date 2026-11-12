@@ -16,9 +16,6 @@ public sealed class CrearRetiroValidator
         RuleFor(x => x.DomicilioRetiro)
             .NotNull();
 
-        RuleFor(x => x.DomicilioDestino)
-            .NotNull();
-
         RuleFor(x => x.DomicilioRetiro)
             .SetValidator(new DireccionRetiroValidator()!)
             .When(x => x.DomicilioRetiro is not null);
