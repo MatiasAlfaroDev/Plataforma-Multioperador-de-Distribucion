@@ -19,6 +19,7 @@ using UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigen
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
+using UltimaMilla.Application.Rutas.Commands.RendirHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
@@ -107,6 +108,7 @@ public static class DependencyInjection
         services.AddScoped<RegistrarReaparicionHandler>();
         services.AddScoped<ObtenerMisHojasDeRutaHandler>();
         services.AddScoped<DespacharMiHojaDeRutaHandler>();
+        services.AddScoped<RendirHojaDeRutaHandler>();
         services.AddScoped<RegistrarPosicionesHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();
         services.AddScoped<EnviarNotificacionDePruebaHandler>();

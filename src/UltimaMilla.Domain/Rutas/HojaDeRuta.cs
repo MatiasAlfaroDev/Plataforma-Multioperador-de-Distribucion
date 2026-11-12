@@ -511,6 +511,23 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
         DespachadaEn = fecha.ToUniversalTime();
     }
 
+    /// <summary>
+    /// RF 22: cierra la jornada de la hoja. Solo una hoja despachada en la que todas las paradas
+    /// ya tienen resultado (ninguna sigue activa) puede rendirse.
+    /// </summary>
+    public void MarcarRendida()
+    {
+        if (Estado != EstadoHojaDeRuta.Despachada)
+            throw new InvalidOperationException(
+                "Solo se puede rendir una hoja de ruta despachada.");
+
+        if (_paradas.Any(p => p.Activa))
+            throw new InvalidOperationException(
+                "La hoja todavía tiene paradas sin resultado.");
+
+        Estado = EstadoHojaDeRuta.Rendida;
+    }
+
     public void ActualizarOrdenParadas(
         IReadOnlyList<HorarioParada> horarios)
     {
