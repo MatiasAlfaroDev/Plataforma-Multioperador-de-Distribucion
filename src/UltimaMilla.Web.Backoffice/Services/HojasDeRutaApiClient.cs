@@ -29,11 +29,33 @@ public sealed record EnvioRutaApiDto(
     TimeOnly? HoraHasta,
     bool TieneCompromiso);
 
+// RF 39: paradas de retiro (se suben bultos) y de entrega de retiros al comercio (se bajan).
+public sealed record RetiroRutaApiDto(
+    Guid Id,
+    string Motivo,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3,
+    DateOnly Fecha,
+    TimeOnly HoraDesde,
+    TimeOnly HoraHasta);
+
+public sealed record EntregaRetiroRutaApiDto(
+    Guid Id,
+    string Motivo,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3);
+
 public sealed record OpcionesHojaRutaApiDto(
     List<RepartidorRutaApiDto> Repartidores,
     List<VehiculoRutaApiDto> Vehiculos,
     List<EnvioRutaApiDto> Envios,
-    List<FranjaRutaApiDto> Franjas);
+    List<FranjaRutaApiDto> Franjas,
+    List<RetiroRutaApiDto>? Retiros = null,
+    List<EntregaRetiroRutaApiDto>? EntregasRetiros = null);
 
 public sealed record HojaRutaApiDto(
     Guid Id,
@@ -58,7 +80,9 @@ public sealed record CrearHojaRutaApiRequest(
     TimeOnly HoraEntregaDesde,
     TimeOnly HoraEntregaHasta,
     int MaximoParadas,
-    IReadOnlyList<Guid> EnviosIds);
+    IReadOnlyList<Guid> EnviosIds,
+    IReadOnlyList<Guid>? RetirosIds = null,
+    IReadOnlyList<Guid>? EntregasRetirosIds = null);
 
 public sealed class HojasDeRutaApiClient(HttpClient http)
 {
