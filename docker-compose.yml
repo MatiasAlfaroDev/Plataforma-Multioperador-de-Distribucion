@@ -188,6 +188,10 @@ services:
       OTEL_SERVICE_NAME: "worker"
       # Lock de las tareas programadas (reintento de avisos fallidos).
       ConnectionStrings__Redis: "redis:6379"
+      # Push al repartidor cuando le asignan un envío (AvisarAsignacionConsumer). Misma cuenta de servicio que la API.
+      Firebase__CredencialesRuta: "/run/secretos/firebase-cuenta-servicio.json"
+    volumes:
+      - ./docker/secretos:/run/secretos:ro
     depends_on:
       postgres:
         condition: service_healthy
