@@ -159,6 +159,30 @@
                         </VerticalStackLayout>
                     </Border>
 
+                    <!-- 5. Retiros de la hoja (RF 39): no se cargan acá, se buscan en los domicilios durante la ruta -->
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding HayRetiros}">
+                        <Label Text="Retiros en esta ruta" Style="{StaticResource Seccion}" />
+                        <Label Text="Sus bultos se escanean en el domicilio, no en el depósito." Style="{StaticResource Secundario}" />
+                        <VerticalStackLayout Spacing="8" BindableLayout.ItemsSource="{Binding Retiros}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:ParadaItem">
+                                    <Border Style="{StaticResource Tarjeta}" Padding="14,12">
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                            <Label Text="{x:Static app:Iconos.Caja}" FontSize="24" VerticalOptions="Center"
+                                                   Style="{StaticResource Icono}"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextoSecundario}, Dark={StaticResource TextoSecundarioOscuro}}" />
+                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                <Label Text="{Binding TituloRetiro}" FontFamily="TextoFuerte" FontSize="15"
+                                                       TextColor="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
+                                                <Label Text="{Binding DetalleRetiro}" Style="{StaticResource Secundario}" />
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
                     <Label Text="Bultos de la hoja" Style="{StaticResource Seccion}"
                            IsVisible="{Binding HayHojaElegida}" />
                 </VerticalStackLayout>
