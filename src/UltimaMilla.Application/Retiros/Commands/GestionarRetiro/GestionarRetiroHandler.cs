@@ -33,6 +33,25 @@ public sealed class GestionarRetiroHandler(
         await unitOfWork.GuardarCambiosAsync(ct);
     }
 
+    /// <summary>RF 38: un retiro no retirado vuelve a Solicitado para asignarlo a otra hoja de ruta.</summary>
+    public async Task ReprogramarAsync(
+        Guid retiroId,
+        CancellationToken ct)
+    {
+        var retiro = await ObtenerRetiroAsync(retiroId, ct);
+
+        retiro.Reprogramar();
+
+        await avisos.PrepararAsync(
+            retiro.Id,
+            TiposAviso.RetiroSolicitado,
+            $"retiro:{retiro.Id}:reprogramado:{reloj.GetUtcNow():O}",
+            reloj.GetUtcNow(),
+            ct);
+
+        await unitOfWork.GuardarCambiosAsync(ct);
+    }
+
     public async Task EntregarAlComercioAsync(
         Guid retiroId,
         CancellationToken ct)

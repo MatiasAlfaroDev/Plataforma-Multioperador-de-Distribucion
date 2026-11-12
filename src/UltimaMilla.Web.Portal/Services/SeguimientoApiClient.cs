@@ -18,7 +18,8 @@ public sealed record SeguimientoPublicoDto(
     string? FranjaReprogramada,
     IReadOnlyList<MovimientoSeguimientoDto> Historial,
     int BultosTotales = 0,
-    int BultosEntregados = 0);
+    int BultosEntregados = 0,
+    string Tipo = "Envio");
 
 public sealed class SeguimientoApiClient(HttpClient http)
 {

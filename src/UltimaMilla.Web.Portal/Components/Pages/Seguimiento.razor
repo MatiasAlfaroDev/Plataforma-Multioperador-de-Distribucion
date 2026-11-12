@@ -37,7 +37,7 @@
             <div class="card-body">
 
                 <h5 class="card-title">
-                    Envío @seguimiento.Referencia
+                    @(seguimiento.Tipo == "Retiro" ? seguimiento.Referencia : $"Envío {seguimiento.Referencia}")
                 </h5>
 
                 <p>

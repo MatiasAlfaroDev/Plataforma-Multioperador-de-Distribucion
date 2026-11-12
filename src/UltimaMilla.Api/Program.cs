@@ -241,16 +241,33 @@ var api = app.MapGroup("/api");
 
 // GET /api/seguimiento/{token}
 // Consulta pública de seguimiento para destinatarios.
+// RF 41: el mismo enlace sirve para envíos y retiros; si el token no es de un envío, se prueba como retiro.
 api.MapGet("/seguimiento/{token}", async (
     string token,
     ConsultarSeguimientoPublicoHandler handler,
+    IDataProtectionProvider dataProtection,
+    IConsultaPublicaRetiroRepository retiros,
     CancellationToken ct) =>
 {
     var seguimiento = await handler.Handle(token, ct);
+    if (seguimiento is not null)
+        return Results.Ok(seguimiento);
 
-    return seguimiento is null
+    if (TokenRetiro.Leer(dataProtection, token) is not var (operadorId, retiroId))
+        return Results.NotFound();
+
+    var retiro = await retiros.ObtenerAsync(operadorId, retiroId, ct);
+
+    return retiro is null
         ? Results.NotFound()
-        : Results.Ok(seguimiento);
+        : Results.Ok(new SeguimientoPublicoDto(
+            "Retiro a domicilio",
+            retiro.Estado,
+            retiro.SolicitadoEn,
+            retiro.FechaSolicitada,
+            null, null, null, null,
+            [],
+            Tipo: "Retiro"));
 })
 .AllowAnonymous();
 
@@ -819,6 +836,28 @@ api.MapPost("/retiros/{retiroId:guid}/recibir-deposito",
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
 
+// POST /api/retiros/{id}/reprogramar → un retiro no retirado vuelve a Solicitado (RF 38).
+api.MapPost("/retiros/{retiroId:guid}/reprogramar",
+    async (
+        Guid retiroId,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        GestionarRetiroHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        await handler.ReprogramarAsync(retiroId, ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
+
 api.MapPost("/retiros/{retiroId:guid}/entregar-comercio",
     async (
         Guid retiroId,
@@ -888,71 +927,18 @@ api.MapGet("/retiros/{retiroId:guid}/enlace-publico",
         if (retiro is null)
             return Results.NotFound();
 
-        var protector = dataProtection
-            .CreateProtector("UltimaMilla.RetiroSeguimiento.v1")
-            .ToTimeLimitedDataProtector();
+        var token = TokenRetiro.Proteger(dataProtection, retiro.OperadorId, retiro.Id);
 
-        var contenido = $"{retiro.OperadorId:N}:{retiro.Id:N}";
-
-        var token = protector.Protect(
-            contenido,
-            TimeSpan.FromDays(30));
-
+        // RF 41: el mismo enlace público que los envíos (página /seguimiento del Portal).
         return Results.Ok(new
         {
-            Url = $"/api/publico/retiros/{token}",
-            VigenciaDias = 30
+            Url = $"/seguimiento/{token}",
+            VigenciaDias = TokenRetiro.VigenciaDias
         });
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.OperadorYComercio));
 
 
-// Consultar el estado sin iniciar sesión.
-api.MapGet("/publico/retiros/{token}",
-    async (
-        string token,
-        IDataProtectionProvider dataProtection,
-        IConsultaPublicaRetiroRepository consultas,
-        CancellationToken ct) =>
-    {
-        string contenido;
-
-        try
-        {
-            var protector = dataProtection
-                .CreateProtector("UltimaMilla.RetiroSeguimiento.v1")
-                .ToTimeLimitedDataProtector();
-
-            contenido = protector.Unprotect(token);
-        }
-        catch (CryptographicException)
-        {
-            return Results.NotFound();
-        }
-        catch (FormatException)
-        {
-            return Results.NotFound();
-        }
-
-        var partes = contenido.Split(':');
-
-        if (partes.Length != 2 ||
-            !Guid.TryParseExact(partes[0], "N", out var operadorId) ||
-            !Guid.TryParseExact(partes[1], "N", out var retiroId))
-        {
-            return Results.NotFound();
-        }
-
-        var seguimiento = await consultas.ObtenerAsync(
-            operadorId,
-            retiroId,
-            ct);
-
-        return seguimiento is null
-            ? Results.NotFound()
-            : Results.Ok(seguimiento);
-    })
-    .AllowAnonymous();
 
 // Registrar la reaparición de un envío extraviado.
 api.MapPost("/envios/{envioId:guid}/reaparicion",
