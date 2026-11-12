@@ -16,4 +16,6 @@ public sealed record SeguimientoPublicoDto(
     IReadOnlyList<MovimientoSeguimientoDto> Historial,
     // RF 35: avance de la entrega ("2 de 3 bultos") sin identificadores internos.
     int BultosTotales = 0,
-    int BultosEntregados = 0);
+    int BultosEntregados = 0,
+    // RF 41: el mismo enlace muestra envíos y retiros a domicilio.
+    string Tipo = "Envio");
