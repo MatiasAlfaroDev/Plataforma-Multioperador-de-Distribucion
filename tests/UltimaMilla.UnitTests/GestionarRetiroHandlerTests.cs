@@ -118,6 +118,25 @@ public sealed class GestionarRetiroHandlerTests
             Guid? cuentaComercialId,
             CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<Retiro>>([retiro]);
+    
+        public Task<IReadOnlyList<Retiro>> ListarParaPlanificacionAsync(
+            Guid operadorId,
+            CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Retiro>>(
+                retiro.OperadorId == operadorId &&
+                retiro.Estado == EstadoRetiro.Solicitado &&
+                retiro.HojaDeRutaId == null
+                    ? [retiro]
+                    : []);
+
+        public Task<IReadOnlyList<Retiro>> ListarParaEntregaComercioAsync(
+            Guid operadorId,
+            CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Retiro>>(
+                retiro.OperadorId == operadorId &&
+                retiro.Estado == EstadoRetiro.EnDeposito
+                    ? [retiro]
+                    : []);
     }
 
     private sealed class HojasEnMemoria(HojaDeRuta hoja)

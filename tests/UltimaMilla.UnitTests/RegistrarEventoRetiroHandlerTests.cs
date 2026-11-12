@@ -250,6 +250,28 @@ public sealed class RegistrarEventoRetiroHandlerTests
                     (!cuentaComercialId.HasValue ||
                      r.CuentaComercialId == cuentaComercialId.Value))
                 .ToList());
+        public Task<IReadOnlyList<Retiro>> ListarParaPlanificacionAsync(
+            Guid operadorId,
+            CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Retiro>>(
+                Lista.Where(r =>
+                    r.OperadorId == operadorId &&
+                    r.Estado == EstadoRetiro.Solicitado &&
+                    r.HojaDeRutaId == null)
+                .OrderBy(r => r.FechaSolicitada)
+                .ThenBy(r => r.HoraDesde)
+                .ToList());
+
+        public Task<IReadOnlyList<Retiro>> ListarParaEntregaComercioAsync(
+            Guid operadorId,
+            CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Retiro>>(
+                Lista.Where(r =>
+                    r.OperadorId == operadorId &&
+                    r.Estado == EstadoRetiro.EnDeposito)
+                .OrderBy(r => r.FechaSolicitada)
+                .ThenBy(r => r.HoraDesde)
+                .ToList());
     }
 
     private sealed class HojasEnMemoria : IHojaDeRutaRepository
