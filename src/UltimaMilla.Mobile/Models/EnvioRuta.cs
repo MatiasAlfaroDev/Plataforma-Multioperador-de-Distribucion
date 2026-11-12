@@ -35,6 +35,9 @@ public sealed class EnvioRuta
     /// <summary>RF 40: parada de retiro en domicilio (se suben bultos).</summary>
     public bool EsRetiro => Modalidad == "Retiro";
 
+    public string TextoBotonExito => EsRetiro ? "Retirado" : "Entregado";
+    public string TextoBotonFallo => EsRetiro ? "No retirado" : "No entregado";
+
     public string EstadoMostrado => ResultadoLocal switch
     {
         null => EstadoServidor,

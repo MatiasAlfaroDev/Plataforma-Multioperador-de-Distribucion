@@ -17,13 +17,13 @@
             <CollectionView.Header>
                 <VerticalStackLayout Spacing="12" Padding="0,16,0,4">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="¿Qué bultos se entregan?" Style="{StaticResource Titulo}" />
+                        <Label Text="{Binding Titulo}" Style="{StaticResource Titulo}" />
                         <Label Text="{Binding Referencia}" Style="{StaticResource Secundario}" FontSize="15" />
                     </VerticalStackLayout>
 
                     <Border Style="{StaticResource Tarjeta}" Padding="14">
                         <VerticalStackLayout Spacing="8">
-                            <Label Text="Escaneá o escribí el código de cada bulto que entregás" Style="{StaticResource EtiquetaCampo}" />
+                            <Label Text="{Binding Instruccion}" Style="{StaticResource EtiquetaCampo}" />
 
                             <Grid ColumnDefinitions="2*,*" ColumnSpacing="10" IsVisible="{Binding HayLectorCamara}">
                                 <Button Text="Escanear" Style="{StaticResource BotonPrimario}"
@@ -65,7 +65,7 @@
                         </VerticalStackLayout>
                     </Border>
 
-                    <Label Text="Bultos del envío (tocá uno para marcarlo o desmarcarlo)" Style="{StaticResource Seccion}" />
+                    <Label Text="{Binding TituloLista}" Style="{StaticResource Seccion}" />
                 </VerticalStackLayout>
             </CollectionView.Header>
 

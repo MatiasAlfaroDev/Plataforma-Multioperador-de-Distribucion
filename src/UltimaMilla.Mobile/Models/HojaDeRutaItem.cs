@@ -8,7 +8,8 @@ public sealed record HojaDeRutaItem(
     string Repartidor,
     IReadOnlyList<ParadaItem> Paradas)
 {
-    public int CantidadBultos => Paradas.Sum(p => p.Bultos.Count);
+    /// <summary>Los bultos que se cargan en el depósito: los de los retiros todavía están en los domicilios.</summary>
+    public int CantidadBultos => Paradas.Where(p => p.TipoOperacion != "Retiro").Sum(p => p.Bultos.Count);
 
     /// <summary>Ya salió: ningún envío sigue "Asignado a ruta". Los retiros siguen asignados hasta que se recogen.</summary>
     public bool YaDespachada =>
@@ -38,6 +39,13 @@ public sealed record ParadaItem(
     Guid? RetiroId = null,
     string TipoOperacion = "Entrega")
 {
+    /// <summary>Cómo se muestra un retiro en la carga del vehículo (no tiene referencia del comercio).</summary>
+    public string TituloRetiro =>
+        RetiroId is Guid id ? $"Retiro {id.ToString()[..8].ToUpperInvariant()}" : ReferenciaExterna;
+
+    public string DetalleRetiro =>
+        $"{Direccion}, {Localidad} · {Bultos.Count} {(Bultos.Count == 1 ? "bulto" : "bultos")} a retirar en el domicilio";
+
     /// <summary>Lo que la app guarda como Id de la parada: el envío o el retiro.</summary>
     public Guid IdParada => RetiroId ?? EnvioId ?? Guid.Empty;
 }

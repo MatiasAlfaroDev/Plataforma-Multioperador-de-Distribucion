@@ -37,7 +37,10 @@ public class EnviosApi : IEnviosApi
             .SelectMany(h => h.Paradas.OrderBy(p => p.Orden))
             .Select(p => new EnvioItem(
                 p.IdParada,
-                p.ReferenciaExterna,
+                // El retiro no tiene referencia del comercio: el servidor manda su Id; se muestra corto.
+                p.RetiroId is Guid retiroId && p.TipoOperacion == "Retiro"
+                    ? $"Retiro {retiroId.ToString()[..8].ToUpperInvariant()}"
+                    : p.ReferenciaExterna,
                 operadorId,
                 OperadorNombre: string.Empty,
                 ComercioNombre: string.Empty,

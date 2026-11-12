@@ -62,19 +62,19 @@
                                 <Border Style="{StaticResource Contador}">
                                     <VerticalStackLayout Spacing="0" HorizontalOptions="Start">
                                         <Label Text="{Binding PorEntregar}" Style="{StaticResource Cifra}" />
-                                        <Label Text="Por entregar" Style="{StaticResource Secundario}" FontSize="12" />
+                                        <Label Text="Pendientes" Style="{StaticResource Secundario}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="1" Style="{StaticResource Contador}">
                                     <VerticalStackLayout Spacing="0" HorizontalOptions="Start">
                                         <Label Text="{Binding Entregados}" Style="{StaticResource Cifra}" />
-                                        <Label Text="Entregados" Style="{StaticResource Secundario}" FontSize="12" />
+                                        <Label Text="Resueltas" Style="{StaticResource Secundario}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="2" Style="{StaticResource Contador}">
                                     <VerticalStackLayout Spacing="0" HorizontalOptions="Start">
                                         <Label Text="{Binding NoEntregados}" Style="{StaticResource Cifra}" />
-                                        <Label Text="No entregados" Style="{StaticResource Secundario}" FontSize="12" />
+                                        <Label Text="No resueltas" Style="{StaticResource Secundario}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
                             </Grid>
@@ -215,7 +215,7 @@
                                 <!-- Botones: solo si todavía no se registró el resultado -->
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,2,0,0"
                                       IsVisible="{Binding PuedeRegistrar}">
-                                    <Button Text="Entregado" Style="{StaticResource BotonExito}" ContentLayout="Left,8"
+                                    <Button Text="{Binding TextoBotonExito}" Style="{StaticResource BotonExito}" ContentLayout="Left,8"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=EntregarCommand}"
                                             CommandParameter="{Binding .}">
                                         <Button.ImageSource>
@@ -223,7 +223,7 @@
                                                              Size="18" Color="{StaticResource White}" />
                                         </Button.ImageSource>
                                     </Button>
-                                    <Button Grid.Column="1" Text="No entregado" Style="{StaticResource BotonPeligro}" ContentLayout="Left,8"
+                                    <Button Grid.Column="1" Text="{Binding TextoBotonFallo}" Style="{StaticResource BotonPeligro}" ContentLayout="Left,8"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=NoEntregadoCommand}"
                                             CommandParameter="{Binding .}">
                                         <Button.ImageSource>

@@ -432,13 +432,13 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     private async Task RetirarAsync(EnvioRuta parada)
     {
         var bultos = await _ruta.ListarBultosAsync(parada.Id);
-        var seleccion = await _elegirBultos.ElegirAsync($"Retiro {parada.ReferenciaExterna}", bultos);
+        var seleccion = await _elegirBultos.ElegirAsync(parada.ReferenciaExterna, bultos, esRetiro: true);
         if (seleccion is null)
             return;
 
         if (seleccion.NoEntregados.Count > 0)
         {
-            await _dialogos.AvisarAsync("Retiro", "Hay que escanear todos los bultos del retiro. Si no se pueden retirar, usá «No entregado».");
+            await _dialogos.AvisarAsync("Retiro", "Hay que escanear todos los bultos del retiro. Si no se pueden retirar, usá «No retirado».");
             return;
         }
 
