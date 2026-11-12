@@ -8,12 +8,13 @@ namespace UltimaMilla.Application.Avisos.Queries.ListarSuscripciones;
 /// </summary>
 public sealed class ListarSuscripcionesHandler(
     ISuscripcionAvisoRepository suscripciones,
+    ICuentaComercialRepository cuentas,
     ITenantContext sesion)
 {
     public async Task<IReadOnlyList<SuscripcionAvisoDto>> Handle(ListarSuscripcionesQuery query, CancellationToken ct)
     {
-        var (_, cuenta) = AlcanceAvisos.Resolver(sesion);
-        return (await suscripciones.ListarAsync(cuenta, ct))
+        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct);
+        return (await suscripciones.ListarAsync(alcance.Cuentas?.Keys.ToList(), ct))
             .Select(SuscripcionAvisoDto.Desde)
             .ToList();
     }

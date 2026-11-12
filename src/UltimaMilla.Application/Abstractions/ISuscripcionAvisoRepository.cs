@@ -15,7 +15,7 @@ public interface ISuscripcionAvisoRepository
     /// <summary>
     /// Lista las suscripciones de un comercio o todas del operador si es null.
     /// </summary>
-    Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(Guid? cuentaComercialId, CancellationToken ct);
+    Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(IReadOnlyCollection<Guid>? cuentasComerciales, CancellationToken ct);
 
     /// <summary>
     /// Agrega una nueva suscripción a la base de datos.

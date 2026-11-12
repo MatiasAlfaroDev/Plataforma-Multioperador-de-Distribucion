@@ -1,0 +1,101 @@
+@page "/seleccionar-comercio"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize]
+@inject IJSRuntime JS
+@inject NavigationManager Navegacion
+
+<PageTitle>Seleccionar comercio - Última Milla</PageTitle>
+
+<div class="encabezado">
+    <div>
+        <h1>Seleccionar comercio</h1>
+        <p>Tu usuario trabaja para más de un comercio. Elegí con cuál querés operar.</p>
+    </div>
+</div>
+
+@if (cargando)
+{
+    <p>Cargando comercios...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="aviso error">
+        <i class="ph ph-x-circle"></i>
+        <span>@error</span>
+    </div>
+}
+else
+{
+    @foreach (var comercio in comercios)
+    {
+        <div class="tarjeta">
+            <h3>@comercio.Nombre</h3>
+            <p>RUT @comercio.Rut · @(comercio.Perfil == "AdministradorComercio" ? "Administrador" : "Usuario")</p>
+
+            <button class="primario"
+                    disabled="@seleccionando"
+                    @onclick="() => Seleccionar(comercio.Id)">
+                <i class="ph ph-check"></i>
+                Seleccionar
+            </button>
+        </div>
+    }
+}
+
+@code {
+    private List<ComercioDto> comercios = new();
+    private bool cargando = true;
+    private bool seleccionando;
+    private string? error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            comercios = await JS.InvokeAsync<List<ComercioDto>>("autenticacionPortal.misComercios") ?? new();
+        }
+        catch (JSException)
+        {
+            error = "No se pudieron cargar los comercios.";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Seleccionar(Guid comercioId)
+    {
+        if (seleccionando)
+            return;
+
+        seleccionando = true;
+        error = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync("autenticacionPortal.seleccionarComercio", comercioId);
+
+            // Recargar para que Blazor tome la cookie con el comercio elegido.
+            Navegacion.NavigateTo("/", forceLoad: true);
+        }
+        catch (JSException)
+        {
+            error = "No se pudo seleccionar el comercio.";
+            seleccionando = false;
+        }
+    }
+
+    private sealed class ComercioDto
+    {
+        public Guid Id { get; set; }
+        public string Nombre { get; set; } = "";
+        public string Rut { get; set; } = "";
+        public string Perfil { get; set; } = "";
+    }
+}

@@ -43,17 +43,27 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy("AdministradorOperador", policy => policy.RequireRole("AdministradorOperador"));
+    options.AddPolicy("Despacho", policy => policy.RequireRole("AdministradorOperador", "Despachador", "Operador"));
     options.AddPolicy("OperadorBackoffice", policy =>
         policy.RequireAuthenticatedUser()
               .RequireRole(
                   "AdministradorOperador",
                   "Operador",
+                  "Despachador",
+                  "OperarioDeposito",
                   // Entra solo a Mensajes fallidos: el menú no le muestra el resto y la API se lo negaría.
                   "AdministradorPlataforma"));
 });
 
 builder.Services.AddRazorPages(options =>
 {
+    // Letra 3.3: la configuración es del administrador; la planificación, del despachador.
+    foreach (var pagina in new[] { "/Zonas", "/EditarZona", "/Tarifas", "/ReglasOperativas", "/SolicitudesComerciales", "/Personal" })
+        options.Conventions.AuthorizePage(pagina, "AdministradorOperador");
+    foreach (var pagina in new[] { "/HojasDeRuta", "/Avisos", "/Reportes" })
+        options.Conventions.AuthorizePage(pagina, "Despacho");
+
     options.Conventions.AuthorizeFolder(
         "/",
         "OperadorBackoffice");
@@ -122,6 +132,12 @@ builder.Services.AddHttpClient<MensajesFallidosApiClient>(c =>
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
 builder.Services.AddHttpClient<VinculacionesApiClient>(c =>
+    c.BaseAddress = new Uri(
+        builder.Configuration["Api:BaseUrl"]
+        ?? "http://localhost:5080/"))
+    .AddHttpMessageHandler<CookieAutenticacionHandler>();
+
+builder.Services.AddHttpClient<PersonalApiClient>(c =>
     c.BaseAddress = new Uri(
         builder.Configuration["Api:BaseUrl"]
         ?? "http://localhost:5080/"))

@@ -1,0 +1,91 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.PersonalModel
+
+@{
+    ViewData["Title"] = "Personal";
+}
+
+<div class="encabezado">
+    <div>
+        <h1>Personal</h1>
+        <p>Usuarios del operador: despachadores, operarios de depósito, repartidores y administradores.</p>
+    </div>
+</div>
+
+@if (TempData["Mensaje"] is string mensaje)
+{
+    <p class="aviso ok" role="status">@mensaje</p>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <p class="aviso error" role="alert">@Model.Error</p>
+}
+
+<section>
+    <h2>Usuarios</h2>
+
+    @if (Model.Personal.Count == 0)
+    {
+        <p class="nota">Todavía no hay personal dado de alta.</p>
+    }
+    else
+    {
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr><th>Nombre</th><th>Email</th><th>Perfil</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.Personal)
+                    {
+                        <tr>
+                            <td>@p.Nombre</td>
+                            <td>@p.Email</td>
+                            <td>@UltimaMilla.Web.Backoffice.Pages.PersonalModel.TextoPerfil(p.Perfil)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section>
+    <h2>Dar de alta</h2>
+
+    <form method="post">
+        <div asp-validation-summary="All" class="error"></div>
+
+        <div class="campos">
+            <div>
+                <label asp-for="Formulario.NombreCompleto">Nombre completo</label>
+                <input asp-for="Formulario.NombreCompleto" />
+            </div>
+            <div>
+                <label asp-for="Formulario.Email">Email</label>
+                <input asp-for="Formulario.Email" type="email" />
+            </div>
+            <div>
+                <label asp-for="Formulario.Password">Contraseña inicial</label>
+                <input asp-for="Formulario.Password" type="password" autocomplete="new-password" />
+                <p class="nota">Se puede dejar vacía si la persona ya tiene cuenta.</p>
+            </div>
+            <div>
+                <label asp-for="Formulario.Perfil">Perfil</label>
+                <select asp-for="Formulario.Perfil">
+                    @foreach (var p in UltimaMilla.Web.Backoffice.Pages.PersonalModel.Perfiles)
+                    {
+                        <option value="@p.Valor">@p.Texto</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label asp-for="Formulario.Telefono">Teléfono (repartidores)</label>
+                <input asp-for="Formulario.Telefono" type="tel" />
+            </div>
+        </div>
+
+        <button type="submit" class="primario"><i class="ph ph-user-plus"></i>Dar de alta</button>
+    </form>
+</section>

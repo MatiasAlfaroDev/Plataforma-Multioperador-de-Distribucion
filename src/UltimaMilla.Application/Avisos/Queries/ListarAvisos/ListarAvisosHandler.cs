@@ -8,12 +8,13 @@ namespace UltimaMilla.Application.Avisos.Queries.ListarAvisos;
 /// </summary>
 public sealed class ListarAvisosHandler(
     IEntregaAvisoRepository entregas,
+    ICuentaComercialRepository cuentas,
     ITenantContext sesion)
 {
     public async Task<IReadOnlyList<EntregaAvisoDto>> Handle(ListarAvisosQuery query, CancellationToken ct)
     {
-        var (_, cuenta) = AlcanceAvisos.Resolver(sesion);
-        return (await entregas.ListarAsync(cuenta, query.Estado, ct))
+        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct);
+        return (await entregas.ListarAsync(alcance.Cuentas?.Keys.ToList(), query.Estado, ct))
             .Select(EntregaAvisoDto.Desde)
             .ToList();
     }

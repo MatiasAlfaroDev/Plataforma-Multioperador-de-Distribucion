@@ -6,6 +6,7 @@ using UltimaMilla.Application.Envios.Eventos;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Application.Abstractions.Caching;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 
@@ -19,7 +20,9 @@ public sealed class RegistrarEventoMovilHandler(
     IPublicadorDeEventos eventos,
     IValidator<RegistrarEventoMovilCommand> validator,
     TimeProvider reloj,
-    ICacheService cache)
+    ICacheService cache,
+    IRepartidorRepository repartidores,
+    ITenantContext sesion)
 {
     public async Task Handle(
         RegistrarEventoMovilCommand command,
@@ -34,6 +37,7 @@ public sealed class RegistrarEventoMovilHandler(
         var envio = await envios.ObtenerAsync(command.EnvioId, ct)
             ?? throw new NoEncontradoException("El envío no existe.");
 
+
         var entregaPrevia =
             await eventosMovil.ObtenerEntregaAsync(envio.Id, ct);
 
@@ -46,6 +50,21 @@ public sealed class RegistrarEventoMovilHandler(
         if (envio.Estado != EstadoEnvio.EnTransito)
             throw new InvalidOperationException(
                 "El envío debe estar en tránsito para registrar una entrega o intento fallido.");
+
+        // Letra 3.3: solo el repartidor que tiene el envío en su hoja de ruta registra la entrega.
+        var hoja = await hojasDeRuta.ObtenerPorEnvioActivoAsync(
+            envio.OperadorId,
+            envio.Id,
+            ct)
+            ?? throw new InvalidOperationException(
+                "El envío no tiene una parada activa en ninguna hoja de ruta.");
+
+        var usuarioId = sesion.UsuarioId
+            ?? throw new UnauthorizedAccessException("Hay que iniciar sesión.");
+
+        var repartidor = await repartidores.ObtenerPorUsuarioAsync(envio.OperadorId, usuarioId, ct);
+        if (repartidor is null || hoja.RepartidorId != repartidor.Id)
+            throw new UnauthorizedAccessException("El envío pertenece a la hoja de ruta de otro repartidor.");
 
         if (envio.VersionReglasOperativasId is not Guid versionReglasId)
             throw new InvalidOperationException(
@@ -187,13 +206,6 @@ public sealed class RegistrarEventoMovilHandler(
             throw new ArgumentException(
                 "El tipo de evento móvil no es válido.");
         }
-
-        var hoja = await hojasDeRuta.ObtenerPorEnvioActivoAsync(
-            envio.OperadorId,
-            envio.Id,
-            ct)
-            ?? throw new InvalidOperationException(
-                "El envío no tiene una parada activa en ninguna hoja de ruta.");
 
         hoja.FinalizarParada(envio, ocurridoEn);
 
