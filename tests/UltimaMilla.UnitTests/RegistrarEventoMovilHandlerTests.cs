@@ -136,7 +136,8 @@ public class RegistrarEventoMovilHandlerTests
             new RelojFijo(Alta.AddHours(5)),
             new CacheEnMemoria(),
             _repartidores,
-            _sesion);
+            _sesion,
+            new BanderasHabilitadas());
     }
 
     [Fact]
@@ -146,6 +147,11 @@ public class RegistrarEventoMovilHandlerTests
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _handler.Handle(Entrega(Guid.NewGuid()), CancellationToken.None));
+    }
+
+    private sealed class BanderasHabilitadas : IBanderas
+    {
+        public Task<bool> EstaHabilitadaAsync(string bandera, Guid operadorId, CancellationToken ct) => Task.FromResult(true);
     }
 
     private sealed class SesionDePrueba(Guid usuarioId) : ITenantContext

@@ -73,6 +73,11 @@ else
 
 <h2>Solicitar retiro</h2>
 
+@if (!cargando && cuentas.Count == 0)
+{
+    <p class="nota">Ninguno de tus operadores ofrece retiros a domicilio por ahora.</p>
+}
+
 <form @onsubmit="SolicitarAsync" @onsubmit:preventDefault>
     <div class="campos">
         <div>
@@ -161,8 +166,11 @@ else
         try
         {
             retiros = await JS.InvokeAsync<List<RetiroItem>>("retirosPortal.listar");
+            // Aclaración 3.2: solo los operadores que tienen habilitado el retiro a domicilio.
+            var banderas = await JS.InvokeAsync<Dictionary<Guid, Dictionary<string, bool>>>("retirosPortal.banderas");
             cuentas = (await JS.InvokeAsync<List<CuentaItem>>("autenticacionPortal.obtenerCuentasComerciales"))
                 .Where(c => c.Activa && c.Estado == CuentaConfirmada)
+                .Where(c => !banderas.TryGetValue(c.OperadorId, out var b) || b.GetValueOrDefault("retiro-domicilio", true))
                 .ToList();
             if (cuentaId == Guid.Empty && cuentas.Count > 0)
                 cuentaId = cuentas[0].Id;
@@ -243,6 +251,6 @@ else
     private sealed record RetiroItem(
         Guid Id, DateOnly FechaSolicitada, TimeOnly HoraDesde, TimeOnly HoraHasta, string Estado,
         DireccionItem DomicilioRetiro, decimal? TarifaCalculada, List<BultoItem> Bultos);
-    private sealed record CuentaItem(Guid Id, string OperadorNombre, bool Activa, int Estado);
+    private sealed record CuentaItem(Guid Id, Guid OperadorId, string OperadorNombre, bool Activa, int Estado);
     private sealed record ResultadoOperacion(bool Exito, string Mensaje);
 }

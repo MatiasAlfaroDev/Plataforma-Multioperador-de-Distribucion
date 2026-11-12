@@ -1,4 +1,5 @@
 using MassTransit;
+using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Avisos.Commands.RegistrarAvisos;
 using UltimaMilla.Application.Envios.Eventos;
 using UltimaMilla.Domain.Avisos;
@@ -10,7 +11,7 @@ namespace UltimaMilla.Worker.Consumidores;
 /// Consumer que convierte eventos de envío en avisos a comercios suscriptos (RF 28).
 /// Es idempotente: usa el inbox de MassTransit y un índice único en entregas_aviso.
 /// </summary>
-public sealed class GenerarAvisosConsumer(TenantDelMensaje tenant, RegistrarAvisosHandler handler)
+public sealed class GenerarAvisosConsumer(TenantDelMensaje tenant, RegistrarAvisosHandler handler, IBanderas banderas)
     : IConsumer<EnvioCreado>, IConsumer<EstadoEnvioCambiado>, IConsumer<EstadoBultoCambiado>
 {
     // RF 36: avisos por bulto; RegistrarAvisos solo los genera para suscripciones con contrato v2.
@@ -18,6 +19,10 @@ public sealed class GenerarAvisosConsumer(TenantDelMensaje tenant, RegistrarAvis
     {
         var m = context.Message;
         var tipo = TiposAviso.DeResultadoBulto(m.Resultado);
+
+        // Aclaración 3.2: sin la funcionalidad de entrega parcial el operador no avisa por bulto.
+        if (!await banderas.EstaHabilitadaAsync(Banderas.EntregaParcial, m.OperadorId, context.CancellationToken))
+            return;
 
         tenant.Fijar(m.OperadorId);
         await handler.Handle(

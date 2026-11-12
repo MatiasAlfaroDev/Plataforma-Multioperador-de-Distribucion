@@ -86,6 +86,10 @@ public sealed record CrearHojaRutaApiRequest(
 
 public sealed class HojasDeRutaApiClient(HttpClient http)
 {
+    /// <summary>GET /api/banderas: las funcionalidades habilitadas para el operador de la sesión (aclaración 3.2).</summary>
+    public async Task<Dictionary<string, bool>> ObtenerBanderasAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<Dictionary<string, bool>>("api/banderas", ct) ?? [];
+
     public async Task<List<OperadorRutaApiDto>> ListarOperadoresAsync(
         CancellationToken ct)
     {

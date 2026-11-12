@@ -53,10 +53,8 @@ public class EnviosApi : IEnviosApi
             .ToList();
     }
 
-    public async Task<IReadOnlyList<string>> ListarMotivosNoEntregaAsync(CancellationToken ct = default) =>
-        (await _http.GetFromJsonAsync<CatalogoMotivos>("api/motivos-no-entrega", JsonOptions, ct))?.Motivos ?? [];
-
-    private sealed record CatalogoMotivos(bool AdmiteEntregaParcial, List<string> Motivos);
+    public async Task<CatalogoMotivos> ObtenerCatalogoAsync(CancellationToken ct = default) =>
+        await _http.GetFromJsonAsync<CatalogoMotivos>("api/motivos-no-entrega", JsonOptions, ct) ?? new(false, []);
 
     public async Task<IReadOnlyList<HojaDeRutaItem>> ListarMisHojasAsync(CancellationToken ct = default) =>
         await PedirMisHojasAsync(ct)

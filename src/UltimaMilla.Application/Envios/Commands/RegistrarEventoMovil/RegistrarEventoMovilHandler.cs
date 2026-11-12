@@ -22,7 +22,8 @@ public sealed class RegistrarEventoMovilHandler(
     TimeProvider reloj,
     ICacheService cache,
     IRepartidorRepository repartidores,
-    ITenantContext sesion)
+    ITenantContext sesion,
+    IBanderas banderas)
 {
     public async Task Handle(
         RegistrarEventoMovilCommand command,
@@ -166,7 +167,8 @@ public sealed class RegistrarEventoMovilHandler(
             {
                 // RF 33: cada operador decide si admite la entrega parcial. 400 y no 409: la app trata el 409
                 // como "ya estaba" y descartaría el evento sin avisarle al repartidor.
-                if (!reglas.AdmiteEntregaParcial)
+                if (!reglas.AdmiteEntregaParcial ||
+                    !await banderas.EstaHabilitadaAsync(Banderas.EntregaParcial, envio.OperadorId, ct))
                     throw new InvalidOperationException(
                         "Las reglas del operador no admiten entregas parciales: registrá la visita como no entregada.");
 

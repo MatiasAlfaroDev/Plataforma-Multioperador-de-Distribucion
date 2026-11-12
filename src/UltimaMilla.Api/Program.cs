@@ -234,6 +234,7 @@ app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapAutenticacionEndpoints();
 app.MapVinculacionesComercialesEndpoints();
 app.MapPersonalEndpoints();
+app.MapBanderasEndpoints();
 
 
 app.MapGet("/api/antiforgery/token", (
@@ -1201,6 +1202,7 @@ api.MapPost("/reglas-operativas", async (
 api.MapGet("/motivos-no-entrega", async (
     ITenantContext tenant,
     ObtenerReglasOperativasVigentesHandler handler,
+    IBanderas banderas,
     CancellationToken ct) =>
 {
     var operadorId = tenant.OperadorId ?? throw new UnauthorizedAccessException("Primero hay que elegir un operador.");
@@ -1208,7 +1210,9 @@ api.MapGet("/motivos-no-entrega", async (
 
     return Results.Ok(new
     {
-        admiteEntregaParcial = reglas?.AdmiteEntregaParcial ?? false,
+        // Regla del operador y bandera de la plataforma (aclaración 3.2): las dos tienen que permitirla.
+        admiteEntregaParcial = (reglas?.AdmiteEntregaParcial ?? false) &&
+            await banderas.EstaHabilitadaAsync(Banderas.EntregaParcial, operadorId, ct),
         motivos = reglas?.Motivos.Select(m => m.Descripcion).ToArray() ?? []
     });
 })

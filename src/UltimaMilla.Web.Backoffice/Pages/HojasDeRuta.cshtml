@@ -242,6 +242,8 @@
             </div>
         }
 
+        @if (Model.RetiroHabilitado)
+        {
         <h3>Retiros a domicilio</h3>
         <p class="nota">
             Hoja mixta (RF 39): los bultos retirados ocupan lugar desde la parada en que se suben; la API
@@ -298,6 +300,7 @@
                     </tbody>
                 </table>
             </div>
+        }
         }
 
         <button type="submit"

@@ -137,6 +137,12 @@ builder.Services.AddHttpClient<VinculacionesApiClient>(c =>
         ?? "http://localhost:5080/"))
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
+builder.Services.AddHttpClient<BanderasApiClient>(c =>
+    c.BaseAddress = new Uri(
+        builder.Configuration["Api:BaseUrl"]
+        ?? "http://localhost:5080/"))
+    .AddHttpMessageHandler<CookieAutenticacionHandler>();
+
 builder.Services.AddHttpClient<PersonalApiClient>(c =>
     c.BaseAddress = new Uri(
         builder.Configuration["Api:BaseUrl"]
