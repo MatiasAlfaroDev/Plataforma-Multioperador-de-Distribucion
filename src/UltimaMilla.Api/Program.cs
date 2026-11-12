@@ -1445,7 +1445,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
 api.MapGet("/hojas-de-ruta/{hojaId:guid}/rendicion",
     async (Guid hojaId, RendirHojaDeRutaHandler handler, CancellationToken ct) =>
         Results.Ok(await handler.ObtenerAsync(hojaId, ct)))
-    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
 
 api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
     async (
@@ -1469,7 +1469,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
 
         return Results.Ok(resultado);
     })
-    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
 
 api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
     async (
