@@ -23,6 +23,7 @@ public sealed class HojasDeRutaModel(
 
     public List<EnvioRutaApiDto> Envios { get; private set; } = [];
     public List<RetiroRutaApiDto> Retiros { get; private set; } = [];
+    public bool RetiroHabilitado { get; private set; } = true;
     public List<EntregaRetiroRutaApiDto> EntregasRetiros { get; private set; } = [];
 
     public List<HojaRutaApiDto> Hojas { get; private set; } = [];
@@ -184,8 +185,10 @@ public sealed class HojasDeRutaModel(
         Repartidores = opciones.Repartidores;
         Vehiculos = opciones.Vehiculos;
         Envios = opciones.Envios;
-        Retiros = opciones.Retiros ?? [];
-        EntregasRetiros = opciones.EntregasRetiros ?? [];
+        // Aclaración 3.2: sin la funcionalidad de retiro el Backoffice no ofrece esas paradas.
+        RetiroHabilitado = (await api.ObtenerBanderasAsync(ct)).GetValueOrDefault("retiro-domicilio", true);
+        Retiros = RetiroHabilitado ? opciones.Retiros ?? [] : [];
+        EntregasRetiros = RetiroHabilitado ? opciones.EntregasRetiros ?? [] : [];
         Franjas = opciones.Franjas;
 
         Hojas = await api.ListarAsync(operadorId, ct);

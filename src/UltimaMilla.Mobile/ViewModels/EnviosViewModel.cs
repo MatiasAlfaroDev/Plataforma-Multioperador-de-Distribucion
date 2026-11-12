@@ -27,6 +27,12 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
 
     private static string ClaveMotivos(Guid operadorId) => $"motivos-no-entrega-{operadorId}";
 
+    private static string ClaveEntregaParcial(Guid operadorId) => $"admite-entrega-parcial-{operadorId}";
+
+    // Sin descargar todavía, se ofrece como antes; el servidor igual la rechaza si no corresponde.
+    private bool AdmiteEntregaParcial =>
+        Operador is null || Preferences.Get(ClaveEntregaParcial(Operador.Id), true);
+
     private string[] MotivosNoEntrega
     {
         get
@@ -222,9 +228,10 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
                     var descargados = await _api.ListarEnviosAsync(Operador.Id);
                     await _ruta.GuardarRutaAsync(Operador.Id, descargados.Where(e => e.OperadorId == Operador.Id));
 
-                    var motivos = await _api.ListarMotivosNoEntregaAsync();
-                    if (motivos.Count > 0)
-                        Preferences.Set(ClaveMotivos(Operador.Id), System.Text.Json.JsonSerializer.Serialize(motivos));
+                    var catalogo = await _api.ObtenerCatalogoAsync();
+                    if (catalogo.Motivos.Count > 0)
+                        Preferences.Set(ClaveMotivos(Operador.Id), System.Text.Json.JsonSerializer.Serialize(catalogo.Motivos));
+                    Preferences.Set(ClaveEntregaParcial(Operador.Id), catalogo.AdmiteEntregaParcial);
                     Aviso = $"Ruta descargada a las {DateTime.Now:HH:mm}.";
                 }
                 catch (RutaNoDisponibleException ex)
@@ -268,7 +275,9 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     private async Task<ResultadoBultos> ElegirBultosAsync(EnvioRuta envio)
     {
         var bultos = await _ruta.ListarBultosAsync(envio.Id);
-        if (bultos.Count <= 1)
+
+        // Aclaración 3.2: si la entrega parcial no está habilitada, la entrega es completa o no es.
+        if (bultos.Count <= 1 || !AdmiteEntregaParcial)
             return ResultadoBultos.Completa;
 
         var seleccion = await _elegirBultos.ElegirAsync(envio.ReferenciaExterna, bultos);

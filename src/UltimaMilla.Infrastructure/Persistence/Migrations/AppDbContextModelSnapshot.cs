@@ -1403,6 +1403,71 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.ToTable("vehiculos", (string)null);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Plataforma.BanderaFuncionalidad", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Habilitada")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("ModificadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Nombre")
+                        .IsUnique();
+
+                    b.ToTable("banderas_funcionalidad", (string)null);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Plataforma.CambioBandera", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Habilitada")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("ModificadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModificadoPor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModificadoEn");
+
+                    b.ToTable("cambios_bandera", (string)null);
+                });
+
             modelBuilder.Entity("UltimaMilla.Domain.Retiros.BultoRetiro", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2285,6 +2350,15 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OperadorId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Plataforma.BanderaFuncionalidad", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Organizacion.Operador", null)
+                        .WithMany()
+                        .HasForeignKey("OperadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

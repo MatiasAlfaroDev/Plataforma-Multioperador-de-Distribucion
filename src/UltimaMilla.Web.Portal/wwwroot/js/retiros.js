@@ -1,6 +1,12 @@
 // Retiros a domicilio (RF 37 y 41): listado, solicitud y enlace público. Mismo esquema que avisos.js.
 
 window.retirosPortal = {
+    // Aclaración 3.2: { operadorId: { "retiro-domicilio": true, ... } } para cada operador del comercio.
+    async banderas() {
+        const respuesta = await fetch("/api/banderas", { method: "GET", credentials: "same-origin" });
+        return respuesta.ok ? await respuesta.json() : {};
+    },
+
     async listar() {
         const respuesta = await fetch("/api/retiros", {
             method: "GET",
