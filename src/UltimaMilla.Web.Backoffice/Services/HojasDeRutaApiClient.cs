@@ -58,7 +58,8 @@ public sealed record CrearHojaRutaApiRequest(
     TimeOnly HoraEntregaDesde,
     TimeOnly HoraEntregaHasta,
     int MaximoParadas,
-    IReadOnlyList<Guid> EnviosIds);
+    IReadOnlyList<Guid> EnviosIds,
+    IReadOnlyList<Guid> RetirosIds);
 
 public sealed class HojasDeRutaApiClient(HttpClient http)
 {
@@ -74,7 +75,8 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
         CancellationToken ct)
     {
         return await http.GetFromJsonAsync<OpcionesHojaRutaApiDto>(
-            $"api/hojas-de-ruta/opciones?operadorId={operadorId}", ct)
+            $"api/hojas-de-ruta/opciones?operadorId={operadorId}",
+            ct)
             ?? throw new InvalidOperationException(
                 "La API no devolvió las opciones de planificación.");
     }
@@ -84,7 +86,8 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
         CancellationToken ct)
     {
         return await http.GetFromJsonAsync<List<HojaRutaApiDto>>(
-            $"api/hojas-de-ruta?operadorId={operadorId}", ct) ?? [];
+            $"api/hojas-de-ruta?operadorId={operadorId}",
+            ct) ?? [];
     }
 
     public async Task<int> DespacharAsync(
@@ -154,7 +157,6 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
         HttpContent? contenido,
         CancellationToken ct)
     {
-        // Obtener token antiforgery de la API.
         using var respuestaToken = await http.GetAsync(
             "api/antiforgery/token",
             ct);
@@ -180,7 +182,6 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
             "X-CSRF-TOKEN",
             datosToken.Token);
 
-        // Recuperar la cookie antiforgery generada por la API.
         if (respuestaToken.Headers.TryGetValues(
             "Set-Cookie",
             out var cookies))

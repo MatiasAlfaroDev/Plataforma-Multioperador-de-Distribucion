@@ -8,20 +8,23 @@ using UltimaMilla.Web.Backoffice.Services;
 namespace UltimaMilla.Web.Backoffice.Pages;
 
 public sealed class HojasDeRutaModel(
-    HojasDeRutaApiClient api) : PageModel
+    HojasDeRutaApiClient api,
+    RetirosApiClient retirosApi) : PageModel
 {
     public Guid OperadorIdSesion =>
-    Guid.TryParse(
-        User.FindFirst("operador_id")?.Value,
-        out var id)
-        ? id
-        : Guid.Empty;
+        Guid.TryParse(
+            User.FindFirst("operador_id")?.Value,
+            out var id)
+            ? id
+            : Guid.Empty;
 
     public List<RepartidorRutaApiDto> Repartidores { get; private set; } = [];
 
     public List<VehiculoRutaApiDto> Vehiculos { get; private set; } = [];
 
     public List<EnvioRutaApiDto> Envios { get; private set; } = [];
+
+    public List<RetiroBackofficeDto> Retiros { get; private set; } = [];
 
     public List<HojaRutaApiDto> Hojas { get; private set; } = [];
 
@@ -32,21 +35,41 @@ public sealed class HojasDeRutaModel(
     [BindProperty]
     public FormularioHojaRuta Formulario { get; set; } = new();
 
- public async Task OnGetAsync(
-    Guid? envioId,
-    CancellationToken ct)
-{
-    await CargarAsync(ct);
-
-    if (envioId.HasValue &&
-        Envios.Any(x => x.Id == envioId.Value))
+    public async Task OnGetAsync(
+        Guid? envioId,
+        Guid? retiroId,
+        CancellationToken ct)
     {
-        Formulario.EnviosIds = [envioId.Value];
+        await CargarAsync(ct);
+
+        if (envioId.HasValue &&
+            Envios.Any(e => e.Id == envioId.Value))
+        {
+            Formulario.EnviosIds = [envioId.Value];
+        }
+
+        if (retiroId.HasValue &&
+            Retiros.Any(r => r.Id == retiroId.Value))
+        {
+            var retiro = Retiros.First(r => r.Id == retiroId.Value);
+
+            Formulario.RetirosIds = [retiro.Id];
+            Formulario.Fecha = retiro.FechaSolicitada;
+        }
     }
-}
+
     public async Task<IActionResult> OnPostAsync(
         CancellationToken ct)
     {
+        Formulario.EnviosIds ??= [];
+        Formulario.RetirosIds ??= [];
+
+        if (OperadorIdSesion == Guid.Empty)
+        {
+            ModelState.AddModelError(
+                "",
+                "No hay un operador seleccionado.");
+        }
 
         if (Formulario.RepartidorId == Guid.Empty)
         {
@@ -62,12 +85,12 @@ public sealed class HojasDeRutaModel(
                 "Seleccioná un vehículo.");
         }
 
-        if (Formulario.EnviosIds is null ||
-            Formulario.EnviosIds.Count == 0)
+        if (Formulario.EnviosIds.Count == 0 &&
+            Formulario.RetirosIds.Count == 0)
         {
             ModelState.AddModelError(
                 "",
-                "Seleccioná al menos un envío.");
+                "Seleccioná al menos un envío o un retiro.");
         }
 
         var franjaValida = IntentarObtenerFranja(
@@ -99,10 +122,10 @@ public sealed class HojasDeRutaModel(
                 horaDesde,
                 horaHasta,
                 Formulario.MaximoParadas,
-                Formulario.EnviosIds);
+                Formulario.EnviosIds,
+                Formulario.RetirosIds);
 
-            var hojaId = await api.CrearAsync(
-                solicitud, ct);
+            var hojaId = await api.CrearAsync(solicitud, ct);
 
             TempData["Exito"] =
                 $"Hoja de ruta creada correctamente. ID: {hojaId}";
@@ -122,77 +145,87 @@ public sealed class HojasDeRutaModel(
     }
 
     public async Task<IActionResult> OnPostDespacharAsync(
-    Guid hojaId,
-    CancellationToken ct)
-{
-    if (OperadorIdSesion == Guid.Empty)
+        Guid hojaId,
+        CancellationToken ct)
     {
-        Error = "No hay un operador seleccionado.";
-        await CargarAsync(ct);
-        return Page();
-    }
-
-    if (hojaId == Guid.Empty)
-    {
-        Error = "Debe seleccionar una hoja de ruta válida.";
-        await CargarAsync(ct);
-        return Page();
-    }
-
-    try
-    {
-        var cantidad = await api.DespacharAsync(
-            OperadorIdSesion,
-            hojaId,
-            ct);
-
-        TempData["Exito"] =
-            $"Hoja de ruta despachada correctamente. " +
-            $"{cantidad} envío(s) actualizado(s).";
-
-        return RedirectToPage("/HojasDeRuta");
-    }
-    catch (Exception ex) when (
-        ex is HttpRequestException ||
-        ex is InvalidOperationException)
-    {
-        Error = ex.Message;
-        await CargarAsync(ct);
-        return Page();
-    }
-}
-
-   private async Task CargarAsync(CancellationToken ct)
-{
-    try
-    {
-        var operadorId = OperadorIdSesion;
-
-        if (operadorId == Guid.Empty)
+        if (OperadorIdSesion == Guid.Empty)
         {
-            Error = "No hay un operador seleccionado en la sesión.";
-            return;
+            Error = "No hay un operador seleccionado.";
+            await CargarAsync(ct);
+            return Page();
         }
 
-        var opciones = await api.ObtenerOpcionesAsync(
-            operadorId, ct);
+        if (hojaId == Guid.Empty)
+        {
+            Error = "Debe seleccionar una hoja de ruta válida.";
+            await CargarAsync(ct);
+            return Page();
+        }
 
-        Repartidores = opciones.Repartidores;
-        Vehiculos = opciones.Vehiculos;
-        Envios = opciones.Envios;
-        Franjas = opciones.Franjas;
+        try
+        {
+            var cantidad = await api.DespacharAsync(
+                OperadorIdSesion,
+                hojaId,
+                ct);
 
-        Hojas = await api.ListarAsync(operadorId, ct);
+            TempData["Exito"] =
+                "Hoja de ruta despachada correctamente. " +
+                $"{cantidad} envío(s) actualizado(s).";
+
+            return RedirectToPage("/HojasDeRuta");
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException ||
+            ex is InvalidOperationException)
+        {
+            Error = ex.Message;
+            await CargarAsync(ct);
+            return Page();
+        }
     }
-    catch (Exception ex) when (
-        ex is HttpRequestException ||
-        ex is InvalidOperationException ||
-        ex is UnauthorizedAccessException)
+
+    private async Task CargarAsync(CancellationToken ct)
     {
-        Error ??=
-            $"No se pudieron cargar las hojas de ruta: {ex.Message}";
+        try
+        {
+            var operadorId = OperadorIdSesion;
+
+            if (operadorId == Guid.Empty)
+            {
+                Error = "No hay un operador seleccionado en la sesión.";
+                return;
+            }
+
+            var opciones = await api.ObtenerOpcionesAsync(
+                operadorId, ct);
+
+            Repartidores = opciones.Repartidores;
+            Vehiculos = opciones.Vehiculos;
+            Envios = opciones.Envios;
+            Franjas = opciones.Franjas;
+
+            var retiros = await retirosApi.ListarAsync(ct);
+
+            Retiros = retiros
+                .Where(r =>
+                    r.OperadorId == operadorId &&
+                    r.Estado == "Solicitado")
+                .OrderBy(r => r.FechaSolicitada)
+                .ThenBy(r => r.HoraDesde)
+                .ToList();
+
+            Hojas = await api.ListarAsync(operadorId, ct);
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException ||
+            ex is InvalidOperationException ||
+            ex is UnauthorizedAccessException)
+        {
+            Error ??=
+                $"No se pudieron cargar las hojas de ruta: {ex.Message}";
+        }
     }
-}
 
     private static bool IntentarObtenerFranja(
         string? valor,
@@ -235,7 +268,6 @@ public sealed class HojasDeRutaModel(
 
     public sealed class FormularioHojaRuta
     {
-
         public Guid RepartidorId { get; set; }
 
         public Guid VehiculoId { get; set; }
@@ -257,5 +289,7 @@ public sealed class HojasDeRutaModel(
         public int MaximoParadas { get; set; } = 20;
 
         public List<Guid> EnviosIds { get; set; } = [];
+
+        public List<Guid> RetirosIds { get; set; } = [];
     }
 }

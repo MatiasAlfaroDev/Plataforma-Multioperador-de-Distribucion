@@ -1,0 +1,443 @@
+
+@page "/mis-retiros"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "ComercioPortal")]
+@inject IJSRuntime JS
+
+<PageTitle>Mis retiros - Última Milla</PageTitle>
+
+<div class="encabezado">
+    <div>
+        <h1>Mis retiros</h1>
+        <p>Consultá los retiros solicitados y su estado actual.</p>
+    </div>
+    <a href="/mis-operadores" class="btn-secundario">
+        + Nuevo retiro
+    </a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="aviso error" role="alert">
+        @error
+    </div>
+}
+
+@if (cargando)
+{
+    <p class="nota">Cargando retiros...</p>
+}
+else if (retiros.Count == 0)
+{
+    <div class="tarjeta">
+        <p class="nota">Todavía no tenés retiros registrados.</p>
+        <a href="/mis-operadores" class="btn-primario">
+            Solicitar un retiro
+        </a>
+    </div>
+}
+else
+{
+    <p class="nota">
+        @(retiros.Count == 1
+            ? "1 retiro"
+            : $"{retiros.Count} retiros")
+    </p>
+
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Motivo</th>
+                    <th>Dirección</th>
+                    <th>Franja</th>
+                    <th class="num">Bultos</th>
+                    <th class="num">Peso (kg)</th>
+                    <th>Estado</th>
+                    <th class="num">Tarifa</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var retiro in retiros)
+                {
+                    <tr @key="retiro.Id">
+                        <td class="codigo">
+                            @retiro.FechaSolicitada.ToString("dd/MM/yyyy")
+                        </td>
+
+                        <td>@retiro.Motivo</td>
+
+                        <td>
+                            @FormatearDireccion(retiro.DomicilioRetiro)
+                        </td>
+
+                        <td>
+                            @retiro.HoraDesde.ToString("HH:mm")
+                            -
+                            @retiro.HoraHasta.ToString("HH:mm")
+                        </td>
+
+                        <td class="num">@retiro.Bultos.Count</td>
+
+                        <td class="num">
+                            @retiro.PesoTotalKg.ToString("N2")
+                        </td>
+
+                        <td>
+                            <span class="@ClaseEstado(retiro.Estado)">
+                                @NombreEstado(retiro.Estado)
+                            </span>
+                        </td>
+
+                        <td class="num">
+                            @(retiro.TarifaCalculada.HasValue
+                                ? $"$ {retiro.TarifaCalculada.Value:N2}"
+                                : "Sin tarifa")
+                        </td>
+
+                        <td>
+                            <button type="button"
+                                    class="btn-secundario"
+                                    @onclick="() => AlternarDetalle(retiro.Id)">
+                                @(retiroExpandido == retiro.Id
+                                    ? "Ocultar detalle"
+                                    : "Ver detalle")
+                            </button>
+                        </td>
+                    </tr>
+
+                    @if (retiroExpandido == retiro.Id)
+                    {
+                        <tr @key="@($"detalle-{retiro.Id}")">
+                            <td colspan="9">
+                                <div class="detalle-retiro">
+                                    <h3>Detalle del retiro</h3>
+
+                                    <div class="detalle-grid">
+                                        <div>
+                                            <strong>Identificador</strong>
+                                            <p>@retiro.Id</p>
+                                        </div>
+
+                                        <div>
+                                            <strong>Fecha de solicitud</strong>
+                                            <p>
+                                                @retiro.SolicitadoEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <strong>Domicilio de retiro</strong>
+                                            <p>
+                                                @FormatearDireccion(retiro.DomicilioRetiro)
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <strong>Domicilio de destino</strong>
+                                            <p>
+                                                @FormatearDireccion(retiro.DomicilioDestino)
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <strong>Peso total</strong>
+                                            <p>
+                                                @retiro.PesoTotalKg.ToString("N2") kg
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <strong>Volumen total</strong>
+                                            <p>
+                                                @retiro.VolumenTotalMetrosCubicos.ToString("N4") m³
+                                            </p>
+                                        </div>
+
+                                        @if (retiro.RetiradoEn.HasValue)
+                                        {
+                                            <div>
+                                                <strong>Retirado el</strong>
+                                                <p>
+                                                    @retiro.RetiradoEn.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                                </p>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <h4>Bultos del retiro</h4>
+
+                                    <div class="tabla">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Identificación</th>
+                                                    <th class="num">Peso (kg)</th>
+                                                    <th>Dimensiones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var bulto in retiro.Bultos)
+                                                {
+                                                    <tr>
+                                                        <td class="codigo">
+                                                            @bulto.Identificacion
+                                                        </td>
+                                                        <td class="num">
+                                                            @bulto.PesoKg.ToString("N2")
+                                                        </td>
+                                                        <td>
+                                                            @bulto.AltoCm ×
+                                                            @bulto.AnchoCm ×
+                                                            @bulto.ProfundidadCm cm
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<style>
+    .tabla {
+        width: 100%;
+        overflow-x: auto;
+        margin-top: 12px;
+        border: 1px solid #e0e0e0;
+        border-radius: 16px;
+        background: white;
+    }
+
+    .tabla table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .tabla th {
+        text-align: left;
+        padding: 14px;
+        border-bottom: 1px solid #e0e0e0;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .tabla td {
+        padding: 14px;
+        border-bottom: 1px solid #e5e5e5;
+        vertical-align: middle;
+    }
+
+    .tabla tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    .tabla .num {
+        text-align: right;
+    }
+
+    .tabla .codigo {
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .chip {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .chip-acento {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .chip-exito {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .chip-alerta {
+        background: #ffedd5;
+        color: #c2410c;
+    }
+
+    .chip-error {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .detalle-retiro {
+        padding: 20px;
+        background: #f9fafb;
+        border-radius: 12px;
+    }
+
+    .detalle-retiro h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+
+    .detalle-retiro h4 {
+        font-size: 15px;
+        font-weight: 700;
+        margin-top: 20px;
+    }
+
+    .detalle-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+    }
+
+    .detalle-grid strong {
+        display: block;
+        font-size: 13px;
+        color: #555;
+    }
+
+    .detalle-grid p {
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+</style>
+
+@code {
+    private List<RetiroItem> retiros = new();
+
+    private bool cargando = true;
+    private string error = "";
+    private Guid? retiroExpandido;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await CargarRetirosAsync();
+    }
+
+    private async Task CargarRetirosAsync()
+    {
+        cargando = true;
+        error = "";
+
+        try
+        {
+            var resultado = await JS.InvokeAsync<List<RetiroItem>>(
+                "autenticacionPortal.listarRetiros");
+
+            retiros = resultado?
+                .OrderByDescending(r => r.SolicitadoEn)
+                .ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudieron cargar los retiros: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AlternarDetalle(Guid retiroId)
+    {
+        retiroExpandido =
+            retiroExpandido == retiroId ? null : retiroId;
+    }
+
+    private static string FormatearDireccion(DireccionItem direccion)
+    {
+        return $"{direccion.Calle} {direccion.Numero}, " +
+               $"{direccion.Localidad}, {direccion.Departamento}";
+    }
+
+    private static string NombreEstado(string estado)
+    {
+        return estado switch
+        {
+            "Solicitado" => "Solicitado",
+            "AsignadoARuta" => "Asignado a ruta",
+            "Retirado" => "Retirado",
+            "NoRetirado" => "No retirado",
+            "EnDeposito" => "En depósito",
+            "EntregadoAlComercio" => "Entregado al comercio",
+            _ => estado
+        };
+    }
+
+    private static string ClaseEstado(string estado)
+    {
+        return estado switch
+        {
+            "Solicitado" => "chip chip-acento",
+            "AsignadoARuta" => "chip chip-exito",
+            "Retirado" => "chip chip-exito",
+            "NoRetirado" => "chip chip-error",
+            "EnDeposito" => "chip chip-alerta",
+            "EntregadoAlComercio" => "chip chip-exito",
+            _ => "chip"
+        };
+    }
+
+    public class RetiroItem
+    {
+        public Guid Id { get; set; }
+        public Guid OperadorId { get; set; }
+        public Guid CuentaComercialId { get; set; }
+        public string Motivo { get; set; } = "";
+        public DireccionItem DomicilioRetiro { get; set; } = new();
+        public DireccionItem DomicilioDestino { get; set; } = new();
+        public DateOnly FechaSolicitada { get; set; }
+        public TimeOnly HoraDesde { get; set; }
+        public TimeOnly HoraHasta { get; set; }
+        public string Estado { get; set; } = "";
+        public DateTimeOffset SolicitadoEn { get; set; }
+        public Guid? HojaDeRutaId { get; set; }
+        public DateTimeOffset? RetiradoEn { get; set; }
+        public string? ReferenciaFotografia { get; set; }
+        public string? ReferenciaFirma { get; set; }
+        public decimal PesoTotalKg { get; set; }
+        public decimal VolumenTotalMetrosCubicos { get; set; }
+        public Guid? VersionTarifariaId { get; set; }
+        public decimal? TarifaCalculada { get; set; }
+        public List<BultoItem> Bultos { get; set; } = new();
+    }
+
+    public class DireccionItem
+    {
+        public string Calle { get; set; } = "";
+        public string Numero { get; set; } = "";
+        public string Localidad { get; set; } = "";
+        public string Departamento { get; set; } = "";
+    }
+
+    public class BultoItem
+    {
+        public Guid Id { get; set; }
+        public string Identificacion { get; set; } = "";
+        public decimal PesoKg { get; set; }
+        public int AltoCm { get; set; }
+        public int AnchoCm { get; set; }
+        public int ProfundidadCm { get; set; }
+        public decimal VolumenMetrosCubicos { get; set; }
+    }
+}

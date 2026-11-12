@@ -1,0 +1,281 @@
+
+@page
+@model UltimaMilla.Web.Backoffice.Pages.RetirosModel
+
+@{
+    ViewData["Title"] = "Retiros";
+}
+
+<div class="retiros-pagina">
+    <header class="retiros-encabezado">
+        <div>
+            <h1>Retiros</h1>
+            <p>Solicitudes de retiro a domicilio de los comercios.</p>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="retiros-error" role="alert">
+            @Model.Error
+        </div>
+    }
+
+    @if (Model.Retiros.Count == 0 && Model.Error is null)
+    {
+        <div class="retiros-vacio">
+            Todavía no hay retiros solicitados.
+        </div>
+    }
+    else if (Model.Retiros.Count > 0)
+    {
+        <p class="retiros-total">
+            @Model.Retiros.Count
+            @(Model.Retiros.Count == 1 ? "retiro" : "retiros")
+        </p>
+
+        <div class="retiros-tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Motivo</th>
+                        <th>Dirección</th>
+                        <th>Franja</th>
+                        <th>Bultos</th>
+                        <th>Peso (kg)</th>
+                        <th>Estado</th>
+                        <th>Tarifa</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var retiro in Model.Retiros)
+                    {
+                        <tr>
+                            <td class="fecha">
+                                @retiro.FechaSolicitada.ToString("dd/MM/yyyy")
+                            </td>
+
+                            <td>
+                                @retiro.Motivo
+                            </td>
+
+                            <td>
+                                @RetirosModel.FormatearDireccion(
+                                    retiro.DomicilioRetiro)
+                            </td>
+
+                            <td class="franja">
+                                @retiro.HoraDesde.ToString("HH:mm")
+                                -
+                                @retiro.HoraHasta.ToString("HH:mm")
+                            </td>
+
+                            <td class="numero">
+                                @retiro.Bultos.Count
+                            </td>
+
+                            <td class="numero">
+                                @retiro.PesoTotalKg.ToString("N2")
+                            </td>
+
+                            <td>
+                                <span class="retiros-estado @RetirosModel.ClaseEstado(retiro.Estado)">
+                                    @RetirosModel.NombreEstado(retiro.Estado)
+                                </span>
+                            </td>
+
+                            <td class="numero">
+                                @(retiro.TarifaCalculada.HasValue
+                                    ? $"$ {retiro.TarifaCalculada.Value:N2}"
+                                    : "—")
+                            </td>
+
+                            
+                            <td>
+                                <div class="flex items-center gap-2 whitespace-nowrap">
+                                    <a asp-page="/DetalleRetiro"
+                                    asp-route-id="@retiro.Id"
+                                    class="btn-secundario py-1.5 text-sm">
+                                        Ver detalle
+                                    </a>
+
+                                    @if (retiro.Estado == "Solicitado")
+                                    {
+                                        <a asp-page="/HojasDeRuta"
+                                        asp-route-retiroId="@retiro.Id"
+                                        class="btn-secundario py-1.5 text-sm">
+                                            Asignar a ruta
+                                        </a>
+                                    }
+                                    else if (retiro.Estado == "AsignadoARuta")
+                                    {
+                                        <span class="nota">Asignado a ruta</span>
+                                    }
+                                    else if (retiro.Estado == "Retirado")
+                                    {
+                                        <a asp-page="/DetalleRetiro"
+                                        asp-route-id="@retiro.Id"
+                                        class="btn-secundario py-1.5 text-sm">
+                                            Recibir en depósito
+                                        </a>
+                                    }
+                                    else if (retiro.Estado == "EnDeposito")
+                                    {
+                                        <a asp-page="/DetalleRetiro"
+                                        asp-route-id="@retiro.Id"
+                                        class="btn-secundario py-1.5 text-sm">
+                                            Entregar al comercio
+                                        </a>
+                                    }
+                                    else if (retiro.Estado == "EntregadoAlComercio")
+                                    {
+                                        <span class="nota">Finalizado</span>
+                                    }
+                                </div>
+                            </td>
+
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<style>
+    .retiros-pagina {
+        padding: 24px 0;
+    }
+
+    .retiros-encabezado {
+        margin-bottom: 24px;
+    }
+
+    .retiros-encabezado h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .retiros-encabezado p,
+    .retiros-total {
+        color: #64748b;
+    }
+
+    .retiros-total {
+        margin: 28px 0 8px;
+        font-size: 14px;
+    }
+
+    .retiros-tabla {
+        width: 100%;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        background: white;
+    }
+
+    .retiros-tabla table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .retiros-tabla th,
+    .retiros-tabla td {
+        padding: 14px;
+        text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+        vertical-align: middle;
+    }
+
+    .retiros-tabla th {
+        font-weight: 600;
+        color: #475569;
+        white-space: nowrap;
+    }
+
+    .retiros-tabla tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .retiros-tabla tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .retiros-tabla .numero {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .retiros-tabla .fecha,
+    .retiros-tabla .franja {
+        white-space: nowrap;
+    }
+
+    .retiros-estado {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .estado-pendiente {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .estado-asignado,
+    .estado-retirado {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .estado-fallido {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .estado-deposito {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .estado-entregado {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .retiros-enlace-detalle {
+        display: inline-block;
+        color: #2563eb;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .retiros-enlace-detalle:hover {
+        color: #1d4ed8;
+        text-decoration: underline;
+    }
+
+    .retiros-error {
+        margin: 20px 0;
+        padding: 14px;
+        background: #fee2e2;
+        color: #991b1b;
+        border-radius: 8px;
+    }
+
+    .retiros-vacio {
+        margin-top: 24px;
+        padding: 32px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+    }
+</style>

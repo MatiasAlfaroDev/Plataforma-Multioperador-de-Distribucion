@@ -431,7 +431,81 @@ async confirmarDevolucion(envioId, datos) {
         exito: false,
         mensaje
     };
+},
+
+
+async crearRetiro(datos) {
+    const respuestaToken = await fetch("/api/antiforgery/token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!respuestaToken.ok) {
+        return {
+            exito: false,
+            mensaje: "No se pudo obtener el token de seguridad."
+        };
+    }
+
+    const { token } = await respuestaToken.json();
+
+    const respuesta = await fetch("/api/retiros", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": token
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(datos)
+    });
+
+    if (respuesta.ok) {
+        const contenido = await respuesta.text();
+
+        return {
+            exito: true,
+            mensaje: "Retiro solicitado correctamente.",
+            resultado: contenido ? JSON.parse(contenido) : null
+        };
+    }
+
+    let mensaje = `No se pudo solicitar el retiro (HTTP ${respuesta.status}).`;
+
+    try {
+        const error = await respuesta.json();
+        mensaje = error.mensaje
+            ?? error.detail
+            ?? error.title
+            ?? mensaje;
+    } catch {
+        // Conservamos el mensaje HTTP.
+    }
+
+    return {
+        exito: false,
+        mensaje
+    };
+},
+
+
+async listarRetiros() {
+    const response = await fetch("/api/retiros", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            `No se pudieron consultar los retiros. HTTP ${response.status}`
+        );
+    }
+
+    return await response.json();
 }
+
+
 
 
 };

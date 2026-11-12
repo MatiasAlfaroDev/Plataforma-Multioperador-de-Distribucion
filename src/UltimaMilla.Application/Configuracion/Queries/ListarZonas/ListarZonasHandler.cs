@@ -45,11 +45,23 @@ public sealed class ListarZonasHandler(
             query.OperadorId,
             ct);
 
+        
         return lista
             .Select(z => new ZonaDto(
                 z.Id,
                 z.Nombre,
-                z.Departamento))
+                z.Departamento,
+                z.Localidades
+                    .Select(l => new LocalidadZonaDto(
+                        l.Nombre,
+                        l.Sector))
+                    .ToList(),
+                z.Franjas
+                    .Select(f => new FranjaZonaDto(
+                        f.HoraDesde,
+                        f.HoraHasta))
+                    .ToList()))
             .ToList();
+
     }
 }

@@ -1,0 +1,669 @@
+
+@page "/nuevo-retiro"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "ComercioPortal")]
+@inject IJSRuntime JS
+
+<PageTitle>Nuevo retiro - Última Milla</PageTitle>
+
+<h3>Solicitar retiro a domicilio</h3>
+
+<p>
+    Completá los datos del comprador y los bultos a retirar.
+</p>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="alert @(exito ? "alert-success" : "alert-danger")"
+         role="alert">
+        @mensaje
+    </div>
+}
+
+@if (cargando)
+{
+    <p>Cargando cuentas comerciales y zonas...</p>
+}
+else
+{
+    <div class="mb-3">
+        <label class="form-label">Cuenta comercial</label>
+
+        <select class="form-select"
+                value="@formulario.CuentaComercialId"
+                disabled="@(CuentaComercialIdSeleccionada.HasValue || procesando)"
+                @onchange="CambiarCuentaAsync">
+
+            <option value="@Guid.Empty">Seleccioná una cuenta</option>
+
+            @foreach (var cuenta in cuentas)
+            {
+                <option value="@cuenta.Id">
+                    @cuenta.ComercioNombre - @cuenta.OperadorNombre
+                </option>
+            }
+        </select>
+    </div>
+
+    @if (cuentaActual is not null)
+    {
+        <div class="alert alert-info">
+            <strong>Operador:</strong> @cuentaActual.OperadorNombre
+            <div>
+                <strong>Comercio:</strong> @cuentaActual.ComercioNombre
+            </div>
+        </div>
+    }
+
+    <div class="mb-3">
+        <label class="form-label">Motivo del retiro</label>
+
+        <InputTextArea class="form-control"
+                       maxlength="500"
+                       @bind-Value="formulario.Motivo" />
+    </div>
+
+    <h5>Domicilio del comprador</h5>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Calle</label>
+
+            <InputText class="form-control"
+                       @bind-Value="formulario.DomicilioRetiro.Calle" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Número</label>
+
+            <InputText class="form-control"
+                       @bind-Value="formulario.DomicilioRetiro.Numero" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Departamento</label>
+
+            <select class="form-select"
+                    value="@formulario.DomicilioRetiro.Departamento"
+                    @onchange="CambiarDepartamento">
+
+                <option value="">Seleccioná un departamento</option>
+
+                @foreach (var departamento in DepartamentosDisponibles)
+                {
+                    <option value="@departamento">
+                        @departamento
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Localidad</label>
+
+            <select class="form-select"
+                    value="@formulario.DomicilioRetiro.Localidad"
+                    @onchange="CambiarLocalidad">
+
+                <option value="">Seleccioná una localidad</option>
+
+                @foreach (var localidad in LocalidadesDisponibles)
+                {
+                    <option value="@localidad">
+                        @localidad
+                    </option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (zonas.Count == 0 && cuentaActual is not null)
+    {
+        <div class="alert alert-warning">
+            Este operador no tiene zonas de cobertura activas disponibles.
+        </div>
+    }
+
+    <h5>Domicilio de destino (comercio)</h5>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Calle</label>
+
+            <InputText class="form-control"
+                       @bind-Value="formulario.DomicilioDestino.Calle" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Número</label>
+
+            <InputText class="form-control"
+                       @bind-Value="formulario.DomicilioDestino.Numero" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Localidad</label>
+
+            <InputText class="form-control"
+                       @bind-Value="formulario.DomicilioDestino.Localidad" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Departamento</label>
+
+            <InputText class="form-control"
+                       @bind-Value="formulario.DomicilioDestino.Departamento" />
+        </div>
+    </div>
+
+    <h5>Fecha y franja horaria</h5>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Fecha solicitada</label>
+
+            <InputDate class="form-control"
+                       @bind-Value="formulario.Fecha" />
+        </div>
+
+        <div class="col-md-8">
+            <label class="form-label">
+                Franja horaria disponible
+            </label>
+
+            <select class="form-select"
+                    @bind="franjaSeleccionada"
+                    disabled="@(FranjasDisponibles.Count == 0)">
+
+                <option value="">Seleccioná una franja</option>
+
+                @foreach (var franja in FranjasDisponibles)
+                {
+                    var valor =
+                        $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
+
+                    <option value="@valor">
+                        @franja.HoraDesde.ToString("HH:mm")
+                        -
+                        @franja.HoraHasta.ToString("HH:mm")
+                    </option>
+                }
+            </select>
+
+            @if (FranjasDisponibles.Count == 0)
+            {
+                <small class="text-muted">
+                    Seleccioná un departamento y una localidad
+                    con cobertura para consultar las franjas.
+                </small>
+            }
+        </div>
+    </div>
+
+    <h5>Bultos</h5>
+
+    @foreach (var bulto in formulario.Bultos)
+    {
+        <div class="border rounded p-3 mb-3" @key="bulto">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">Identificación</label>
+
+                    <InputText class="form-control"
+                               @bind-Value="bulto.Identificacion" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Peso (kg)</label>
+
+                    <InputNumber class="form-control"
+                                 @bind-Value="bulto.PesoKg" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Alto (cm)</label>
+
+                    <InputNumber class="form-control"
+                                 @bind-Value="bulto.AltoCm" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Ancho (cm)</label>
+
+                    <InputNumber class="form-control"
+                                 @bind-Value="bulto.AnchoCm" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Prof. (cm)</label>
+
+                    <InputNumber class="form-control"
+                                 @bind-Value="bulto.ProfundidadCm" />
+                </div>
+            </div>
+
+            <button type="button"
+                    class="btn btn-outline-danger btn-sm mt-2"
+                    @onclick="() => QuitarBulto(bulto)"
+                    disabled="@(formulario.Bultos.Count == 1 || procesando)">
+                Quitar
+            </button>
+        </div>
+    }
+
+    <button type="button"
+            class="btn btn-outline-secondary mb-3"
+            @onclick="AgregarBulto"
+            disabled="@procesando">
+        + Agregar bulto
+    </button>
+
+    <div>
+        <button type="button"
+                class="btn btn-primary"
+                @onclick="SolicitarRetiro"
+                disabled="@(procesando || exito || cuentaActual is null)">
+
+            @(procesando ? "Enviando..." : "Solicitar retiro")
+        </button>
+    </div>
+}
+
+@code {
+
+    [SupplyParameterFromQuery(Name = "cuentaComercialId")]
+    public Guid? CuentaComercialIdSeleccionada { get; set; }
+
+    private FormularioRetiro formulario = new();
+
+    private List<CuentaOpcion> cuentas = new();
+    private List<ZonaRetiroDto> zonas = new();
+
+    private CuentaOpcion? cuentaActual;
+
+    private string franjaSeleccionada = "";
+    private string mensaje = "";
+
+    private bool cargando = true;
+    private bool procesando;
+    private bool exito;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            var resultado = await JS.InvokeAsync<List<CuentaOpcion>>(
+                "autenticacionPortal.obtenerCuentasComerciales");
+
+            cuentas = resultado?
+                .Where(c => c.Activa && c.Estado == 1)
+                .ToList() ?? new();
+
+            if (CuentaComercialIdSeleccionada.HasValue)
+            {
+                cuentaActual = cuentas.FirstOrDefault(c =>
+                    c.Id == CuentaComercialIdSeleccionada.Value);
+
+                if (cuentaActual is null)
+                {
+                    mensaje = "La cuenta comercial seleccionada no está disponible.";
+                }
+            }
+            else if (cuentas.Count == 1)
+            {
+                cuentaActual = cuentas[0];
+            }
+
+            if (cuentaActual is not null)
+            {
+                formulario.CuentaComercialId = cuentaActual.Id;
+                await CargarZonasAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"No se pudieron cargar los datos: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CambiarCuentaAsync(ChangeEventArgs args)
+    {
+        if (!Guid.TryParse(args.Value?.ToString(), out var id))
+            id = Guid.Empty;
+
+        cuentaActual = cuentas.FirstOrDefault(c => c.Id == id);
+
+        formulario.CuentaComercialId = cuentaActual?.Id ?? Guid.Empty;
+
+        zonas.Clear();
+        franjaSeleccionada = "";
+        formulario.DomicilioRetiro.Departamento = "";
+        formulario.DomicilioRetiro.Localidad = "";
+
+        mensaje = "";
+        exito = false;
+
+        if (cuentaActual is not null)
+            await CargarZonasAsync();
+    }
+
+    private async Task CargarZonasAsync()
+    {
+        if (cuentaActual is null)
+            return;
+
+        try
+        {
+            zonas = await JS.InvokeAsync<List<ZonaRetiroDto>>(
+                "autenticacionPortal.obtenerZonas",
+                cuentaActual.OperadorId) ?? new();
+        }
+        catch (Exception ex)
+        {
+            zonas = new();
+
+            mensaje = $"No se pudieron cargar las zonas: {ex.Message}";
+        }
+    }
+
+    private List<string> DepartamentosDisponibles =>
+        zonas
+            .Select(z => z.Departamento)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(d => d)
+            .ToList();
+
+    private List<string> LocalidadesDisponibles =>
+        zonas
+            .Where(z => string.Equals(
+                z.Departamento,
+                formulario.DomicilioRetiro.Departamento,
+                StringComparison.OrdinalIgnoreCase))
+            .SelectMany(z => z.Localidades)
+            .Where(l => l.Sector is null)
+            .Select(l => l.Nombre)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(l => l)
+            .ToList();
+
+    private List<ZonaRetiroDto> ZonasCompatibles =>
+        zonas
+            .Where(z =>
+                string.Equals(
+                    z.Departamento,
+                    formulario.DomicilioRetiro.Departamento,
+                    StringComparison.OrdinalIgnoreCase)
+                &&
+                z.Localidades.Any(l =>
+                    string.Equals(
+                        l.Nombre,
+                        formulario.DomicilioRetiro.Localidad,
+                        StringComparison.OrdinalIgnoreCase)
+                    && l.Sector is null))
+            .ToList();
+
+    private List<FranjaZonaDto> FranjasDisponibles =>
+        ZonasCompatibles
+            .SelectMany(z => z.Franjas)
+            .DistinctBy(f => new
+            {
+                f.HoraDesde,
+                f.HoraHasta
+            })
+            .OrderBy(f => f.HoraDesde)
+            .ToList();
+
+    private void CambiarDepartamento(ChangeEventArgs args)
+    {
+        formulario.DomicilioRetiro.Departamento =
+            args.Value?.ToString() ?? "";
+
+        formulario.DomicilioRetiro.Localidad = "";
+        franjaSeleccionada = "";
+    }
+
+    private void CambiarLocalidad(ChangeEventArgs args)
+    {
+        formulario.DomicilioRetiro.Localidad =
+            args.Value?.ToString() ?? "";
+
+        franjaSeleccionada = "";
+    }
+
+    private void AgregarBulto()
+    {
+        formulario.Bultos.Add(new BultoFormulario());
+    }
+
+    private void QuitarBulto(BultoFormulario bulto)
+    {
+        if (formulario.Bultos.Count > 1)
+            formulario.Bultos.Remove(bulto);
+    }
+
+    private async Task SolicitarRetiro()
+    {
+        if (procesando || exito)
+            return;
+
+        mensaje = "";
+
+        if (cuentaActual is null ||
+            formulario.CuentaComercialId == Guid.Empty)
+        {
+            mensaje = "Seleccioná una cuenta comercial.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formulario.Motivo))
+        {
+            mensaje = "Ingresá el motivo del retiro.";
+            return;
+        }
+
+        if (formulario.Motivo.Length > 500)
+        {
+            mensaje = "El motivo no puede superar los 500 caracteres.";
+            return;
+        }
+
+        if (!DireccionCompleta(formulario.DomicilioRetiro))
+        {
+            mensaje = "Completá el domicilio del comprador.";
+            return;
+        }
+
+        if (!DireccionCompleta(formulario.DomicilioDestino))
+        {
+            mensaje = "Completá el domicilio de destino.";
+            return;
+        }
+
+        if (formulario.Fecha < DateOnly.FromDateTime(DateTime.Today))
+        {
+            mensaje = "La fecha no puede ser anterior a hoy.";
+            return;
+        }
+
+        var partes = franjaSeleccionada.Split('|');
+
+        if (partes.Length != 2 ||
+            !TimeOnly.TryParse(partes[0], out var desde) ||
+            !TimeOnly.TryParse(partes[1], out var hasta))
+        {
+            mensaje = "Seleccioná una franja horaria válida.";
+            return;
+        }
+
+        if (!FranjasDisponibles.Any(f =>
+            f.HoraDesde == desde &&
+            f.HoraHasta == hasta))
+        {
+            mensaje = "La franja no está disponible para esta zona.";
+            return;
+        }
+
+        if (ZonasCompatibles.Count != 1)
+        {
+            mensaje = "No se pudo identificar una única zona de cobertura.";
+            return;
+        }
+
+        if (formulario.Bultos.Count == 0)
+        {
+            mensaje = "Agregá al menos un bulto.";
+            return;
+        }
+
+        if (formulario.Bultos.Any(b =>
+            string.IsNullOrWhiteSpace(b.Identificacion) ||
+            b.PesoKg <= 0 ||
+            b.PesoKg > 1000 ||
+            b.AltoCm < 1 || b.AltoCm > 500 ||
+            b.AnchoCm < 1 || b.AnchoCm > 500 ||
+            b.ProfundidadCm < 1 || b.ProfundidadCm > 500))
+        {
+            mensaje = "Revisá la identificación, el peso y las dimensiones de los bultos.";
+            return;
+        }
+
+        if (formulario.Bultos
+            .GroupBy(b => b.Identificacion.Trim(),
+                StringComparer.OrdinalIgnoreCase)
+            .Any(g => g.Count() > 1))
+        {
+            mensaje = "Las identificaciones de los bultos no pueden repetirse.";
+            return;
+        }
+
+        procesando = true;
+
+        try
+        {
+            var datos = new
+            {
+                formulario.CuentaComercialId,
+                Motivo = formulario.Motivo.Trim(),
+                formulario.DomicilioRetiro,
+                formulario.DomicilioDestino,
+                formulario.Fecha,
+                HoraDesde = desde,
+                HoraHasta = hasta,
+                formulario.Bultos
+            };
+
+            var resultado = await JS.InvokeAsync<ResultadoRetiro>(
+                "autenticacionPortal.crearRetiro",
+                datos);
+
+            exito = resultado.Exito;
+
+            mensaje = string.IsNullOrWhiteSpace(resultado.Mensaje)
+                ? (exito
+                    ? "Retiro solicitado correctamente."
+                    : "No se pudo solicitar el retiro.")
+                : resultado.Mensaje;
+        }
+        catch (Exception ex)
+        {
+            exito = false;
+            mensaje = $"Error al solicitar el retiro: {ex.Message}";
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+
+    private static bool DireccionCompleta(DireccionFormulario d)
+    {
+        return !string.IsNullOrWhiteSpace(d.Calle)
+            && !string.IsNullOrWhiteSpace(d.Numero)
+            && !string.IsNullOrWhiteSpace(d.Localidad)
+            && !string.IsNullOrWhiteSpace(d.Departamento);
+    }
+
+    public class FormularioRetiro
+    {
+        public Guid CuentaComercialId { get; set; }
+
+        public string Motivo { get; set; } = "";
+
+        public DireccionFormulario DomicilioRetiro { get; set; } = new();
+
+        public DireccionFormulario DomicilioDestino { get; set; } = new();
+
+        public DateOnly Fecha { get; set; } =
+            DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+
+        public List<BultoFormulario> Bultos { get; set; } =
+            new() { new BultoFormulario() };
+    }
+
+    public class DireccionFormulario
+    {
+        public string Calle { get; set; } = "";
+        public string Numero { get; set; } = "";
+        public string Localidad { get; set; } = "";
+        public string Departamento { get; set; } = "";
+    }
+
+    public class BultoFormulario
+    {
+        public string Identificacion { get; set; } = "";
+        public decimal PesoKg { get; set; } = 1;
+        public int AltoCm { get; set; } = 1;
+        public int AnchoCm { get; set; } = 1;
+        public int ProfundidadCm { get; set; } = 1;
+    }
+
+    public class CuentaOpcion
+    {
+        public Guid Id { get; set; }
+        public Guid OperadorId { get; set; }
+        public string OperadorNombre { get; set; } = "";
+        public Guid ComercioId { get; set; }
+        public string ComercioNombre { get; set; } = "";
+        public bool Activa { get; set; }
+        public int Estado { get; set; }
+    }
+
+    public class ZonaRetiroDto
+    {
+        public Guid Id { get; set; }
+        public string Nombre { get; set; } = "";
+        public string Departamento { get; set; } = "";
+        public List<LocalidadZonaDto> Localidades { get; set; } = new();
+        public List<FranjaZonaDto> Franjas { get; set; } = new();
+    }
+
+    public class LocalidadZonaDto
+    {
+        public string Nombre { get; set; } = "";
+        public string? Sector { get; set; }
+    }
+
+    public class FranjaZonaDto
+    {
+        public TimeOnly HoraDesde { get; set; }
+        public TimeOnly HoraHasta { get; set; }
+    }
+
+    public class ResultadoRetiro
+    {
+        public bool Exito { get; set; }
+        public string Mensaje { get; set; } = "";
+    }
+}

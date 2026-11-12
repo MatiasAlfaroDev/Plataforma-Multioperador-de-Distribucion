@@ -1,0 +1,243 @@
+
+@page "{id:guid}"
+@model UltimaMilla.Web.Backoffice.Pages.DetalleRetiroModel
+@using UltimaMilla.Web.Backoffice.Services
+
+@{
+    ViewData["Title"] = "Detalle de retiro";
+}
+
+<div class="encabezado">
+    <div>
+        <a asp-page="/Retiros">Volver a retiros</a>
+        <h1>Detalle de retiro</h1>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.MensajeExito))
+{
+    <div class="aviso" role="status">
+        @Model.MensajeExito
+    </div>
+}
+
+@if (Model.Error is not null)
+{
+    <div class="aviso error" role="alert">
+        @Model.Error
+    </div>
+}
+
+@if (Model.Retiro is { } retiro)
+{
+    <h2>Información general</h2>
+
+    <div class="tabla">
+        <table>
+            <tbody>
+                <tr>
+                    <th>Identificador</th>
+                    <td class="codigo">@retiro.Id</td>
+                </tr>
+                <tr>
+                    <th>Estado</th>
+                    <td>@DetalleRetiroModel.NombreEstado(retiro.Estado)</td>
+                </tr>
+                <tr>
+                    <th>Motivo</th>
+                    <td>@retiro.Motivo</td>
+                </tr>
+                <tr>
+                    <th>Fecha de solicitud</th>
+                    <td>@Formato.Hora(retiro.SolicitadoEn)</td>
+                </tr>
+                <tr>
+                    <th>Fecha del retiro</th>
+                    <td>@retiro.FechaSolicitada.ToString("dd/MM/yyyy")</td>
+                </tr>
+                <tr>
+                    <th>Franja horaria</th>
+                    <td>
+                        @retiro.HoraDesde.ToString("HH:mm")
+                        -
+                        @retiro.HoraHasta.ToString("HH:mm")
+                    </td>
+                </tr>
+                <tr>
+                    <th>Domicilio de retiro</th>
+                    <td>@DetalleRetiroModel.Direccion(retiro.DomicilioRetiro)</td>
+                </tr>
+                <tr>
+                    <th>Domicilio de destino</th>
+                    <td>@DetalleRetiroModel.Direccion(retiro.DomicilioDestino)</td>
+                </tr>
+                <tr>
+                    <th>Peso total</th>
+                    <td>@retiro.PesoTotalKg.ToString("N2") kg</td>
+                </tr>
+                <tr>
+                    <th>Volumen total</th>
+                    <td>@retiro.VolumenTotalMetrosCubicos.ToString("N4") m³</td>
+                </tr>
+                <tr>
+                    <th>Tarifa</th>
+                    <td>
+                        @(retiro.TarifaCalculada.HasValue
+                            ? $"$ {retiro.TarifaCalculada.Value:N2}"
+                            : "Sin calcular")
+                    </td>
+                </tr>
+
+                @if (retiro.HojaDeRutaId.HasValue)
+                {
+                    <tr>
+                        <th>Hoja de ruta</th>
+                        <td>@retiro.HojaDeRutaId</td>
+                    </tr>
+                }
+
+                @if (retiro.RetiradoEn.HasValue)
+                {
+                    <tr>
+                        <th>Retirado el</th>
+                        <td>@Formato.Hora(retiro.RetiradoEn.Value)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Bultos del retiro</h2>
+
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>Identificación</th>
+                    <th>Peso (kg)</th>
+                    <th>Dimensiones (cm)</th>
+                    <th>Volumen (m³)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var bulto in retiro.Bultos)
+                {
+                    <tr>
+                        <td class="codigo">@bulto.Identificacion</td>
+                        <td>@bulto.PesoKg.ToString("N2")</td>
+                        <td>
+                            @bulto.AltoCm ×
+                            @bulto.AnchoCm ×
+                            @bulto.ProfundidadCm
+                        </td>
+                        <td>@bulto.VolumenMetrosCubicos.ToString("N4")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Acciones disponibles</h2>
+
+    @if (retiro.Estado == "Solicitado")
+    {
+        <section class="mt-6">
+            <h3>Asignar a hoja de ruta</h3>
+
+            <p class="nota">
+                Este retiro está pendiente de planificación.
+                Debe asignarse a una hoja de ruta del operador.
+            </p>
+
+            <a asp-page="/HojasDeRuta"
+               class="primario inline-block">
+                Ir a hojas de ruta
+            </a>
+        </section>
+    }
+    else if (retiro.Estado == "AsignadoARuta")
+    {
+        <section class="mt-6">
+            <h3>Retiro asignado</h3>
+
+            <p class="nota">
+                El retiro ya está asignado a una hoja de ruta.
+                La ejecución se registra desde la aplicación
+                del repartidor.
+            </p>
+
+            <a asp-page="/HojasDeRuta">
+                Consultar hojas de ruta
+            </a>
+        </section>
+    }
+    else if (retiro.Estado == "Retirado")
+    {
+        <section class="mt-6">
+            <h3>Recibir en depósito</h3>
+
+            <p class="nota">
+                Confirmá esta operación cuando los bultos
+                hayan llegado físicamente al depósito.
+            </p>
+
+            <form method="post"
+                  asp-page-handler="RecibirDeposito"
+                  asp-route-id="@retiro.Id"
+                  onsubmit="return confirm('¿Confirmás que el retiro fue recibido en depósito?');">
+
+                @Html.AntiForgeryToken()
+
+                <button type="submit" class="primario">
+                    Confirmar recepción en depósito
+                </button>
+            </form>
+        </section>
+    }
+    else if (retiro.Estado == "NoRetirado")
+    {
+        <section class="mt-6">
+            <h3>Retiro no realizado</h3>
+
+            <p class="nota">
+                El repartidor registró que no pudo realizar
+                el retiro. Es necesario gestionar una nueva
+                programación antes de continuar.
+            </p>
+        </section>
+    }
+    else if (retiro.Estado == "EnDeposito")
+    {
+        <section class="mt-6">
+            <h3>Entregar al comercio</h3>
+
+            <p class="nota">
+                Confirmá la entrega únicamente cuando los
+                bultos hayan sido entregados al comercio.
+                Si existe una hoja de ruta de entrega,
+                deberá estar despachada.
+            </p>
+
+            <form method="post"
+                  asp-page-handler="EntregarComercio"
+                  asp-route-id="@retiro.Id"
+                  onsubmit="return confirm('¿Confirmás la entrega del retiro al comercio?');">
+
+                @Html.AntiForgeryToken()
+
+                <button type="submit" class="primario">
+                    Confirmar entrega al comercio
+                </button>
+            </form>
+        </section>
+    }
+    else if (retiro.Estado == "EntregadoAlComercio")
+    {
+        <section class="mt-6">
+            <p class="nota">
+                El retiro fue entregado al comercio.
+                No quedan acciones pendientes.
+            </p>
+        </section>
+    }
+}

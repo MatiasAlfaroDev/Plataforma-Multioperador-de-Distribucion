@@ -63,6 +63,10 @@ else
                 href="@($"/?cuentaComercialId={cuenta.Id}")">
                     Crear envío
                 </a>
+                <a href="@($"/nuevo-retiro?cuentaComercialId={cuenta.Id}")"
+                class="btn btn-primary">
+                    Crear retiro
+                </a>
             }
             else if (cuenta.Estado == EstadoVinculacion.Pendiente)
             {

@@ -1,3 +1,4 @@
+
 @page
 @model UltimaMilla.Web.Backoffice.Pages.HojasDeRutaModel
 
@@ -8,20 +9,23 @@
 <div class="encabezado">
     <div>
         <h1>Hojas de ruta</h1>
-        <p>Seleccioná los envíos, el repartidor y el vehículo. El sistema comprobará las restricciones y calculará el orden de las paradas.</p>
+        <p>
+            Planificá envíos y retiros seleccionando el repartidor,
+            el vehículo y las operaciones que se incluirán en la ruta.
+        </p>
     </div>
 </div>
 
 @if (TempData["Exito"] is string exito)
 {
-    <div class="aviso ok">
+    <div class="aviso ok" role="status">
         @exito
     </div>
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.Error))
 {
-    <div class="aviso error">
+    <div class="aviso error" role="alert">
         @Model.Error
     </div>
 }
@@ -30,54 +34,48 @@
     Los datos corresponden al operador de tu sesión.
 </p>
 
-@if (Model.OperadorIdSesion != Guid.Empty){
+@if (Model.OperadorIdSesion != Guid.Empty)
+{
     <h2>Crear hoja de ruta</h2>
 
     <form method="post">
+        @Html.AntiForgeryToken()
 
         <div asp-validation-summary="All"
              class="error mb-3"></div>
 
-
-        <!-- Fecha de reparto -->
         <div class="mb-3">
             <label asp-for="Formulario.Fecha">
                 Fecha de reparto
             </label>
 
             <input asp-for="Formulario.Fecha"
-                   type="date"
-                   />
+                   type="date" />
 
             <small class="nota">
-                Día en que se realizará el reparto.
+                Día en que se realizará la ruta.
             </small>
         </div>
 
-        <!-- Hora de salida -->
         <div class="mb-3">
             <label asp-for="Formulario.HoraSalida">
                 Hora de salida
             </label>
 
             <input asp-for="Formulario.HoraSalida"
-                   type="time"
-                   />
+                   type="time" />
 
             <small class="nota">
                 Hora prevista de salida del repartidor.
             </small>
         </div>
 
-        <!-- Franja horaria -->
         <div class="mb-3">
             <label asp-for="Formulario.FranjaSeleccionada">
                 Franja horaria de entrega
             </label>
 
-            <select asp-for="Formulario.FranjaSeleccionada"
-                   >
-
+            <select asp-for="Formulario.FranjaSeleccionada">
                 <option value="">
                     Seleccionar franja
                 </option>
@@ -99,20 +97,17 @@
                   class="error"></span>
 
             <small class="nota">
-                Se utilizará para validar los horarios
-                de los envíos seleccionados.
+                La API validará la compatibilidad de horarios
+                de las operaciones seleccionadas.
             </small>
         </div>
 
-        <!-- Repartidor -->
         <div class="mb-3">
             <label asp-for="Formulario.RepartidorId">
                 Repartidor
             </label>
 
-            <select asp-for="Formulario.RepartidorId"
-                   >
-
+            <select asp-for="Formulario.RepartidorId">
                 <option value="">
                     Seleccionar repartidor
                 </option>
@@ -126,15 +121,12 @@
             </select>
         </div>
 
-        <!-- Vehículo -->
         <div class="mb-3">
             <label asp-for="Formulario.VehiculoId">
                 Vehículo
             </label>
 
-            <select asp-for="Formulario.VehiculoId"
-                   >
-
+            <select asp-for="Formulario.VehiculoId">
                 <option value="">
                     Seleccionar vehículo
                 </option>
@@ -150,7 +142,6 @@
             </select>
         </div>
 
-        <!-- Máximo de paradas -->
         <div class="mb-3">
             <label asp-for="Formulario.MaximoParadas">
                 Máximo de paradas
@@ -159,14 +150,12 @@
             <input asp-for="Formulario.MaximoParadas"
                    type="number"
                    min="1"
-                   max="200"
-                   />
+                   max="200" />
 
             <span asp-validation-for="Formulario.MaximoParadas"
                   class="error"></span>
         </div>
 
-        <!-- Selección de envíos -->
         <h3>Envíos disponibles</h3>
 
         <p class="nota">
@@ -178,13 +167,15 @@
         {
             <div class="aviso">
                 <i class="ph ph-info"></i>
-                <p>No hay envíos en depósito para este operador.</p>
+                <p>
+                    No hay envíos disponibles para este operador.
+                </p>
             </div>
         }
         else
         {
             <div class="tabla">
-                <table class="table">
+                <table>
                     <thead>
                         <tr>
                             <th>Seleccionar</th>
@@ -192,7 +183,6 @@
                             <th>Localidad</th>
                             <th>Peso</th>
                             <th>Compromiso actual</th>
-                            <th>Acciones</th>
                         </tr>
                     </thead>
 
@@ -242,16 +232,104 @@
             </div>
         }
 
-        <button type="submit"
-                class="btn-primario"
-                disabled="@(Model.Envios.Count == 0)">
-            Crear y asignar hoja de ruta
-        </button>
+        <h3 class="mt-6">Retiros disponibles</h3>
+
+        <p class="nota">
+            Seleccioná los retiros solicitados por los comercios.
+            Solo aparecen los que todavía no fueron asignados
+            a una hoja de ruta.
+        </p>
+
+        @if (Model.Retiros.Count == 0)
+        {
+            <div class="aviso">
+                <i class="ph ph-info"></i>
+                <p>
+                    No hay retiros pendientes de asignación.
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="tabla">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Motivo</th>
+                            <th>Domicilio de retiro</th>
+                            <th>Fecha</th>
+                            <th>Franja</th>
+                            <th>Peso (kg)</th>
+                            <th>Bultos</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var retiro in Model.Retiros)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox"
+                                           name="Formulario.RetirosIds"
+                                           value="@retiro.Id"
+                                           checked="@(Model.Formulario.RetirosIds.Contains(retiro.Id))" />
+                                </td>
+
+                                <td>
+                                    @retiro.Motivo
+                                </td>
+
+                                <td>
+                                    @retiro.DomicilioRetiro.Calle
+                                    @retiro.DomicilioRetiro.Numero,
+                                    @retiro.DomicilioRetiro.Localidad
+                                </td>
+
+                                <td>
+                                    @retiro.FechaSolicitada.ToString("dd/MM/yyyy")
+                                </td>
+
+                                <td>
+                                    @retiro.HoraDesde.ToString("HH:mm")
+                                    -
+                                    @retiro.HoraHasta.ToString("HH:mm")
+                                </td>
+
+                                <td class="num">
+                                    @retiro.PesoTotalKg.ToString("N2")
+                                </td>
+
+                                <td class="num">
+                                    @retiro.Bultos.Count
+                                </td>
+
+                                <td>
+                                    <a asp-page="/DetalleRetiro"
+                                       asp-route-id="@retiro.Id"
+                                       class="btn-secundario py-1.5 text-sm">
+                                        Ver detalle
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <div class="mt-6">
+            <button type="submit"
+                    class="btn-primario"
+                    disabled="@(Model.Envios.Count == 0 && Model.Retiros.Count == 0)">
+                Crear y asignar hoja de ruta
+            </button>
+        </div>
     </form>
 
     <hr class="my-4" />
 
-    <!-- Listado de hojas de ruta -->
     <h2>Hojas de ruta creadas</h2>
 
     @if (Model.Hojas.Count == 0)
@@ -263,7 +341,7 @@
     else
     {
         <div class="tabla">
-            <table class="table">
+            <table>
                 <thead>
                     <tr>
                         <th>Fecha</th>
@@ -271,6 +349,7 @@
                         <th>Paradas</th>
                         <th>Peso asignado</th>
                         <th>Identificador</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
 
@@ -278,19 +357,28 @@
                     @foreach (var hoja in Model.Hojas)
                     {
                         <tr>
-                            <td>@hoja.Fecha</td>
-
                             <td>
-                                @(hoja.HoraSalida?.ToString("HH:mm") ?? "Sin definir")
+                                @hoja.Fecha.ToString("dd/MM/yyyy")
                             </td>
 
-                            <td class="num">@hoja.CantidadParadas</td>
+                            <td>
+                                @(hoja.HoraSalida?.ToString("HH:mm")
+                                    ?? "Sin definir")
+                            </td>
 
-                            <td class="num">@hoja.PesoAsignadoKg kg</td>
+                            <td class="num">
+                                @hoja.CantidadParadas
+                            </td>
 
-                            <td class="codigo">@hoja.Id</td>
+                            <td class="num">
+                                @hoja.PesoAsignadoKg kg
+                            </td>
 
-                           <td>
+                            <td class="codigo">
+                                @hoja.Id
+                            </td>
+
+                            <td>
                                 @if (hoja.Despachada)
                                 {
                                     <span class="estado-despachada">
@@ -300,8 +388,8 @@
                                 else
                                 {
                                     <form method="post"
-                                        asp-page-handler="Despachar"
-                                        asp-route-hojaId="@hoja.Id">
+                                          asp-page-handler="Despachar"
+                                          asp-route-hojaId="@hoja.Id">
 
                                         @Html.AntiForgeryToken()
 
@@ -317,53 +405,61 @@
                     }
                 </tbody>
             </table>
-
-            <dialog id="confirmarDespacho" class="modal-despacho">
-    <h2>Confirmar despacho</h2>
-
-    <p>
-        ¿Confirmás que querés despachar esta hoja de ruta?
-    </p>
-
-    <p class="nota">
-        Los envíos asignados pasarán al estado En tránsito.
-    </p>
-
-    <div class="acciones-modal">
-        <button type="button"
-                class="btn-secundario"
-                onclick="cerrarConfirmacionDespacho()">
-            Cancelar
-        </button>
-
-        <button type="button"
-                class="btn-primario"
-                onclick="confirmarDespacho()">
-            Confirmar despacho
-        </button>
-    </div>
-</dialog>
-
-<script>
-    let formularioDespacho = null;
-
-    function abrirConfirmacionDespacho(boton) {
-        formularioDespacho = boton.closest("form");
-
-        document.getElementById("confirmarDespacho").showModal();
-    }
-
-    function cerrarConfirmacionDespacho() {
-        document.getElementById("confirmarDespacho").close();
-        formularioDespacho = null;
-    }
-
-    function confirmarDespacho() {
-        if (formularioDespacho) {
-            formularioDespacho.requestSubmit();
-        }
-    }
-</script>
         </div>
+
+        <dialog id="confirmarDespacho"
+                class="modal-despacho">
+
+            <h2>Confirmar despacho</h2>
+
+            <p>
+                ¿Confirmás que querés despachar esta hoja de ruta?
+            </p>
+
+            <p class="nota">
+                La API verificará las condiciones de despacho
+                de las operaciones asignadas.
+            </p>
+
+            <div class="acciones-modal">
+                <button type="button"
+                        class="btn-secundario"
+                        onclick="cerrarConfirmacionDespacho()">
+                    Cancelar
+                </button>
+
+                <button type="button"
+                        class="btn-primario"
+                        onclick="confirmarDespacho()">
+                    Confirmar despacho
+                </button>
+            </div>
+        </dialog>
+
+        <script>
+            let formularioDespacho = null;
+
+            function abrirConfirmacionDespacho(boton) {
+                formularioDespacho = boton.closest("form");
+
+                document.getElementById(
+                    "confirmarDespacho"
+                ).showModal();
+            }
+
+            function cerrarConfirmacionDespacho() {
+                document.getElementById(
+                    "confirmarDespacho"
+                ).close();
+
+                formularioDespacho = null;
+            }
+
+            function confirmarDespacho() {
+                if (formularioDespacho) {
+                    formularioDespacho.requestSubmit();
+                }
+            }
+        </script>
     }
 }
