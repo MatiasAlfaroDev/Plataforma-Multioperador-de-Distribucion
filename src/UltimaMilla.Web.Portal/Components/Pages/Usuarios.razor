@@ -78,7 +78,35 @@
     </form>
 </div>
 
+<div class="tarjeta">
+    <h2>Integración por API</h2>
+    <p class="nota">
+        Tu sistema puede solicitar envíos y retiros llamando a <code>POST /api/envios</code> y <code>POST /api/retiros</code>
+        con el encabezado <code>X-Api-Key</code>. La clave actúa con tu usuario y se muestra una sola vez;
+        generar otra invalida la anterior.
+    </p>
+    @if (claveApi is not null)
+    {
+        <p><code>@claveApi</code></p>
+    }
+    <button @onclick="GenerarClaveAsync"><i class="ph ph-key"></i>Generar clave de API</button>
+</div>
+
 @code {
+    private string? claveApi;
+
+    private async Task GenerarClaveAsync()
+    {
+        try
+        {
+            claveApi = await JS.InvokeAsync<string>("retirosPortal.generarClaveApi");
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
     private List<UsuarioDto> usuarios = new();
     private string nombre = "", email = "", password = "", perfil = "Comercio";
     private string? error, mensaje;

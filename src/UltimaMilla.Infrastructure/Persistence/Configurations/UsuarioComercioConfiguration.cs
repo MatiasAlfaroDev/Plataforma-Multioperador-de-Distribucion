@@ -34,5 +34,8 @@ public sealed class UsuarioComercioConfiguration
             x.UsuarioId,
             x.ComercioId
         }).IsUnique();
+
+        builder.Property(x => x.ClaveApiHash).HasMaxLength(64);
+        builder.HasIndex(x => x.ClaveApiHash).IsUnique();
     }
 }
