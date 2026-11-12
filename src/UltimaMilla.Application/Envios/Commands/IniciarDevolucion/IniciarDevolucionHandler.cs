@@ -37,9 +37,7 @@ public sealed class IniciarDevolucionHandler(
                 "Debe iniciar sesión y seleccionar un operador.");
         }
 
-        if (tenantContext.Perfil is not (
-            Perfiles.AdministradorOperador or
-            Perfiles.Operador))
+        if (!Perfiles.Despacho.Contains(tenantContext.Perfil))
         {
             throw new UnauthorizedAccessException(
                 "No tiene permisos para iniciar devoluciones.");

@@ -18,11 +18,11 @@ public sealed class EventosDeEstadoInterceptor(IServiceProvider servicios) : Sav
     {
         if (eventData.Context is not null)
         {
-            var entries = eventData.Context.ChangeTracker.Entries<EventoEnvio>()
-                .Where(e => e.State == EntityState.Added)
-                .ToList();
+            var hayEventos =
+                eventData.Context.ChangeTracker.Entries<EventoEnvio>().Any(e => e.State == EntityState.Added) ||
+                eventData.Context.ChangeTracker.Entries<EventoBulto>().Any(e => e.State == EntityState.Added);
 
-            if (entries.Count > 0)
+            if (hayEventos)
                 throw new InvalidOperationException("Usar SaveChangesAsync: publicar en el outbox es asíncrono.");
         }
 
@@ -56,6 +56,32 @@ public sealed class EventosDeEstadoInterceptor(IServiceProvider servicios) : Sav
                     e.OperadorId,
                     e.EstadoAnterior,
                     e.EstadoNuevo,
+                    e.OcurridoEn),
+                    cancellationToken);
+            }
+        }
+
+        // RF 31 y 36: lo mismo para cada cambio de bulto.
+        var eventosBulto = context.ChangeTracker.Entries<EventoBulto>()
+            .Where(e => e.State == EntityState.Added)
+            .Select(e => e.Entity)
+            .ToList();
+
+        if (eventosBulto.Count > 0)
+        {
+            var publicador = servicios.GetRequiredService<IPublishEndpoint>();
+
+            foreach (var e in eventosBulto)
+            {
+                await publicador.Publish(new EstadoBultoCambiado(
+                    e.Id,
+                    e.EnvioId,
+                    e.OperadorId,
+                    e.Identificacion,
+                    e.EstadoAnterior,
+                    e.EstadoNuevo,
+                    e.Resultado,
+                    e.Motivo,
                     e.OcurridoEn),
                     cancellationToken);
             }

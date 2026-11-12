@@ -809,6 +809,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OperadorId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("RecargoNuevasVisitas")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<string>("ReferenciaExterna")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -855,6 +859,56 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperadorId", "FechaAlta");
 
                     b.ToTable("envios", (string)null);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.EventoBulto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BultoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EstadoAnterior")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("EstadoNuevo")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Identificacion")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Motivo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("OcurridoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Resultado")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId");
+
+                    b.HasIndex("OperadorId", "EnvioId", "OcurridoEn");
+
+                    b.ToTable("eventos_bulto", (string)null);
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Envios.EventoEnvio", b =>
@@ -2063,6 +2117,15 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.EventoBulto", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Envios.Envio", null)
+                        .WithMany("EventosBulto")
+                        .HasForeignKey("EnvioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("UltimaMilla.Domain.Envios.EventoEnvio", b =>
                 {
                     b.HasOne("UltimaMilla.Domain.Envios.Envio", null)
@@ -2425,6 +2488,8 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Navigation("Bultos");
 
                     b.Navigation("Eventos");
+
+                    b.Navigation("EventosBulto");
 
                     b.Navigation("Intentos");
                 });

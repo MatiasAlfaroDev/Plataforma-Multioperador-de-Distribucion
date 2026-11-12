@@ -40,11 +40,7 @@ public sealed class CrearEnvioHandler(
 
 await validator.ValidateAndThrowAsync(command, ct);
 
-if (tenantContext.Perfil is not (
-    Perfiles.AdministradorOperador or
-    Perfiles.Operador or
-    Perfiles.AdministradorComercio or
-    Perfiles.Comercio))
+if (!Perfiles.DespachoYComercio.Contains(tenantContext.Perfil))
 {
     throw new UnauthorizedAccessException(
         "Su perfil no tiene permisos para crear envíos.");

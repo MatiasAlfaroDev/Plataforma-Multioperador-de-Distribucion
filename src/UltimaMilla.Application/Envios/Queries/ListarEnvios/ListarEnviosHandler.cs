@@ -24,8 +24,7 @@ public sealed class ListarEnviosHandler(
 
         var perfil = tenantContext.Perfil;
 
-        var esOperador = perfil is
-            Perfiles.AdministradorOperador or Perfiles.Operador;
+        var esOperador = Perfiles.PersonalOperador.Contains(perfil);
 
         var esComercio = perfil is
             Perfiles.AdministradorComercio or Perfiles.Comercio;

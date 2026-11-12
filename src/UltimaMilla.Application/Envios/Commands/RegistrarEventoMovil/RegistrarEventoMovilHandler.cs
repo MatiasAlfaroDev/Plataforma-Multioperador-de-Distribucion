@@ -144,36 +144,63 @@ public sealed class RegistrarEventoMovilHandler(
                 command.Latitud.Value,
                 command.Longitud.Value);
 
-            var resultadosNoEntregados =
-                new List<(Guid BultoId, MotivoNoEntrega Motivo, string Evidencia)>();
+            // RF 31: el resultado de la visita se deriva de los bultos escaneados, no de lo que diga la app.
+            // Si informa más bultos que los pendientes hay conflicto: lo detalla la validación de la entrega parcial.
+            var resultadoVisita = command.BultosEntregados.Count <= envio.BultosPendientes
+                ? MaquinaEstadosBulto.ResultadoDeVisita(envio.BultosPendientes, command.BultosEntregados.Count)
+                : DisparadorEnvio.RegistrarEntregaParcial;
 
-            foreach (var resultado in command.BultosNoEntregados)
+            if (resultadoVisita == DisparadorEnvio.Entregar)
             {
-                var motivo = await motivos.ObtenerPorDescripcionAsync(
-                    envio.OperadorId,
-                    versionReglasId,
-                    resultado.Motivo,
-                    ct)
-                    ?? throw new NoEncontradoException(
-                        $"El motivo '{resultado.Motivo}' no existe en el catálogo del operador.");
-
-                resultadosNoEntregados.Add((
-                    resultado.BultoId,
-                    motivo,
-                    resultado.Evidencia));
+                envio.Aplicar(
+                    DisparadorEnvio.Entregar,
+                    reglas,
+                    ocurridoEn,
+                    "Mobile",
+                    "Mobile",
+                    pruebaEntrega: prueba,
+                    latitud: command.Latitud,
+                    longitud: command.Longitud);
             }
+            else
+            {
+                // RF 33: cada operador decide si admite la entrega parcial. 400 y no 409: la app trata el 409
+                // como "ya estaba" y descartaría el evento sin avisarle al repartidor.
+                if (!reglas.AdmiteEntregaParcial)
+                    throw new InvalidOperationException(
+                        "Las reglas del operador no admiten entregas parciales: registrá la visita como no entregada.");
 
-            envio.Aplicar(
-                DisparadorEnvio.RegistrarEntregaParcial,
-                reglas,
-                ocurridoEn,
-                "Mobile",
-                "Mobile",
-                pruebaEntrega: prueba,
-                bultosEntregados: command.BultosEntregados,
-                bultosNoEntregados: resultadosNoEntregados,
-                latitud: command.Latitud,
-                longitud: command.Longitud);
+                var resultadosNoEntregados =
+                    new List<(Guid BultoId, MotivoNoEntrega Motivo, string Evidencia)>();
+
+                foreach (var resultado in command.BultosNoEntregados)
+                {
+                    var motivo = await motivos.ObtenerPorDescripcionAsync(
+                        envio.OperadorId,
+                        versionReglasId,
+                        resultado.Motivo,
+                        ct)
+                        ?? throw new NoEncontradoException(
+                            $"El motivo '{resultado.Motivo}' no existe en el catálogo del operador.");
+
+                    resultadosNoEntregados.Add((
+                        resultado.BultoId,
+                        motivo,
+                        resultado.Evidencia));
+                }
+
+                envio.Aplicar(
+                    DisparadorEnvio.RegistrarEntregaParcial,
+                    reglas,
+                    ocurridoEn,
+                    "Mobile",
+                    "Mobile",
+                    pruebaEntrega: prueba,
+                    bultosEntregados: command.BultosEntregados,
+                    bultosNoEntregados: resultadosNoEntregados,
+                    latitud: command.Latitud,
+                    longitud: command.Longitud);
+            }
         }
 
         else if (tipo == TipoEventoMovil.NoEntregado)

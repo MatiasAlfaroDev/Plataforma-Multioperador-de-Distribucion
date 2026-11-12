@@ -27,7 +27,7 @@ public sealed class ListarCuentasComercialesHandler(
     }
 
     if (tenant.OperadorId.HasValue &&
-        tenant.Perfil is Perfiles.AdministradorOperador or "Operador")
+        Perfiles.PersonalOperador.Contains(tenant.Perfil))
     {
         return cuentas.ListarResumenAsync(
             tenant.OperadorId.Value,

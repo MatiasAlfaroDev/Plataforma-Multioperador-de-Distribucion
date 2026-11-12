@@ -1,5 +1,6 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
+using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Application.Seguridad;
 
@@ -8,6 +9,7 @@ namespace UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 public sealed class RetornarADepositoHandler(
     IEnvioRepository envios,
     IVersionReglasOperativasRepository reglasRepository,
+    IVersionTarifariaRepository tarifas,
     IUnitOfWork unitOfWork,
     TimeProvider reloj,
     ITenantContext tenantContext)
@@ -68,9 +70,7 @@ public sealed class RetornarADepositoHandler(
                 "Debe iniciar sesión y seleccionar un operador.");
         }
 
-        if (tenantContext.Perfil is not (
-            Perfiles.AdministradorOperador or
-            Perfiles.Operador))
+        if (!Perfiles.Deposito.Contains(tenantContext.Perfil))
         {
             throw new UnauthorizedAccessException(
                 "No tiene permisos para registrar retornos al depósito.");
@@ -94,12 +94,36 @@ public sealed class RetornarADepositoHandler(
             ?? throw new NoEncontradoException(
                 "No se encontraron las reglas operativas del envío.");
 
+        var ahora = reloj.GetUtcNow();
+        var veniaDeEntregaParcial = envio.Estado == EstadoEnvio.EntregadoParcialmente;
+
         envio.Aplicar(
             DisparadorEnvio.RetornarADeposito,
             reglas,
-            reloj.GetUtcNow(),
+            ahora,
             "Deposito",
             command.Responsable.Trim());
+
+        // RF 33 y 34: los bultos pendientes de una entrega parcial siguen lo que digan las reglas del operador,
+        // sin esperar una decisión manual. Una nueva visita los deja Reprogramado, listos para otra hoja de ruta.
+        if (veniaDeEntregaParcial)
+        {
+            if (reglas.AccionBultosPendientes == AccionBultosPendientes.NuevaVisita && envio.AdmiteNuevaVisita(reglas))
+            {
+                envio.Aplicar(DisparadorEnvio.Reprogramar, reglas, ahora, "Sistema", "Reglas operativas");
+
+                if (reglas.NuevaVisitaConRecargo)
+                {
+                    // ponytail: el recargo es el precio base vigente de la zona; un importe propio en las reglas si hace falta.
+                    var tarifa = await tarifas.ObtenerVigenteAsync(envio.OperadorId, envio.Direccion.Departamento, ahora, ct);
+                    envio.AgregarRecargoNuevaVisita(tarifa?.PrecioBase ?? 0);
+                }
+            }
+            else if (envio.PuedeIniciarDevolucion(reglas))
+            {
+                envio.Aplicar(DisparadorEnvio.IniciarDevolucion, reglas, ahora, "Sistema", "Reglas operativas");
+            }
+        }
 
         await unitOfWork.GuardarCambiosAsync(ct);
     }
