@@ -10,6 +10,7 @@ public sealed class SuscripcionAvisoConfiguration : IEntityTypeConfiguration<Sus
     public void Configure(EntityTypeBuilder<SuscripcionAviso> builder)
     {
         builder.ToTable("suscripciones_aviso");
+        builder.Property(s => s.VersionContrato).HasDefaultValue(1);
         builder.HasKey(s => s.Id);
 
         builder.Property(s => s.Url)

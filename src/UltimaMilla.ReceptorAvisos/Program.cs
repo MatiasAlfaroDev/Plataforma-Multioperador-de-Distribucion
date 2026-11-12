@@ -17,14 +17,18 @@ var app = builder.Build();
 var secreto = app.Configuration["Receptor:Secreto"] ?? throw new InvalidOperationException("Falta Receptor:Secreto.");
 var estado = new EstadoReceptor(app.Configuration["Receptor:Modo"] ?? "ok");
 
-app.MapPost("/avisos", async (HttpRequest request) =>
+// RF 36: /avisos recibe el contrato v1 (el de siempre) y /avisos/v2 el que agrega los bultos.
+app.MapPost("/avisos", (HttpRequest request) => RecibirAsync(request, "v1"));
+app.MapPost("/avisos/v2", (HttpRequest request) => RecibirAsync(request, "v2"));
+
+async Task<IResult> RecibirAsync(HttpRequest request, string contrato)
 {
     using var lector = new StreamReader(request.Body);
     var cuerpo = await lector.ReadToEndAsync();
 
     var firma = request.Headers["X-UltimaMilla-Firma"].ToString();
     var entrega = request.Headers["X-UltimaMilla-Entrega"].ToString();
-    var evento = request.Headers["X-UltimaMilla-Evento"].ToString();
+    var evento = $"{request.Headers["X-UltimaMilla-Evento"]} ({contrato})";
 
     var esperada = "sha256=" + Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secreto), Encoding.UTF8.GetBytes(cuerpo))).ToLowerInvariant();
 
@@ -54,7 +58,7 @@ app.MapPost("/avisos", async (HttpRequest request) =>
     var duplicado = !estado.MarcarRecibido(entrega);
     estado.Registrar(entrega, evento, duplicado ? "200 (duplicado, ignorado)" : $"200 (intento {intento})", cuerpo);
     return Results.Ok();
-});
+}
 
 app.MapPost("/modo/{modo}", (string modo) =>
 {
