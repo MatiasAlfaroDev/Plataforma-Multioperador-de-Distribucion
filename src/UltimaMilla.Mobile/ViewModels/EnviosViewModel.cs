@@ -15,14 +15,28 @@ namespace UltimaMilla.Mobile.ViewModels;
 /// </summary>
 public partial class EnviosViewModel : ObservableObject, IQueryAttributable
 {
-    // Provisorio: en el diseño el catálogo de motivos lo define cada operador (VersionReglas).
-    private static readonly string[] MotivosNoEntrega =
+    // RF 32: el catálogo lo define cada operador; se descarga con la ruta y se guarda en el teléfono.
+    // Estos solo se usan si nunca se pudo descargar (primera vez sin señal).
+    private static readonly string[] MotivosPorDefecto =
     [
         "Destinatario ausente",
         "Dirección incorrecta o inexistente",
         "Rechazado por el destinatario",
         "Zona inaccesible"
     ];
+
+    private static string ClaveMotivos(Guid operadorId) => $"motivos-no-entrega-{operadorId}";
+
+    private string[] MotivosNoEntrega
+    {
+        get
+        {
+            var guardados = Operador is null ? null : Preferences.Get(ClaveMotivos(Operador.Id), null);
+            return string.IsNullOrEmpty(guardados)
+                ? MotivosPorDefecto
+                : System.Text.Json.JsonSerializer.Deserialize<string[]>(guardados) ?? MotivosPorDefecto;
+        }
+    }
 
     private readonly IEnviosApi _api;
     private readonly RutaRepository _ruta;
@@ -207,6 +221,10 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
                     // solo los que coinciden con el operador de la pantalla: la app nunca mezcla operadores.
                     var descargados = await _api.ListarEnviosAsync(Operador.Id);
                     await _ruta.GuardarRutaAsync(Operador.Id, descargados.Where(e => e.OperadorId == Operador.Id));
+
+                    var motivos = await _api.ListarMotivosNoEntregaAsync();
+                    if (motivos.Count > 0)
+                        Preferences.Set(ClaveMotivos(Operador.Id), System.Text.Json.JsonSerializer.Serialize(motivos));
                     Aviso = $"Ruta descargada a las {DateTime.Now:HH:mm}.";
                 }
                 catch (RutaNoDisponibleException ex)
