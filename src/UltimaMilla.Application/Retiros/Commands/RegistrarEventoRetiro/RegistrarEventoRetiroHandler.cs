@@ -81,6 +81,11 @@ public sealed class RegistrarEventoRetiroHandler(
 
         var tipo = command.Tipo?.Trim();
 
+        var identificacionesInformadas = command.IdentificacionesBultos
+            ?? command.IdsBultos?
+                .Select(id => retiro.Bultos.FirstOrDefault(b => b.Id == id)?.Identificacion ?? id.ToString())
+                .ToList();
+
         if (tipo != "Retirado" && tipo != "NoRetirado")
             throw new ArgumentException(
                 "El tipo debe ser Retirado o NoRetirado.");
@@ -88,7 +93,7 @@ public sealed class RegistrarEventoRetiroHandler(
         if (tipo == "Retirado")
         {
             var identificaciones =
-                command.IdentificacionesBultos?
+                identificacionesInformadas?
                     .Select(x => x?.Trim())
                     .ToArray();
 
@@ -121,7 +126,7 @@ public sealed class RegistrarEventoRetiroHandler(
             tipo,
             command.FechaHora,
             reloj.GetUtcNow(),
-            command.IdentificacionesBultos,
+            identificacionesInformadas,
             command.ReferenciaFotografia,
             command.ReferenciaFirma,
             command.MotivoFallo);
