@@ -16,7 +16,9 @@ public sealed record SeguimientoPublicoDto(
     TimeOnly? HoraEntregaHasta,
     DateTimeOffset? FechaReprogramada,
     string? FranjaReprogramada,
-    IReadOnlyList<MovimientoSeguimientoDto> Historial);
+    IReadOnlyList<MovimientoSeguimientoDto> Historial,
+    int BultosTotales = 0,
+    int BultosEntregados = 0);
 
 public sealed class SeguimientoApiClient(HttpClient http)
 {

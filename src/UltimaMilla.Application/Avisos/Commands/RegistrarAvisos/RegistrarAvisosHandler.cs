@@ -3,6 +3,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Avisos.Eventos;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Avisos;
+using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Application.Avisos.Commands.RegistrarAvisos;
 
@@ -32,14 +33,7 @@ public sealed class RegistrarAvisosHandler(
             if (await entregas.ExisteAsync(s.Id, command.ClaveEvento, ct))
                 continue;
 
-            var cuerpo = JsonSerializer.Serialize(new
-            {
-                tipo = command.TipoEvento,
-                envioId = envio.Id,
-                referenciaExterna = envio.ReferenciaExterna,
-                estado = envio.Estado.ToString(),
-                ocurridoEn = command.OcurridoEn
-            }, OpcionesJson);
+            var cuerpo = CuerpoDelAviso(s.VersionContrato, command, envio);
 
             var entrega = EntregaAviso.Crear(s, command.TipoEvento, command.ClaveEvento, cuerpo);
             await entregas.AgregarAsync(entrega, ct);
@@ -53,5 +47,45 @@ public sealed class RegistrarAvisosHandler(
             await unitOfWork.GuardarCambiosAsync(ct);
 
         return creados;
+    }
+
+    /// <summary>
+    /// RF 36: el contrato se versiona por suscripción. La v1 no cambia (los comercios ya la consumen);
+    /// la v2 agrega la versión, el estado de cada bulto y, en los avisos de bulto, el bulto que cambió.
+    /// </summary>
+    public static string CuerpoDelAviso(int versionContrato, RegistrarAvisosCommand command, Envio envio)
+    {
+        if (versionContrato < 2)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                tipo = command.TipoEvento,
+                envioId = envio.Id,
+                referenciaExterna = envio.ReferenciaExterna,
+                estado = envio.Estado.ToString(),
+                ocurridoEn = command.OcurridoEn
+            }, OpcionesJson);
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            version = 2,
+            tipo = command.TipoEvento,
+            envioId = envio.Id,
+            referenciaExterna = envio.ReferenciaExterna,
+            estado = envio.Estado.ToString(),
+            ocurridoEn = command.OcurridoEn,
+            bultos = new
+            {
+                total = envio.CantidadBultos,
+                entregados = envio.BultosEntregados,
+                detalle = envio.Bultos
+                    .OrderBy(b => b.Identificacion)
+                    .Select(b => new { identificacion = b.Identificacion, estado = b.Estado.ToString() })
+            },
+            bulto = command.Bulto is { } b
+                ? new { identificacion = b.Identificacion, estadoAnterior = b.EstadoAnterior, estadoNuevo = b.EstadoNuevo, motivo = b.Motivo }
+                : null
+        }, OpcionesJson);
     }
 }

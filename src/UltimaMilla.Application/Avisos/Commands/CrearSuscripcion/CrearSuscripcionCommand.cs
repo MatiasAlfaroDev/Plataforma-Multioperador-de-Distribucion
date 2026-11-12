@@ -9,4 +9,5 @@ namespace UltimaMilla.Application.Avisos.Commands.CrearSuscripcion;
 public sealed record CrearSuscripcionCommand(
     Guid? CuentaComercialId,
     string Url,
-    IReadOnlyList<string> TiposEvento);
+    IReadOnlyList<string> TiposEvento,
+    int VersionContrato = 1);

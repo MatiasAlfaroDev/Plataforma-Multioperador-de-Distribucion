@@ -59,6 +59,8 @@ public sealed class ConsultarSeguimientoPublicoHandler(
             envio.HoraEntregaHasta,
             envio.FechaReprogramada,
             envio.FranjaReprogramada,
-            historial);
+            historial,
+            envio.CantidadBultos,
+            envio.BultosEntregados);
     }
 }

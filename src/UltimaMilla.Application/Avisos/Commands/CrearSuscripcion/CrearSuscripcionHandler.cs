@@ -40,7 +40,7 @@ public sealed class CrearSuscripcionHandler(
 
         // El secreto lo genera la plataforma: con él el comercio verifica la firma de cada aviso.
         var secreto = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
-        var s = SuscripcionAviso.Crear(operadorId, cuentaId, command.Url, secreto, command.TiposEvento);
+        var s = SuscripcionAviso.Crear(operadorId, cuentaId, command.Url, secreto, command.TiposEvento, command.VersionContrato);
         await suscripciones.AgregarAsync(s, ct);
         await unitOfWork.GuardarCambiosAsync(ct);
 

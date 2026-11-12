@@ -13,4 +13,7 @@ public sealed record SeguimientoPublicoDto(
     TimeOnly? HoraEntregaHasta,
     DateTimeOffset? FechaReprogramada,
     string? FranjaReprogramada,
-    IReadOnlyList<MovimientoSeguimientoDto> Historial);
+    IReadOnlyList<MovimientoSeguimientoDto> Historial,
+    // RF 35: avance de la entrega ("2 de 3 bultos") sin identificadores internos.
+    int BultosTotales = 0,
+    int BultosEntregados = 0);
