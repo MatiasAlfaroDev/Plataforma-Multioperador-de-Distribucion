@@ -3,6 +3,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Domain.Organizacion;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Infrastructure.Repositories;
 
@@ -53,9 +54,14 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
             .AsSplitQuery()
             .Include(e => e.Bultos)
             .Include(e => e.Intentos)
-            .Where(e => e.OperadorId == operadorId &&
+            .Where(e =>
+                e.OperadorId == operadorId &&
                 (e.Estado == EstadoEnvio.EnDeposito ||
-                e.Estado == EstadoEnvio.Reprogramado))
+                e.Estado == EstadoEnvio.Reprogramado ||
+                e.Estado == EstadoEnvio.EnDevolucion) &&
+                !db.Set<ParadaRuta>().Any(p =>
+                    p.EnvioId == e.Id &&
+                    p.LiberadaEn == null))
             .OrderByDescending(e => e.FechaAlta)
             .ToListAsync(ct);
     }

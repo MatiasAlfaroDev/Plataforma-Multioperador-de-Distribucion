@@ -614,8 +614,13 @@ public class Envio : AuditableEntity, ITenantEntity
         {
             FechaReprogramada = null;
             FranjaReprogramada = null;
-        }
 
+            // Se elimina el compromiso anterior.
+            // La nueva fecha se establecerá al planificar otra ruta.
+            FechaEntregaComprometida = null;
+            HoraEntregaDesde = null;
+            HoraEntregaHasta = null;
+        }
         _eventos.Add(evento);
     }
 

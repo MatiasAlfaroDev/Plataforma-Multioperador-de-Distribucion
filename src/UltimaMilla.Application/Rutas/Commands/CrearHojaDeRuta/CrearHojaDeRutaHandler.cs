@@ -4,6 +4,7 @@ using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Retiros;
 using UltimaMilla.Domain.Rutas;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 
@@ -77,10 +78,6 @@ public sealed class CrearHojaDeRutaHandler(
             throw new ArgumentException(
                 "La franja de entrega no es válida.");
         }
-
-        if (enviosIds.Count + retirosIds.Count == 0)
-            throw new ArgumentException(
-                "Seleccioná al menos una entrega o un retiro.");
 
         if (enviosIds.Any(id => id == Guid.Empty) ||
             enviosIds.Distinct().Count() != enviosIds.Count)
@@ -277,15 +274,28 @@ public sealed class CrearHojaDeRutaHandler(
                 throw new InvalidOperationException(
                     "El envío no está en devolución.");
 
+            var hojaActiva = await hojas.ObtenerPorEnvioActivoAsync(
+                command.OperadorId,
+                envio.Id,
+                ct);
+
+            if (hojaActiva is not null)
+                throw new InvalidOperationException(
+                    "La devolución ya está asignada a una hoja de ruta.");
+
             var cuenta = await cuentas.ObtenerAsync(
                 envio.CuentaComercialId, ct)
                 ?? throw new InvalidOperationException(
                     "La cuenta comercial no existe.");
 
             if (cuenta.OperadorId != command.OperadorId ||
-                cuenta.Id != envio.CuentaComercialId)
+                cuenta.Id != envio.CuentaComercialId ||
+                !cuenta.Activa ||
+                cuenta.Estado != EstadoCuentaComercial.Confirmada)
+            {
                 throw new InvalidOperationException(
-                    "La cuenta comercial no corresponde al operador.");
+                    "La cuenta comercial no está habilitada para recibir devoluciones.");
+            }
 
             var direccion = cuenta.DireccionRecepcion
                 ?? throw new InvalidOperationException(
@@ -313,6 +323,15 @@ public sealed class CrearHojaDeRutaHandler(
             if (retiro.Estado != EstadoRetiro.EnDeposito)
                 throw new InvalidOperationException(
                     "El retiro todavía no está disponible para entregar al comercio.");
+
+            var hojaActiva = await hojas.ObtenerPorRetiroEnEntregaActivoAsync(
+                command.OperadorId,
+                retiro.Id,
+                ct);
+
+            if (hojaActiva is not null)
+                throw new InvalidOperationException(
+                    "La entrega del retiro ya está asignada a una hoja de ruta.");
 
             var zona = ObtenerZona(
                 retiro.DomicilioDestino.Localidad);
