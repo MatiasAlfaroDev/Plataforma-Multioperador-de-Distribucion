@@ -1,4 +1,5 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Domain.Configuracion;
 
 namespace UltimaMilla.Application.Configuracion.Commands.ActualizarReglasOperativas;
@@ -7,7 +8,8 @@ public sealed class ActualizarReglasOperativasHandler(
     IVersionReglasOperativasRepository reglas,
     IMotivoNoEntregaRepository motivosRepository,
     IUnitOfWork unitOfWork,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICacheService cache)
 {
     public async Task<Guid> Handle(
         ActualizarReglasOperativasCommand command,
@@ -86,6 +88,8 @@ public sealed class ActualizarReglasOperativasHandler(
 
             nuevaVersionId = nuevaVersion.Id;
         }, ct);
+
+        await cache.EliminarAsync(ClavesCache.ReglasVigentes(command.OperadorId), ct);
 
         return nuevaVersionId;
     }

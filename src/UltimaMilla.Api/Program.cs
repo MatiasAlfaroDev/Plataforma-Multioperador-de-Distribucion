@@ -179,8 +179,11 @@ if (!soloInicializar)
         ?? throw new InvalidOperationException(
             "No se configuró ConnectionStrings:Redis.");
 
-    var redis = await ConnectionMultiplexer.ConnectAsync(
-        redisConnectionString);
+    // Aclaración 3.1: sin Redis la API arranca igual y la caché se comporta como fallos (va a la base);
+    // se reconecta sola cuando Redis vuelve.
+    var opcionesRedis = ConfigurationOptions.Parse(redisConnectionString);
+    opcionesRedis.AbortOnConnectFail = false;
+    var redis = await ConnectionMultiplexer.ConnectAsync(opcionesRedis);
 
     builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 
@@ -216,6 +219,7 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
 }
 
 app.UseExceptionHandler();
+app.UseLimiteDeTasa();
 
 app.UseAuthentication();
 app.UseAuthorization();

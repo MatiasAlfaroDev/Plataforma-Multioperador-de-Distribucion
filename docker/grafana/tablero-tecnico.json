@@ -465,7 +465,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Redis — Historial de HIT",
+      "title": "Redis — Aciertos por caso de uso (por segundo)",
       "id": 18,
       "gridPos": {
         "x": 0,
@@ -480,8 +480,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(cache_hits_total)",
-          "legendFormat": "HIT"
+          "expr": "sum by (caso_de_uso) (rate(cache_hits_total[5m]))",
+          "legendFormat": "{{caso_de_uso}}"
         }
       ],
       "fieldConfig": {
@@ -499,7 +499,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Redis — Historial de MISS",
+      "title": "Redis — Fallos por caso de uso (por segundo)",
       "id": 19,
       "gridPos": {
         "x": 8,
@@ -514,8 +514,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(cache_misses_total)",
-          "legendFormat": "MISS"
+          "expr": "sum by (caso_de_uso) (rate(cache_misses_total[5m]))",
+          "legendFormat": "{{caso_de_uso}}"
         }
       ],
       "fieldConfig": {
@@ -533,7 +533,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Redis — Porcentaje de aciertos",
+      "title": "Redis — Porcentaje de aciertos por caso de uso",
       "id": 20,
       "gridPos": {
         "x": 16,
@@ -548,8 +548,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * sum(rate(cache_hits_total[5m])) / (sum(rate(cache_hits_total[5m])) + sum(rate(cache_misses_total[5m])))",
-          "legendFormat": "Hit Rate"
+          "expr": "100 * sum by (caso_de_uso) (rate(cache_hits_total[5m])) / (sum by (caso_de_uso) (rate(cache_hits_total[5m])) + sum by (caso_de_uso) (rate(cache_misses_total[5m])))",
+          "legendFormat": "{{caso_de_uso}}"
         }
       ],
       "fieldConfig": {

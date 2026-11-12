@@ -6,6 +6,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\UltimaMilla.Domain\UltimaMilla.Domain.csproj" />
     <ProjectReference Include="..\..\src\UltimaMilla.Application\UltimaMilla.Application.csproj" />
+    <!-- La caché en Redis (aclaración 3.1) se prueba con su implementación real. -->
+    <ProjectReference Include="..\..\src\UltimaMilla.Infrastructure\UltimaMilla.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

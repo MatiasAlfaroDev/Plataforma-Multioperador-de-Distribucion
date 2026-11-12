@@ -680,6 +680,15 @@ public class RegistrarEventoMovilHandlerTests
         return Task.CompletedTask;
     }
 
+    public Task EliminarPorPrefijoAsync(
+        string prefijo,
+        CancellationToken ct = default)
+    {
+        foreach (var clave in _datos.Keys.Where(k => k.StartsWith(prefijo)).ToList())
+            _datos.Remove(clave);
+        return Task.CompletedTask;
+    }
+
     public Task EliminarAsync(
         string clave,
         CancellationToken ct = default)

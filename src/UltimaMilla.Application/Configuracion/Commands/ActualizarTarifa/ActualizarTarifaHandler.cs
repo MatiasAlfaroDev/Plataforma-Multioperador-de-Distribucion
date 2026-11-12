@@ -1,4 +1,5 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Domain.Configuracion;
 
 namespace UltimaMilla.Application.Configuracion.Commands.ActualizarTarifa;
@@ -8,7 +9,8 @@ public sealed class ActualizarTarifaHandler(
     ICuadroTarifarioRepository cuadros,
     IZonaCoberturaRepository zonas,
     IUnitOfWork unitOfWork,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICacheService cache)
 {
     public async Task<Guid> Handle(
         ActualizarTarifaCommand command,
@@ -127,6 +129,9 @@ public sealed class ActualizarTarifaHandler(
                 nuevaVersionId = nuevaVersion.Id;
             },
             ct);
+
+        // La versión nueva pasa a ser la vigente: todas las réplicas lo ven al borrar la entrada compartida.
+        await cache.EliminarPorPrefijoAsync(ClavesCache.PrefijoTarifas(command.OperadorId), ct);
 
         return nuevaVersionId;
     }
