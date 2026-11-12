@@ -440,6 +440,14 @@ public class ExtravioYReaparicionHandlerTests
                     h.RepartidorId == repartidorId &&
                     h.Fecha == fecha)
                     .ToList());
+        
+        public Task<HojaDeRuta?> ObtenerPorRetiroEnEntregaActivoAsync(
+            Guid operadorId,
+            Guid retiroId,
+            CancellationToken ct)
+        {
+            return Task.FromResult<HojaDeRuta?>(null);
+        }
     }
 
     private sealed class ReglasEnMemoria(

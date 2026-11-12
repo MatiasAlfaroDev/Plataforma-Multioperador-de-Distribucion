@@ -13,10 +13,21 @@ public sealed record RetiroParaPlanificar(
     Retiro Retiro,
     ZonaCobertura Zona);
 
+public sealed record DevolucionParaPlanificar(
+    Envio Envio,
+    ZonaCobertura Zona,
+    Direccion DireccionDestino);
+
+public sealed record EntregaRetiroParaPlanificar(
+    Retiro Retiro,
+    ZonaCobertura Zona);
+
 public enum TipoOperacionRuta
 {
     Entrega,
-    Retiro
+    Retiro,
+    DevolucionComercio,
+    EntregaRetiroComercio
 }
 
 public sealed record HorarioOperacionRuta(
@@ -59,7 +70,11 @@ public static class PlanificacionHojaDeRuta
     public static IReadOnlyList<HorarioOperacionRuta> Calcular(
         HojaDeRuta ruta,
         IReadOnlyList<EnvioParaPlanificar> envios,
-        IReadOnlyList<RetiroParaPlanificar> retiros)
+        IReadOnlyList<RetiroParaPlanificar> retiros,
+        IReadOnlyList<DevolucionParaPlanificar>? devoluciones = null,
+        IReadOnlyList<EntregaRetiroParaPlanificar>? entregasRetiros = null,
+        TimeOnly? horaEntregaDesde = null,
+        TimeOnly? horaEntregaHasta = null)
     {
         ArgumentNullException.ThrowIfNull(ruta);
         ArgumentNullException.ThrowIfNull(envios);
@@ -70,6 +85,18 @@ public static class PlanificacionHojaDeRuta
         if (ruta.HoraSalida is null)
             throw new InvalidOperationException(
                 "La hoja debe tener hora de salida.");
+        
+        devoluciones ??= [];
+        entregasRetiros ??= [];
+
+        if ((devoluciones.Count > 0 || entregasRetiros.Count > 0) &&
+            (horaEntregaDesde is null ||
+            horaEntregaHasta is null ||
+            horaEntregaDesde >= horaEntregaHasta))
+        {
+            throw new ArgumentException(
+                "Las entregas al comercio requieren una franja válida.");
+        }
 
         var operaciones = new List<Operacion>();
 
@@ -188,6 +215,96 @@ public static class PlanificacionHojaDeRuta
                 retiro.VolumenTotalMetrosCubicos));
         }
 
+        foreach (var item in devoluciones)
+        {
+            if (item is null ||
+                item.Envio is null ||
+                item.Zona is null ||
+                item.DireccionDestino is null)
+                throw new ArgumentException(
+                    "Hay devoluciones inválidas.");
+
+            var envio = item.Envio;
+            var zona = item.Zona;
+
+            if (envio.OperadorId != ruta.OperadorId)
+                throw new InvalidOperationException(
+                    "La devolución pertenece a otro operador.");
+
+            if (envio.Estado != EstadoEnvio.EnDevolucion)
+                throw new InvalidOperationException(
+                    "El envío no está en devolución.");
+
+            ValidarZona(
+                ruta,
+                zona,
+                item.DireccionDestino.Localidad);
+
+            ValidarFranja(
+                zona,
+                horaEntregaDesde!.Value,
+                horaEntregaHasta!.Value);
+
+            var bultos = envio.Bultos
+                .Where(b => b.Estado == EstadoBulto.EnDevolucion)
+                .ToList();
+
+            if (bultos.Count == 0)
+                throw new InvalidOperationException(
+                    "La devolución no tiene bultos pendientes.");
+
+            operaciones.Add(new Operacion(
+                envio.Id,
+                TipoOperacionRuta.DevolucionComercio,
+                horaEntregaDesde.Value,
+                horaEntregaHasta.Value,
+                zona.MinutosTrasladoEstimado!.Value,
+                item.DireccionDestino.Localidad,
+                bultos.Sum(b => b.PesoKg),
+                bultos.Sum(b => b.VolumenMetrosCubicos)));
+        }
+
+        foreach (var item in entregasRetiros)
+        {
+            if (item is null ||
+                item.Retiro is null ||
+                item.Zona is null)
+                throw new ArgumentException(
+                    "Hay entregas de retiros inválidas.");
+
+            var retiro = item.Retiro;
+            var zona = item.Zona;
+
+            if (retiro.OperadorId != ruta.OperadorId)
+                throw new InvalidOperationException(
+                    "El retiro pertenece a otro operador.");
+
+            if (retiro.Estado != EstadoRetiro.EnDeposito)
+                throw new InvalidOperationException(
+                    "El retiro todavía no está en depósito.");
+
+            ValidarZona(
+                ruta,
+                zona,
+                retiro.DomicilioDestino.Localidad);
+
+            ValidarFranja(
+                zona,
+                horaEntregaDesde!.Value,
+                horaEntregaHasta!.Value);
+
+            operaciones.Add(new Operacion(
+                retiro.Id,
+                TipoOperacionRuta.EntregaRetiroComercio,
+                horaEntregaDesde.Value,
+                horaEntregaHasta.Value,
+                zona.MinutosTrasladoEstimado!.Value,
+                retiro.DomicilioDestino.Localidad,
+                retiro.PesoTotalKg,
+                retiro.VolumenTotalMetrosCubicos));
+        }
+
+
         if (operaciones.Count == 0)
             throw new InvalidOperationException(
                 "La ruta debe tener al menos una operación.");
@@ -197,19 +314,22 @@ public static class PlanificacionHojaDeRuta
                 "Se supera el máximo de paradas.");
 
         // Los identificadores de las operaciones deben ser únicos.
-        if (operaciones.Select(x => x.Id).Distinct().Count()
-            != operaciones.Count)
+        if (operaciones
+            .Select(x => (x.Tipo, x.Id))
+            .Distinct()
+            .Count() != operaciones.Count)
+        {
             throw new InvalidOperationException(
                 "Hay operaciones repetidas en la ruta.");
+        }
 
-        // No se pueden omitir paradas activas.
+        // No se pueden omitir paradas activas.  
         foreach (var parada in ruta.Paradas.Where(p => p.Activa))
         {
-            bool incluida = operaciones.Any(x =>
-                (x.Tipo == TipoOperacionRuta.Entrega &&
-                 parada.EnvioId == x.Id) ||
-                (x.Tipo == TipoOperacionRuta.Retiro &&
-                 parada.RetiroId == x.Id));
+            var incluida = operaciones.Any(x =>
+                x.Tipo == parada.TipoOperacion &&
+                (parada.EnvioId == x.Id ||
+                parada.RetiroId == x.Id));
 
             if (!incluida)
                 throw new InvalidOperationException(
@@ -218,11 +338,11 @@ public static class PlanificacionHojaDeRuta
 
         // La carga inicial corresponde solamente a las entregas.
         decimal pesoActual = operaciones
-            .Where(x => x.Tipo == TipoOperacionRuta.Entrega)
+            .Where(x => x.Tipo != TipoOperacionRuta.Retiro)
             .Sum(x => x.PesoKg);
 
         decimal volumenActual = operaciones
-            .Where(x => x.Tipo == TipoOperacionRuta.Entrega)
+            .Where(x => x.Tipo != TipoOperacionRuta.Retiro)
             .Sum(x => x.VolumenM3);
 
         ValidarCapacidad(ruta, pesoActual, volumenActual);
@@ -255,7 +375,7 @@ public static class PlanificacionHojaDeRuta
             var operacion = ordenadas[i];
             var horario = horarios[i];
 
-            if (operacion.Tipo == TipoOperacionRuta.Entrega)
+            if (operacion.Tipo != TipoOperacionRuta.Retiro)
             {
                 pesoActual -= operacion.PesoKg;
                 volumenActual -= operacion.VolumenM3;

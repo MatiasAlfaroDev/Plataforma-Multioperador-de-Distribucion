@@ -38,6 +38,31 @@ public sealed class CuentaComercialConfiguration : IEntityTypeConfiguration<Cuen
         builder.HasOne<Operador>().WithMany().HasForeignKey(c => c.OperadorId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Comercio>().WithMany().HasForeignKey(c => c.ComercioId).OnDelete(DeleteBehavior.Restrict);
 
+        builder.OwnsOne(c => c.DireccionRecepcion, d =>
+        {
+            d.Property(x => x.Calle)
+                .HasColumnName("recepcion_calle")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            d.Property(x => x.Numero)
+                .HasColumnName("recepcion_numero")
+                .HasMaxLength(20);
+
+            d.Property(x => x.Localidad)
+                .HasColumnName("recepcion_localidad")
+                .HasMaxLength(100)
+                .IsRequired();
+
+            d.Property(x => x.Departamento)
+                .HasColumnName("recepcion_departamento")
+                .HasMaxLength(50)
+                .IsRequired();
+        });
+
+        builder.Navigation(c => c.DireccionRecepcion)
+            .IsRequired(false);
+
         // Un comercio tiene una sola cuenta con cada operador.
         builder.HasIndex(c => new { c.OperadorId, c.ComercioId }).IsUnique();
     }

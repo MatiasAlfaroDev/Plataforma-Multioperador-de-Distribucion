@@ -10,4 +10,6 @@ public sealed record CrearHojaDeRutaCommand(
     TimeOnly HoraEntregaHasta,
     int MaximoParadas,
     IReadOnlyList<Guid> EnviosIds,
-    IReadOnlyList<Guid>? RetirosIds = null);
+    IReadOnlyList<Guid>? RetirosIds = null,
+    IReadOnlyList<Guid>? DevolucionesIds = null,
+    IReadOnlyList<Guid>? EntregasRetirosIds = null);

@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Antiforgery;
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
 using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Commands.ConfigurarDireccionRecepcion;
+using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerDireccionRecepcion;
 
 namespace UltimaMilla.Api.Endpoints;
 
@@ -158,6 +161,86 @@ public static class VinculacionesComercialesEndpoints
         }
     });
 
+
+    grupo.MapPut("/{id:guid}/direccion-recepcion", async (
+        Guid id,
+        ConfigurarDireccionRecepcionRequest request,
+        ConfigurarDireccionRecepcionHandler handler,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido.");
+        }
+
+        try
+        {
+            await handler.Handle(
+                new ConfigurarDireccionRecepcionCommand(
+                    id,
+                    request.Calle,
+                    request.Numero,
+                    request.Localidad,
+                    request.Departamento),
+                ct);
+
+            return Results.Ok(new
+            {
+                Mensaje = "Dirección de recepción actualizada correctamente."
+            });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
+        catch (NoEncontradoException ex)
+        {
+            return Results.NotFound(new { mensaje = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { mensaje = ex.Message });
+        }
+    });
+
+
+    grupo.MapGet("/{id:guid}/direccion-recepcion", async (
+        Guid id,
+        ObtenerDireccionRecepcionHandler handler,
+        CancellationToken ct) =>
+    {
+        try
+        {
+            var direccion = await handler.Handle(
+                new ObtenerDireccionRecepcionQuery(id),
+                ct);
+
+            return Results.Ok(direccion);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
+        catch (NoEncontradoException ex)
+        {
+            return Results.NotFound(new { mensaje = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { mensaje = ex.Message });
+        }
+    });
+
         return app;
     }
 }
+
+public sealed record ConfigurarDireccionRecepcionRequest(
+    string Calle,
+    string Numero,
+    string Localidad,
+    string Departamento);

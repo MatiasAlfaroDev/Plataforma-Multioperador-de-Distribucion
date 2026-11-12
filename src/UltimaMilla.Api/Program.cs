@@ -1350,7 +1350,9 @@ api.MapPost("/hojas-de-ruta", async (
             request.HoraEntregaHasta,
             request.MaximoParadas,
             request.EnviosIds ?? [],
-            request.RetirosIds ?? []),
+            request.RetirosIds ?? [],
+            request.DevolucionesIds ?? [],
+            request.EntregasRetirosIds ?? []),
         ct);
 
     return Results.Created(
@@ -1720,4 +1722,4 @@ public sealed record IniciarDevolucionRequest( string Responsable);
 public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);
 
 public sealed record AgregarRetiroARutaRequest(Guid RetiroId);
-public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId, DateOnly Fecha, TimeOnly HoraSalida, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta, int MaximoParadas, IReadOnlyList<Guid>? EnviosIds, IReadOnlyList<Guid>? RetirosIds = null);
+public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId, DateOnly Fecha, TimeOnly HoraSalida, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta,  int MaximoParadas, IReadOnlyList<Guid>? EnviosIds, IReadOnlyList<Guid>? RetirosIds = null, IReadOnlyList<Guid>? DevolucionesIds = null, IReadOnlyList<Guid>? EntregasRetirosIds = null);

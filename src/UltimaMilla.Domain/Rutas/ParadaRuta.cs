@@ -15,9 +15,14 @@ public sealed class ParadaRuta : AuditableEntity
 
     public bool Activa => LiberadaEn is null;
 
-    public bool EsEntrega => EnvioId.HasValue;
-    public bool EsRetiro => RetiroId.HasValue;
+    public bool EsEntrega =>
+        TipoOperacion is TipoOperacionRuta.Entrega
+            or TipoOperacionRuta.DevolucionComercio
+            or TipoOperacionRuta.EntregaRetiroComercio;
 
+    public bool EsRetiro =>
+        TipoOperacion == TipoOperacionRuta.Retiro;
+    public TipoOperacionRuta TipoOperacion { get; private set; }
     private ParadaRuta() { }
 
     // Conserva la creación utilizada por las entregas existentes.
@@ -34,7 +39,8 @@ public sealed class ParadaRuta : AuditableEntity
             HojaDeRutaId = hojaDeRutaId,
             EnvioId = envioId,
             RetiroId = null,
-            Orden = orden
+            Orden = orden,
+            TipoOperacion = TipoOperacionRuta.Entrega,
         };
     }
 
@@ -51,7 +57,44 @@ public sealed class ParadaRuta : AuditableEntity
             HojaDeRutaId = hojaDeRutaId,
             EnvioId = null,
             RetiroId = retiroId,
-            Orden = orden
+            Orden = orden,
+            TipoOperacion = TipoOperacionRuta.Retiro
+        };
+    }
+
+    internal static ParadaRuta CrearDevolucionComercio(
+        Guid hojaDeRutaId,
+        Guid envioId,
+        int orden)
+    {
+        ValidarDatos(hojaDeRutaId, envioId, orden);
+
+        return new ParadaRuta
+        {
+            Id = Guid.NewGuid(),
+            HojaDeRutaId = hojaDeRutaId,
+            EnvioId = envioId,
+            RetiroId = null,
+            Orden = orden,
+            TipoOperacion = TipoOperacionRuta.DevolucionComercio
+        };
+    }
+
+    internal static ParadaRuta CrearEntregaRetiroComercio(
+        Guid hojaDeRutaId,
+        Guid retiroId,
+        int orden)
+    {
+        ValidarDatos(hojaDeRutaId, retiroId, orden);
+
+        return new ParadaRuta
+        {
+            Id = Guid.NewGuid(),
+            HojaDeRutaId = hojaDeRutaId,
+            EnvioId = null,
+            RetiroId = retiroId,
+            Orden = orden,
+            TipoOperacion = TipoOperacionRuta.EntregaRetiroComercio
         };
     }
 

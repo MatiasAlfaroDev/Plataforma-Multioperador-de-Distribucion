@@ -3,6 +3,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Domain.Rutas;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
@@ -17,7 +18,8 @@ public sealed class ConfirmarDevolucionHandler(
     ITenantContext tenantContext,
     IOperadorActivo operadorActivo,
     TimeProvider reloj,
-    ICacheService cache)
+    ICacheService cache,
+    IHojaDeRutaRepository hojas)
 {
     public async Task Handle(
         ConfirmarDevolucionCommand command,
@@ -89,6 +91,36 @@ public sealed class ConfirmarDevolucionHandler(
             throw new InvalidOperationException(
                 "El envío no está en proceso de devolución.");
 
+        var hojaActiva = await hojas.ObtenerPorEnvioActivoAsync(
+            envio.OperadorId,
+            envio.Id,
+            ct);
+
+        if (hojaActiva is not null)
+        {
+            var parada = hojaActiva.Paradas.SingleOrDefault(p =>
+                p.Activa && p.EnvioId == envio.Id);
+
+            if (parada?.TipoOperacion !=
+                TipoOperacionRuta.DevolucionComercio)
+            {
+                throw new InvalidOperationException(
+                    "El envío tiene una parada activa de otro tipo.");
+            }
+
+            if (hojaActiva.Estado != EstadoHojaDeRuta.Despachada)
+            {
+                throw new InvalidOperationException(
+                    "La hoja de ruta todavía no fue despachada.");
+            }
+
+            if (modalidad != ModalidadDevolucion.EntregaDirecta)
+            {
+                throw new InvalidOperationException(
+                    "La devolución en ruta debe confirmarse como entrega directa.");
+            }
+        }
+
         var esperados = envio.Bultos
             .Where(b => b.Estado == EstadoBulto.EnDevolucion)
             .Select(b => b.Identificacion)
@@ -136,6 +168,13 @@ public sealed class ConfirmarDevolucionHandler(
             receptorDevolucion: command.Receptor.Trim(),
             referenciaConstanciaDevolucion:
                 command.ReferenciaConstancia.Trim());
+        
+        if (hojaActiva is not null)
+        {
+            hojaActiva.FinalizarParada(
+                envio,
+                reloj.GetUtcNow());
+        }
 
         await unitOfWork.GuardarCambiosAsync(ct);
 

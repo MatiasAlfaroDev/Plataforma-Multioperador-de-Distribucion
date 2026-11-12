@@ -1609,6 +1609,11 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("RetiroId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("TipoOperacion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EnvioId")
@@ -2139,6 +2144,45 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OperadorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.OwnsOne("UltimaMilla.Domain.Envios.Direccion", "DireccionRecepcion", b1 =>
+                        {
+                            b1.Property<Guid>("CuentaComercialId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Calle")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("recepcion_calle");
+
+                            b1.Property<string>("Departamento")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("character varying(50)")
+                                .HasColumnName("recepcion_departamento");
+
+                            b1.Property<string>("Localidad")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("recepcion_localidad");
+
+                            b1.Property<string>("Numero")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
+                                .HasColumnName("recepcion_numero");
+
+                            b1.HasKey("CuentaComercialId");
+
+                            b1.ToTable("cuentas_comerciales");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CuentaComercialId");
+                        });
+
+                    b.Navigation("DireccionRecepcion");
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Organizacion.Repartidor", b =>

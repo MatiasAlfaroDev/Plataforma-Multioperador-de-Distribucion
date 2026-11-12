@@ -193,5 +193,10 @@ public sealed class ParadaRutaConfiguration
             .IsUnique()
             .HasFilter(
                 "\"RetiroId\" IS NOT NULL AND \"liberada_en\" IS NULL");
+
+        builder.Property(x => x.TipoOperacion)
+            .HasConversion<string>()
+            .HasMaxLength(40)
+            .IsRequired();
     }
 }

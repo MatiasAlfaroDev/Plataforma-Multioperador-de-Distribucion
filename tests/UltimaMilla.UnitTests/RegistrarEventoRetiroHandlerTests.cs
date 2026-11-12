@@ -298,6 +298,14 @@ public sealed class RegistrarEventoRetiroHandlerTests
                 h.OperadorId == operadorId &&
                 h.Paradas.Any(p =>
                     p.EnvioId == envioId && p.Activa)));
+
+        public Task<HojaDeRuta?> ObtenerPorRetiroEnEntregaActivoAsync(
+            Guid operadorId,
+            Guid retiroId,
+            CancellationToken ct)
+        {
+            return Task.FromResult<HojaDeRuta?>(null);
+        }
     }
 
     private sealed class RepartidoresEnMemoria

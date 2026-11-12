@@ -56,6 +56,7 @@ public class MisHojasDeRutaTests
             new HojasEnMemoria(_hojas),
             new EnviosEnMemoria(_envios),
             new RetirosEnMemoria(new List<Retiro>()),
+            new CuentasEnMemoria(),
             _sesion);
 
         _despachar = new DespacharMiHojaDeRutaHandler(
@@ -305,7 +306,15 @@ public class MisHojasDeRutaTests
             Task.FromResult<IReadOnlyList<HojaDeRuta>>(lista.Where(h => h.OperadorId == operadorId).ToList());
 
         public Task<HojaDeRuta?> ObtenerPorEnvioActivoAsync( Guid operadorId, Guid envioId, CancellationToken ct) =>
-            Task.FromResult(lista.SingleOrDefault(h => h.OperadorId == operadorId && h.Paradas.Any(p => p.EnvioId == envioId && p.Activa)));
+           Task.FromResult(lista.SingleOrDefault(h => h.OperadorId == operadorId && h.Paradas.Any(p => p.EnvioId == envioId && p.Activa)));
+    
+        public Task<HojaDeRuta?> ObtenerPorRetiroEnEntregaActivoAsync(
+            Guid operadorId,
+            Guid retiroId,
+            CancellationToken ct)
+        {
+            return Task.FromResult<HojaDeRuta?>(null);
+        }
     }
 
     private sealed class ReglasEnMemoria(VersionReglasOperativas reglas) : IVersionReglasOperativasRepository
@@ -355,6 +364,43 @@ public class MisHojasDeRutaTests
     private sealed class RelojFijo(DateTimeOffset ahora) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => ahora;
+    }
+
+    private sealed class CuentasEnMemoria : ICuentaComercialRepository
+    {
+        public Task<CuentaComercial?> ObtenerAsync(
+            Guid id, CancellationToken ct) =>
+            Task.FromResult<CuentaComercial?>(null);
+
+        public Task<IReadOnlyList<UltimaMilla.Application.CuentasComerciales.CuentaComercialDto>>
+            ListarResumenAsync(
+                Guid operadorId,
+                Guid? cuentaComercialId,
+                CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task<CuentaComercial?> ObtenerPorOperadorYComercioAsync(
+            Guid operadorId,
+            Guid comercioId,
+            CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task AgregarAsync(
+            CuentaComercial cuenta,
+            CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes.SolicitudPendienteDto>>
+            ListarSolicitudesPendientesAsync(
+                Guid operadorId,
+                CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<UltimaMilla.Application.CuentasComerciales.CuentaComercialDto>>
+            ListarPorComercioAsync(
+                Guid comercioId,
+                CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 
     private sealed class EnviosEnMemoria(List<Envio> lista) : IEnvioRepository
