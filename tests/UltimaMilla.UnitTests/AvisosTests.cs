@@ -350,9 +350,9 @@ public class AvisosTests
         public Task<SuscripcionAviso?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(s => s.Id == id));
 
-        public Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(Guid? cuentaComercialId, CancellationToken ct) =>
+        public Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(IReadOnlyCollection<Guid>? cuentas, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<SuscripcionAviso>>(
-                Lista.Where(s => cuentaComercialId is null || s.CuentaComercialId == cuentaComercialId).ToList());
+                Lista.Where(s => cuentas is null || cuentas.Contains(s.CuentaComercialId)).ToList());
 
         public Task AgregarAsync(SuscripcionAviso suscripcion, CancellationToken ct)
         {
@@ -368,14 +368,17 @@ public class AvisosTests
         public Task<EntregaAviso?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(e => e.Id == id));
 
+        public Task<EntregaAviso?> ObtenerAsync(Guid id, IReadOnlyCollection<Guid>? cuentas, CancellationToken ct) =>
+            Task.FromResult(Lista.FirstOrDefault(e => e.Id == id && (cuentas is null || cuentas.Contains(e.CuentaComercialId))));
+
         public Task<bool> ExisteAsync(Guid suscripcionId, string claveEvento, CancellationToken ct) =>
             Task.FromResult(Lista.Any(e => e.SuscripcionId == suscripcionId && e.ClaveEvento == claveEvento));
 
-        public Task<IReadOnlyList<EntregaAviso>> ListarAsync(Guid? cuentaComercialId, EstadoEntregaAviso? estado, CancellationToken ct)
+        public Task<IReadOnlyList<EntregaAviso>> ListarAsync(IReadOnlyCollection<Guid>? cuentas, EstadoEntregaAviso? estado, CancellationToken ct)
         {
             var query = Lista.AsQueryable();
-            if (cuentaComercialId is not null)
-                query = query.Where(e => e.CuentaComercialId == cuentaComercialId);
+            if (cuentas is not null)
+                query = query.Where(e => cuentas.Contains(e.CuentaComercialId));
             if (estado is not null)
                 query = query.Where(e => e.Estado == estado);
 

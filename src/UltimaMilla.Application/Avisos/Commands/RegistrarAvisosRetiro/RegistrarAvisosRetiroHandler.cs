@@ -55,7 +55,7 @@ public sealed class RegistrarAvisosRetiroHandler(
                 "La clave del evento es obligatoria.");
 
         var lista = await suscripciones.ListarAsync(
-            retiro.CuentaComercialId,
+            [retiro.CuentaComercialId],
             ct);
 
         var creados = 0;

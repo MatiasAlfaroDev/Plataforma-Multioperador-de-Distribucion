@@ -24,7 +24,7 @@ public sealed class RegistrarAvisosHandler(
         var envio = await envios.ObtenerAsync(command.EnvioId, ct)
             ?? throw new NoEncontradoException("El envío no existe.");
 
-        var lista = await suscripciones.ListarAsync(envio.CuentaComercialId, ct);
+        var lista = await suscripciones.ListarAsync([envio.CuentaComercialId], ct);
         int creados = 0;
 
         foreach (var s in lista.Where(s => s.Escucha(command.TipoEvento)))
