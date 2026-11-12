@@ -152,6 +152,8 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
     public void Reprogramar()
     {
         CrearMaquina().Fire(DisparadorRetiro.Reprogramar);
+
+        HojaDeRutaId = null;
     }
 
     public void RecibirEnDeposito()

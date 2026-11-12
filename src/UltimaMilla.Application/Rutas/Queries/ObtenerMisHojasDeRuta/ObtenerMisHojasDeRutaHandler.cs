@@ -3,6 +3,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 
@@ -11,6 +12,7 @@ public sealed class ObtenerMisHojasDeRutaHandler(
     IHojaDeRutaRepository hojas,
     IEnvioRepository envios,
     IRetiroRepository retiros,
+    ICuentaComercialRepository cuentas,
     ITenantContext sesion)
 {
     public async Task<IReadOnlyList<MiHojaDeRutaDto>> Handle(
@@ -25,9 +27,8 @@ public sealed class ObtenerMisHojasDeRutaHandler(
             ?? throw new InvalidOperationException(
                 "Primero hay que elegir un operador.");
 
-        var repartidor =
-            await repartidores.ObtenerPorUsuarioAsync(
-                operadorId, usuarioId, ct)
+        var repartidor = await repartidores.ObtenerPorUsuarioAsync(
+            operadorId, usuarioId, ct)
             ?? throw new NoEncontradoException(
                 "Tu usuario no está vinculado a un repartidor de este operador.");
 
@@ -47,71 +48,126 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                 .Where(p => p.Activa)
                 .OrderBy(p => p.Orden))
             {
-                if (parada.EnvioId is Guid envioId)
+                switch (parada.TipoOperacion)
                 {
-                    var envio = await envios.ObtenerAsync(
-                        envioId, ct)
-                        ?? throw new InvalidOperationException(
-                            $"No existe el envío {envioId} de la ruta.");
-                    if (envio.OperadorId != operadorId)
-                        throw new InvalidOperationException(
-                            "La hoja contiene un envío de otro operador.");
+                    case TipoOperacionRuta.Entrega:
+                    case TipoOperacionRuta.DevolucionComercio:
+                    {
+                        var envioId = parada.EnvioId
+                            ?? throw new InvalidOperationException(
+                                "La parada no tiene envío asociado.");
 
-                    // Solo los bultos pendientes de entrega.
-                    var pendientes = envio.Bultos
-                        .Where(b => b.Estado == EstadoBulto.Pendiente)
-                        .OrderBy(b => b.Identificacion)
-                        .ToList();
+                        var envio = await envios.ObtenerAsync(envioId, ct)
+                            ?? throw new InvalidOperationException(
+                                $"No existe el envío {envioId} de la ruta.");
 
-                    paradas.Add(new MiParadaDto(
-                        parada.Orden,
-                        envio.Id,
-                        envio.ReferenciaExterna,
-                        envio.Destinatario.Nombre,
-                        envio.Destinatario.Telefono,
-                        $"{envio.Direccion.Calle} {envio.Direccion.Numero}",
-                        envio.Direccion.Localidad,
-                        envio.Estado.ToString(),
-                        pendientes
-                            .Select(b => b.Identificacion)
-                            .ToList(),
-                        pendientes
-                            .Select(b => new MiBultoDto(
+                        if (envio.OperadorId != operadorId)
+                            throw new InvalidOperationException(
+                                "La hoja contiene un envío de otro operador.");
+
+                        var esDevolucion =
+                            parada.TipoOperacion ==
+                            TipoOperacionRuta.DevolucionComercio;
+
+                        var bultos = envio.Bultos
+                            .Where(b => b.Estado ==
+                                (esDevolucion
+                                    ? EstadoBulto.EnDevolucion
+                                    : EstadoBulto.Pendiente))
+                            .OrderBy(b => b.Identificacion)
+                            .ToList();
+
+                        var direccion = envio.Direccion;
+                        var nombre = envio.Destinatario.Nombre;
+                        string? telefono = envio.Destinatario.Telefono;
+
+                        if (esDevolucion)
+                        {
+                            var cuenta = await cuentas.ObtenerAsync(
+                                envio.CuentaComercialId, ct)
+                                ?? throw new InvalidOperationException(
+                                    "No existe la cuenta comercial del envío.");
+
+                            if (cuenta.OperadorId != operadorId)
+                                throw new InvalidOperationException(
+                                    "La cuenta pertenece a otro operador.");
+
+                            direccion = cuenta.DireccionRecepcion
+                                ?? throw new InvalidOperationException(
+                                    "El comercio no tiene dirección de recepción.");
+
+                            nombre = "Devolución al comercio";
+                            telefono = null;
+                        }
+
+                        paradas.Add(new MiParadaDto(
+                            parada.Orden,
+                            envio.Id,
+                            envio.ReferenciaExterna,
+                            nombre,
+                            telefono,
+                            $"{direccion.Calle} {direccion.Numero}",
+                            direccion.Localidad,
+                            envio.Estado.ToString(),
+                            bultos.Select(b => b.Identificacion).ToList(),
+                            bultos.Select(b => new MiBultoDto(
                                 b.Id,
-                                b.Identificacion))
-                            .ToList()));
-                }
-                else if (parada.RetiroId is Guid retiroId)
-                {
-                    var retiro = await retiros.ObtenerAsync(retiroId, ct)
-                        ?? throw new InvalidOperationException(
-                            $"No existe el retiro {retiroId} de la ruta.");
+                                b.Identificacion)).ToList(),
+                            TipoOperacion: parada.TipoOperacion.ToString()));
 
-                    if (retiro.OperadorId != operadorId ||
-                        retiro.HojaDeRutaId != hoja.Id)
+                        break;
+                    }
+
+                    case TipoOperacionRuta.Retiro:
+                    case TipoOperacionRuta.EntregaRetiroComercio:
+                    {
+                        var retiroId = parada.RetiroId
+                            ?? throw new InvalidOperationException(
+                                "La parada no tiene retiro asociado.");
+
+                        var retiro = await retiros.ObtenerAsync(retiroId, ct)
+                            ?? throw new InvalidOperationException(
+                                $"No existe el retiro {retiroId} de la ruta.");
+
+                        if (retiro.OperadorId != operadorId)
+                            throw new InvalidOperationException(
+                                "La hoja contiene un retiro de otro operador.");
+
+                        var esRecogida =
+                            parada.TipoOperacion == TipoOperacionRuta.Retiro;
+
+                        if (esRecogida && retiro.HojaDeRutaId != hoja.Id)
+                            throw new InvalidOperationException(
+                                "El retiro no pertenece a esta hoja.");
+
+                        var direccion = esRecogida
+                            ? retiro.DomicilioRetiro
+                            : retiro.DomicilioDestino;
+
+                        paradas.Add(new MiParadaDto(
+                            parada.Orden,
+                            null,
+                            retiro.Id.ToString(),
+                            esRecogida
+                                ? "Retiro en domicilio"
+                                : "Entrega de retiro al comercio",
+                            null,
+                            $"{direccion.Calle} {direccion.Numero}",
+                            direccion.Localidad,
+                            retiro.Estado.ToString(),
+                            retiro.Bultos
+                                .Select(b => b.Identificacion)
+                                .OrderBy(x => x)
+                                .ToList(),
+                            RetiroId: retiro.Id,
+                            TipoOperacion: parada.TipoOperacion.ToString()));
+
+                        break;
+                    }
+
+                    default:
                         throw new InvalidOperationException(
-                            "La hoja contiene un retiro inválido.");
-
-                    paradas.Add(new MiParadaDto(
-                        parada.Orden,
-                        null,
-                        retiro.Id.ToString(),
-                        "Retiro en domicilio",
-                        null,
-                        $"{retiro.DomicilioRetiro.Calle} {retiro.DomicilioRetiro.Numero}",
-                        retiro.DomicilioRetiro.Localidad,
-                        retiro.Estado.ToString(),
-                        retiro.Bultos
-                            .Select(b => b.Identificacion)
-                            .OrderBy(x => x)
-                            .ToList(),
-                        RetiroId: retiro.Id,
-                        TipoOperacion: "Retiro"));
-                }
-                else
-                {
-                    throw new InvalidOperationException(
-                        "La hoja contiene una parada inválida.");
+                            "La hoja contiene un tipo de parada inválido.");
                 }
             }
 

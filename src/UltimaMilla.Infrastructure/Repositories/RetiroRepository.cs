@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Retiros;
 using UltimaMilla.Infrastructure.Persistence;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Infrastructure.Repositories;
 
@@ -41,6 +42,42 @@ public sealed class RetiroRepository(AppDbContext db) : IRetiroRepository
 
         return await consulta
             .OrderByDescending(r => r.SolicitadoEn)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Retiro>> ListarParaPlanificacionAsync(
+        Guid operadorId,
+        CancellationToken ct)
+    {
+        return await db.Retiros
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(r => r.Bultos)
+            .Where(r =>
+                r.OperadorId == operadorId &&
+                r.Estado == EstadoRetiro.Solicitado &&
+                r.HojaDeRutaId == null)
+            .OrderBy(r => r.FechaSolicitada)
+            .ThenBy(r => r.HoraDesde)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Retiro>> ListarParaEntregaComercioAsync(
+        Guid operadorId,
+        CancellationToken ct)
+    {
+        return await db.Retiros
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(r => r.Bultos)
+            .Where(r =>
+                r.OperadorId == operadorId &&
+                r.Estado == EstadoRetiro.EnDeposito &&
+                !db.Set<ParadaRuta>().Any(p =>
+                    p.RetiroId == r.Id &&
+                    p.LiberadaEn == null))
+            .OrderBy(r => r.FechaSolicitada)
+            .ThenBy(r => r.HoraDesde)
             .ToListAsync(ct);
     }
 }

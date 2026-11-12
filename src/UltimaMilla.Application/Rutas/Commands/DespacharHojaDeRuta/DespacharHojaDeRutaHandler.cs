@@ -4,6 +4,7 @@ using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Retiros;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 
@@ -52,65 +53,102 @@ public sealed class DespacharHojaDeRutaHandler(
         var enviosPreparados = new List<(
             Envio Envio,
             VersionReglasOperativas Reglas)>();
-
+        
         foreach (var parada in paradas)
         {
-            if (parada.EnvioId is Guid envioId)
+            switch (parada.TipoOperacion)
             {
-                var envio = await envios.ObtenerAsync(
-                    envioId, ct)
-                    ?? throw new NoEncontradoException(
-                        $"No existe el envío de la parada {parada.Id}.");
-
-                if (envio.OperadorId != command.OperadorId)
+                case TipoOperacionRuta.Entrega:
+                case TipoOperacionRuta.DevolucionComercio:
                 {
-                    throw new InvalidOperationException(
-                        "El envío pertenece a otro operador.");
+                    var envioId = parada.EnvioId
+                        ?? throw new InvalidOperationException(
+                            "La parada no tiene un envío asociado.");
+
+                    var envio = await envios.ObtenerAsync(envioId, ct)
+                        ?? throw new NoEncontradoException(
+                            $"No existe el envío de la parada {parada.Id}.");
+
+                    if (envio.OperadorId != command.OperadorId)
+                        throw new InvalidOperationException(
+                            "El envío pertenece a otro operador.");
+
+                    if (parada.TipoOperacion ==
+                        TipoOperacionRuta.DevolucionComercio)
+                    {
+                        if (envio.Estado != EstadoEnvio.EnDevolucion ||
+                            !envio.Bultos.Any(b =>
+                                b.Estado == EstadoBulto.EnDevolucion))
+                        {
+                            throw new InvalidOperationException(
+                                "La devolución no está disponible para despachar.");
+                        }
+
+                        // Permanece EnDevolucion.
+                        break;
+                    }
+
+                    if (envio.Estado != EstadoEnvio.AsignadoARuta)
+                        throw new InvalidOperationException(
+                            $"El envío {envio.ReferenciaExterna} no está asignado a ruta.");
+
+                    if (envio.VersionReglasOperativasId is not Guid reglasId)
+                        throw new InvalidOperationException(
+                            $"El envío {envio.ReferenciaExterna} no tiene reglas operativas.");
+
+                    var reglas = await reglasRepository.ObtenerPorIdAsync(
+                        command.OperadorId,
+                        reglasId,
+                        ct)
+                        ?? throw new InvalidOperationException(
+                            $"No existen las reglas operativas del envío {envio.ReferenciaExterna}.");
+
+                    enviosPreparados.Add((envio, reglas));
+                    break;
                 }
 
-                if (envio.Estado != EstadoEnvio.AsignadoARuta)
+                case TipoOperacionRuta.Retiro:
+                case TipoOperacionRuta.EntregaRetiroComercio:
                 {
-                    throw new InvalidOperationException(
-                        $"El envío {envio.ReferenciaExterna} no está asignado a ruta.");
+                    var retiroId = parada.RetiroId
+                        ?? throw new InvalidOperationException(
+                            "La parada no tiene un retiro asociado.");
+
+                    var retiro = await retiros.ObtenerAsync(retiroId, ct)
+                        ?? throw new NoEncontradoException(
+                            $"No existe el retiro de la parada {parada.Id}.");
+
+                    if (retiro.OperadorId != command.OperadorId)
+                        throw new InvalidOperationException(
+                            "El retiro pertenece a otro operador.");
+
+                    if (parada.TipoOperacion == TipoOperacionRuta.Retiro)
+                    {
+                        if (retiro.HojaDeRutaId != hoja.Id ||
+                            retiro.Estado != EstadoRetiro.AsignadoARuta)
+                        {
+                            throw new InvalidOperationException(
+                                "El retiro no está correctamente asignado.");
+                        }
+                    }
+                    else
+                    {
+                        if (retiro.Estado != EstadoRetiro.EnDeposito ||
+                            retiro.Bultos.Count == 0)
+                        {
+                            throw new InvalidOperationException(
+                                "El retiro no está disponible para entregar al comercio.");
+                        }
+
+                        // Permanece EnDeposito.
+                    }
+
+                    break;
                 }
 
-                if (envio.VersionReglasOperativasId is not Guid reglasId)
-                {
+                default:
                     throw new InvalidOperationException(
-                        $"El envío {envio.ReferenciaExterna} no tiene reglas operativas.");
-                }
-
-                var reglas = await reglasRepository.ObtenerPorIdAsync(
-                    command.OperadorId,
-                    reglasId,
-                    ct)
-                    ?? throw new InvalidOperationException(
-                        $"No existen las reglas operativas del envío {envio.ReferenciaExterna}.");
-
-                enviosPreparados.Add((envio, reglas));
-            }
-            else if (parada.RetiroId is Guid retiroId)
-            {
-                var retiro = await retiros.ObtenerAsync(
-                    retiroId, ct)
-                    ?? throw new NoEncontradoException(
-                        $"No existe el retiro de la parada {parada.Id}.");
-
-                if (retiro.OperadorId != command.OperadorId ||
-                    retiro.HojaDeRutaId != hoja.Id ||
-                    retiro.Estado != EstadoRetiro.AsignadoARuta)
-                {
-                    throw new InvalidOperationException(
-                        "La parada contiene un retiro que no está correctamente asignado.");
-                }
-
-                // No cambiamos el estado del retiro al despachar:
-                // permanece AsignadoARuta hasta registrar su resultado.
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    "La hoja contiene una parada sin operación válida.");
+                        "La hoja contiene una operación inválida.");
             }
         }
 

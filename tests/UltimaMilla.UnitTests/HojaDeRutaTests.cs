@@ -3,6 +3,7 @@ using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Rutas;
+using UltimaMilla.Domain.Retiros;
 using Xunit;
 
 namespace UltimaMilla.UnitTests;
@@ -80,6 +81,97 @@ public class HojaDeRutaTests
         }
 
         return envio;
+    }
+
+    private static (
+        Envio Envio,
+        VersionReglasOperativas Reglas)
+        CrearEnvioEnDevolucion(Guid operadorId)
+    {
+        var ahora = DateTimeOffset.UtcNow;
+
+        VersionReglasOperativas? reglas = null;
+
+        var envio = CrearEnvio(
+            operadorId,
+            capturarReglas: r => reglas = r);
+
+        if (reglas is null)
+            throw new InvalidOperationException(
+                "No se crearon las reglas operativas.");
+
+        envio.Aplicar(
+            DisparadorEnvio.AsignarARuta,
+            reglas,
+            ahora,
+            "Prueba",
+            "Despachador");
+
+        envio.Aplicar(
+            DisparadorEnvio.Despachar,
+            reglas,
+            ahora,
+            "Prueba",
+            "Repartidor");
+
+        var motivo = MotivoNoEntrega.Crear(
+            operadorId,
+            reglas.Id,
+            "AUSENTE",
+            "Destinatario ausente",
+            requiereDevolucion: true);
+
+        envio.Aplicar(
+            DisparadorEnvio.RegistrarIntentoFallido,
+            reglas,
+            ahora,
+            "Prueba",
+            "Repartidor",
+            motivoNoEntrega: motivo,
+            evidenciaFallo: "foto-intento-fallido");
+
+        envio.Aplicar(
+            DisparadorEnvio.RetornarADeposito,
+            reglas,
+            ahora,
+            "Prueba",
+            "Operario");
+
+        envio.Aplicar(
+            DisparadorEnvio.IniciarDevolucion,
+            reglas,
+            ahora,
+            "Prueba",
+            "Operario");
+
+        return (envio, reglas);
+    }
+
+    private static Retiro CrearRetiroEnDeposito(Guid operadorId)
+    {
+        var ahora = DateTimeOffset.UtcNow;
+
+        var retiro = Retiro.Crear(
+            operadorId,
+            Guid.NewGuid(),
+            "Devolución del cliente",
+            new Direccion("Calle Origen", "100", "San José", "San José"),
+            new Direccion("Calle Comercio", "200", "San José", "San José"),
+            DateOnly.FromDateTime(ahora.Date),
+            new TimeOnly(9, 0),
+            new TimeOnly(17, 0),
+            [BultoRetiro.Crear("RET-001", 5m, 20, 20, 20)],
+            ahora);
+
+        retiro.AsignarARuta(Guid.NewGuid());
+        retiro.RegistrarRetiro(
+            ahora,
+            "foto-retiro",
+            "firma-retiro");
+
+        retiro.RecibirEnDeposito();
+
+        return retiro;
     }
 
     [Fact]
@@ -466,6 +558,210 @@ public class HojaDeRutaTests
         Assert.Equal(
             volumenInicial - primero.VolumenTotalMetrosCubicos,
             ruta.VolumenAsignadoM3);
+    }
+
+    [Fact]
+    public void EntregaRetiroComercio_CreaParadaCorrecta()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var retiro = CrearRetiroEnDeposito(operadorId);
+
+        ruta.AgregarEntregaRetiroComercio(retiro);
+
+        var parada = Assert.Single(ruta.Paradas);
+
+        Assert.Equal(
+            TipoOperacionRuta.EntregaRetiroComercio,
+            parada.TipoOperacion);
+
+        Assert.Equal(retiro.Id, parada.RetiroId);
+        Assert.True(parada.Activa);
+        Assert.Equal(retiro.PesoTotalKg, ruta.PesoAsignadoKg);
+    }
+
+    [Fact]
+    public void EntregaRetiroComercio_NoFinalizaAntesDeConfirmar()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var retiro = CrearRetiroEnDeposito(operadorId);
+
+        ruta.AgregarEntregaRetiroComercio(retiro);
+        ruta.MarcarDespachada(DateTimeOffset.UtcNow);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ruta.FinalizarParadaEntregaRetiroComercio(
+                retiro,
+                DateTimeOffset.UtcNow));
+
+        Assert.True(Assert.Single(ruta.Paradas).Activa);
+    }
+
+    [Fact]
+    public void EntregaRetiroComercio_ConfirmadaLiberaParada()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var retiro = CrearRetiroEnDeposito(operadorId);
+        var ahora = DateTimeOffset.UtcNow;
+
+        ruta.AgregarEntregaRetiroComercio(retiro);
+        ruta.MarcarDespachada(ahora);
+
+        retiro.EntregarAlComercio();
+
+        ruta.FinalizarParadaEntregaRetiroComercio(
+            retiro,
+            ahora);
+
+        Assert.Equal(
+            EstadoRetiro.EntregadoAlComercio,
+            retiro.Estado);
+
+        Assert.False(Assert.Single(ruta.Paradas).Activa);
+    }   
+
+    [Fact]
+    public void DevolucionComercio_CreaParadaCorrecta()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var (envio, _) = CrearEnvioEnDevolucion(operadorId);
+
+        ruta.AgregarDevolucionComercio(envio);
+
+        var parada = Assert.Single(ruta.Paradas);
+
+        Assert.Equal(
+            TipoOperacionRuta.DevolucionComercio,
+            parada.TipoOperacion);
+
+        Assert.Equal(envio.Id, parada.EnvioId);
+        Assert.True(parada.Activa);
+
+        Assert.Equal(
+            envio.Bultos
+                .Where(b => b.Estado == EstadoBulto.EnDevolucion)
+                .Sum(b => b.PesoKg),
+            ruta.PesoAsignadoKg);
+    }
+
+    [Fact]
+    public void DevolucionComercio_NoFinalizaSinConfirmacion()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var (envio, _) = CrearEnvioEnDevolucion(operadorId);
+        var ahora = DateTimeOffset.UtcNow;
+
+        ruta.AgregarDevolucionComercio(envio);
+        ruta.MarcarDespachada(ahora);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ruta.FinalizarParada(envio, ahora));
+
+        Assert.True(Assert.Single(ruta.Paradas).Activa);
+    }
+
+    [Fact]
+    public void DevolucionComercio_ConfirmadaLiberaParada()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var (envio, reglas) = CrearEnvioEnDevolucion(operadorId);
+        var ahora = DateTimeOffset.UtcNow;
+
+        ruta.AgregarDevolucionComercio(envio);
+        ruta.MarcarDespachada(ahora);
+
+        envio.Aplicar(
+            DisparadorEnvio.ConfirmarDevolucion,
+            reglas,
+            ahora,
+            "PortalComercio",
+            "ComercioTest",
+            modalidadDevolucion: ModalidadDevolucion.EntregaDirecta,
+            receptorDevolucion: "Responsable del comercio",
+            referenciaConstanciaDevolucion: "CONST-001");
+
+        ruta.FinalizarParada(envio, ahora);
+
+        Assert.Equal(EstadoEnvio.Devuelto, envio.Estado);
+        Assert.All(envio.Bultos,
+            b => Assert.Equal(EstadoBulto.Devuelto, b.Estado));
+
+        Assert.False(Assert.Single(ruta.Paradas).Activa);
+    }
+
+    [Fact]
+    public void RutaMixta_EntregaDevolucionAntesDeRecogerRetiro()
+    {
+        var operadorId = Guid.NewGuid();
+
+        var ruta = CrearRuta(
+            operadorId,
+            capacidadPeso: 10m);
+
+        ruta.ConfigurarHoraSalida(new TimeOnly(8, 0));
+
+        var (envio, _) = CrearEnvioEnDevolucion(operadorId);
+
+        var retiro = Retiro.Crear(
+            operadorId,
+            Guid.NewGuid(),
+            "Retiro de prueba",
+            new Direccion("Origen", "100", "San José", "San José"),
+            new Direccion("Comercio", "200", "San José", "San José"),
+            ruta.Fecha,
+            new TimeOnly(11, 0),
+            new TimeOnly(12, 0),
+            [BultoRetiro.Crear("RET-MIXTO", 9m, 20, 20, 20)],
+            DateTimeOffset.UtcNow);
+
+        var zona = ZonaCobertura.Crear(
+            operadorId,
+            "San José",
+            "San José");
+
+        zona.AgregarLocalidad("San José");
+        zona.AgregarFranja(
+            new TimeOnly(9, 0),
+            new TimeOnly(10, 0));
+        zona.AgregarFranja(
+            new TimeOnly(11, 0),
+            new TimeOnly(12, 0));
+        zona.ConfigurarTiempoEstimado(10);
+
+        var horarios = PlanificacionHojaDeRuta.Calcular(
+            ruta,
+            Array.Empty<EnvioParaPlanificar>(),
+            [new RetiroParaPlanificar(retiro, zona)],
+            [new DevolucionParaPlanificar(
+                envio,
+                zona,
+                new Direccion("Comercio", "200", "San José", "San José"))],
+            Array.Empty<EntregaRetiroParaPlanificar>(),
+            new TimeOnly(9, 0),
+            new TimeOnly(10, 0));
+
+        Assert.Equal(2, horarios.Count);
+
+        Assert.Equal(
+            TipoOperacionRuta.DevolucionComercio,
+            horarios[0].Tipo);
+
+        Assert.Equal(
+            TipoOperacionRuta.Retiro,
+            horarios[1].Tipo);
+
+        // Después de entregar la devolución,
+        // el vehículo queda vacío.
+        Assert.Equal(0m, horarios[0].PesoPosteriorKg);
+
+        // Después de recoger el retiro,
+        // transporta los 9 kg recogidos.
+        Assert.Equal(9m, horarios[1].PesoPosteriorKg);
     }
 
 }

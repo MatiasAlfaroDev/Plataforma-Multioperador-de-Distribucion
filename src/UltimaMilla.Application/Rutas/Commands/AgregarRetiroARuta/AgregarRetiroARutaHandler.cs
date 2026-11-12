@@ -45,6 +45,16 @@ public sealed class AgregarRetiroARutaHandler(
 
         hoja.VerificarEditable();
 
+        if (hoja.Paradas.Any(p =>
+            p.Activa &&
+            p.TipoOperacion is (
+                TipoOperacionRuta.DevolucionComercio or
+                TipoOperacionRuta.EntregaRetiroComercio)))
+        {
+            throw new InvalidOperationException(
+                "No se pueden agregar operaciones a una hoja que contiene entregas al comercio.");
+        }
+
         if (!hoja.HoraSalida.HasValue)
             throw new InvalidOperationException(
                 "La hoja no tiene hora de salida.");

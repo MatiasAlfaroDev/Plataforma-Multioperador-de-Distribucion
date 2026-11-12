@@ -4,6 +4,7 @@ using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Retiros;
 using UltimaMilla.Domain.Rutas;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 
@@ -16,7 +17,8 @@ public sealed class CrearHojaDeRutaHandler(
     IZonaCoberturaRepository zonas,
     IVersionReglasOperativasRepository reglasRepository,
     IUnitOfWork unitOfWork,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICuentaComercialRepository cuentas)
 {
     public async Task<Guid> Handle(
         CrearHojaDeRutaCommand command,
@@ -30,12 +32,52 @@ public sealed class CrearHojaDeRutaHandler(
             throw new ArgumentException(
                 "Operador, repartidor y vehículo son obligatorios.");
 
+        
         var enviosIds = command.EnviosIds ?? [];
         var retirosIds = command.RetirosIds ?? [];
+        var devolucionesIds = command.DevolucionesIds ?? [];
+        var entregasRetirosIds = command.EntregasRetirosIds ?? [];
 
-        if (enviosIds.Count + retirosIds.Count == 0)
+        if (enviosIds.Count + retirosIds.Count +
+            devolucionesIds.Count + entregasRetirosIds.Count == 0)
+        {
             throw new ArgumentException(
-                "Seleccioná al menos una entrega o un retiro.");
+                "Seleccioná al menos una operación.");
+        }
+
+        static void ValidarIds(
+            IReadOnlyList<Guid> ids,
+            string descripcion)
+        {
+            if (ids.Any(id => id == Guid.Empty) ||
+                ids.Distinct().Count() != ids.Count)
+            {
+                throw new ArgumentException(
+                    $"La selección de {descripcion} contiene identificadores inválidos o repetidos.");
+            }
+        }
+
+        ValidarIds(enviosIds, "envíos");
+        ValidarIds(retirosIds, "retiros");
+        ValidarIds(devolucionesIds, "devoluciones");
+        ValidarIds(entregasRetirosIds, "entregas de retiros");
+
+        if (enviosIds.Intersect(devolucionesIds).Any())
+            throw new ArgumentException(
+                "Un envío no puede seleccionarse como entrega y devolución.");
+
+        if (retirosIds.Intersect(entregasRetirosIds).Any())
+            throw new ArgumentException(
+                "Un retiro no puede seleccionarse como recogida y entrega.");
+
+        if ((enviosIds.Count > 0 ||
+            devolucionesIds.Count > 0 ||
+            entregasRetirosIds.Count > 0) &&
+            command.HoraEntregaDesde >= command.HoraEntregaHasta)
+        {
+            throw new ArgumentException(
+                "La franja de entrega no es válida.");
+        }
 
         if (enviosIds.Any(id => id == Guid.Empty) ||
             enviosIds.Distinct().Count() != enviosIds.Count)
@@ -96,9 +138,10 @@ public sealed class CrearHojaDeRutaHandler(
 
         var seleccionEnvios = new List<EnvioParaPlanificar>();
         var seleccionRetiros = new List<RetiroParaPlanificar>();
+        var seleccionDevoluciones = new List<DevolucionParaPlanificar>();
+        var seleccionEntregasRetiros = new List<EntregaRetiroParaPlanificar>();
 
-        var reglasPorEnvio =
-            new Dictionary<Guid, VersionReglasOperativas>();
+        var reglasPorEnvio = new Dictionary<Guid, VersionReglasOperativas>();
 
         foreach (var envioId in enviosIds)
         {
@@ -217,11 +260,97 @@ public sealed class CrearHojaDeRutaHandler(
                 new RetiroParaPlanificar(retiro, zona));
         }
 
+        foreach (var devolucionId in devolucionesIds)
+        {
+            var envio = await envios.ObtenerAsync(devolucionId, ct)
+                ?? throw new InvalidOperationException(
+                    $"No existe el envío {devolucionId}.");
+
+            if (envio.OperadorId != command.OperadorId)
+                throw new InvalidOperationException(
+                    "La devolución pertenece a otro operador.");
+
+            if (envio.Estado != EstadoEnvio.EnDevolucion)
+                throw new InvalidOperationException(
+                    "El envío no está en devolución.");
+
+            var hojaActiva = await hojas.ObtenerPorEnvioActivoAsync(
+                command.OperadorId,
+                envio.Id,
+                ct);
+
+            if (hojaActiva is not null)
+                throw new InvalidOperationException(
+                    "La devolución ya está asignada a una hoja de ruta.");
+
+            var cuenta = await cuentas.ObtenerAsync(
+                envio.CuentaComercialId, ct)
+                ?? throw new InvalidOperationException(
+                    "La cuenta comercial no existe.");
+
+            if (cuenta.OperadorId != command.OperadorId ||
+                cuenta.Id != envio.CuentaComercialId ||
+                !cuenta.Activa ||
+                cuenta.Estado != EstadoCuentaComercial.Confirmada)
+            {
+                throw new InvalidOperationException(
+                    "La cuenta comercial no está habilitada para recibir devoluciones.");
+            }
+
+            var direccion = cuenta.DireccionRecepcion
+                ?? throw new InvalidOperationException(
+                    "La cuenta comercial no tiene dirección de recepción configurada.");
+
+            var zona = ObtenerZona(direccion.Localidad);
+
+            seleccionDevoluciones.Add(
+                new DevolucionParaPlanificar(
+                    envio,
+                    zona,
+                    direccion));
+        }
+
+        foreach (var retiroId in entregasRetirosIds)
+        {
+            var retiro = await retiros.ObtenerAsync(retiroId, ct)
+                ?? throw new InvalidOperationException(
+                    $"No existe el retiro {retiroId}.");
+
+            if (retiro.OperadorId != command.OperadorId)
+                throw new InvalidOperationException(
+                    "El retiro pertenece a otro operador.");
+
+            if (retiro.Estado != EstadoRetiro.EnDeposito)
+                throw new InvalidOperationException(
+                    "El retiro todavía no está disponible para entregar al comercio.");
+
+            var hojaActiva = await hojas.ObtenerPorRetiroEnEntregaActivoAsync(
+                command.OperadorId,
+                retiro.Id,
+                ct);
+
+            if (hojaActiva is not null)
+                throw new InvalidOperationException(
+                    "La entrega del retiro ya está asignada a una hoja de ruta.");
+
+            var zona = ObtenerZona(
+                retiro.DomicilioDestino.Localidad);
+
+            seleccionEntregasRetiros.Add(
+                new EntregaRetiroParaPlanificar(
+                    retiro,
+                    zona));
+        }
+
         // Planificación única para entregas, retiros o ambos.
         var horarios = PlanificacionHojaDeRuta.Calcular(
             hoja,
             seleccionEnvios,
-            seleccionRetiros);
+            seleccionRetiros,
+            seleccionDevoluciones,
+            seleccionEntregasRetiros,
+            command.HoraEntregaDesde,
+            command.HoraEntregaHasta);
 
         var enviosPorId = seleccionEnvios.ToDictionary(
             x => x.Envio.Id,
@@ -230,32 +359,63 @@ public sealed class CrearHojaDeRutaHandler(
         var retirosPorId = seleccionRetiros.ToDictionary(
             x => x.Retiro.Id,
             x => x.Retiro);
+        
+        var devolucionesPorId = seleccionDevoluciones.ToDictionary(x => x.Envio.Id, x => x.Envio);
 
-        var ahora = reloj.GetUtcNow();
+        var entregasRetirosPorId = seleccionEntregasRetiros.ToDictionary(x => x.Retiro.Id, x => x.Retiro);
+                var ahora = reloj.GetUtcNow();
 
+        
         foreach (var horario in horarios)
         {
-            if (horario.Tipo == TipoOperacionRuta.Entrega)
+            switch (horario.Tipo)
             {
-                var envio = enviosPorId[horario.ReferenciaId];
+                case TipoOperacionRuta.Entrega:
+                {
+                    var envio = enviosPorId[horario.ReferenciaId];
 
-                hoja.AgregarEnvio(envio);
+                    hoja.AgregarEnvio(envio);
 
-                envio.Aplicar(
-                    DisparadorEnvio.AsignarARuta,
-                    reglasPorEnvio[envio.Id],
-                    ahora,
-                    "Backoffice",
-                    "Despachador");
-            }
-            else
-            {
-                var retiro = retirosPorId[horario.ReferenciaId];
+                    envio.Aplicar(
+                        DisparadorEnvio.AsignarARuta,
+                        reglasPorEnvio[envio.Id],
+                        ahora,
+                        "Backoffice",
+                        "Despachador");
+                    break;
+                }
 
-                hoja.AgregarRetiro(retiro);
-                retiro.AsignarARuta(hoja.Id);
+                case TipoOperacionRuta.Retiro:
+                {
+                    var retiro = retirosPorId[horario.ReferenciaId];
+
+                    hoja.AgregarRetiro(retiro);
+                    retiro.AsignarARuta(hoja.Id);
+                    break;
+                }
+
+                case TipoOperacionRuta.DevolucionComercio:
+                {
+                    var envio = devolucionesPorId[horario.ReferenciaId];
+                    hoja.AgregarDevolucionComercio(envio);
+                    break;
+                }
+
+                case TipoOperacionRuta.EntregaRetiroComercio:
+                {
+                    var retiro = entregasRetirosPorId[horario.ReferenciaId];
+                    hoja.AgregarEntregaRetiroComercio(retiro);
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException(
+                        "El tipo de operación no es válido.");
             }
         }
+
+        hoja.ActualizarOrdenOperaciones(horarios);
+
 
         await hojas.AgregarAsync(hoja, ct);
         await unitOfWork.GuardarCambiosAsync(ct);

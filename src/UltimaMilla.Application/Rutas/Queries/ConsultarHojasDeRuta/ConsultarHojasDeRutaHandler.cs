@@ -3,6 +3,8 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Rutas;
+using UltimaMilla.Domain.Retiros;
+using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 
@@ -28,6 +30,33 @@ public sealed record EnvioRutaDto(
     TimeOnly? HoraHasta,
     bool TieneCompromiso);
 
+public sealed record RetiroRutaDto(
+    Guid Id,
+    string Motivo,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3,
+    DateOnly Fecha,
+    TimeOnly HoraDesde,
+    TimeOnly HoraHasta);
+
+public sealed record DevolucionRutaDto(
+    Guid Id,
+    string ReferenciaExterna,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3);
+
+public sealed record EntregaRetiroRutaDto(
+    Guid Id,
+    string Motivo,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3);
+
 public sealed record FranjaRutaDto(
     TimeOnly HoraDesde,
     TimeOnly HoraHasta);
@@ -36,6 +65,9 @@ public sealed record OpcionesHojaDeRutaDto(
     IReadOnlyList<RepartidorRutaDto> Repartidores,
     IReadOnlyList<VehiculoRutaDto> Vehiculos,
     IReadOnlyList<EnvioRutaDto> Envios,
+    IReadOnlyList<RetiroRutaDto> Retiros,
+    IReadOnlyList<DevolucionRutaDto> Devoluciones,
+    IReadOnlyList<EntregaRetiroRutaDto> EntregasRetiros,
     IReadOnlyList<FranjaRutaDto> Franjas);
 
 public sealed record HojaDeRutaDto(
@@ -54,7 +86,9 @@ public sealed class ConsultarHojasDeRutaHandler(
     IEnvioRepository envios,
     IHojaDeRutaRepository hojas,
     IZonaCoberturaRepository zonas,
-    IVersionReglasOperativasRepository reglasRepository)
+    IVersionReglasOperativasRepository reglasRepository,
+    IRetiroRepository retiros,
+    ICuentaComercialRepository cuentas)
 {
     public async Task<OpcionesHojaDeRutaDto> ObtenerOpcionesAsync(
         Guid operadorId,
@@ -75,6 +109,14 @@ public sealed class ConsultarHojasDeRutaHandler(
 
         var listaEnvios = await envios.ListarParaPlanificacionAsync(
             operadorId, ct);
+
+        var listaRetiros = await retiros.ListarParaPlanificacionAsync(
+            operadorId,
+            ct);
+
+        var listaRetirosParaEntrega = await retiros.ListarParaEntregaComercioAsync(
+            operadorId,
+            ct);
 
         var zonasOperador = await zonas.ListarPorOperadorAsync(
             operadorId, ct);
@@ -121,8 +163,24 @@ public sealed class ConsultarHojasDeRutaHandler(
 
         var elegibles = new List<Envio>();
 
-        foreach (var envio in listaEnvios){
-            if (!hayFiltros){
+        foreach (var envio in listaEnvios)
+        {
+            // Solo se permiten envíos en depósito sin intentos fallidos
+            // o envíos cuya reprogramación ya fue confirmada.
+            if (envio.Estado == EstadoEnvio.EnDeposito &&
+                envio.IntentosRealizados > 0)
+            {
+                continue;
+            }
+
+            if (envio.Estado != EstadoEnvio.EnDeposito &&
+                envio.Estado != EstadoEnvio.Reprogramado)
+            {
+                continue;
+            }
+
+            if (!hayFiltros)
+            {
                 elegibles.Add(envio);
                 continue;
             }
@@ -200,6 +258,129 @@ public sealed class ConsultarHojasDeRutaHandler(
                 x.HoraEntregaHasta.HasValue))
             .ToList();
 
+        var retirosDisponibles = listaRetiros
+            .Where(r =>
+                r.Estado == EstadoRetiro.Solicitado &&
+                r.HojaDeRutaId == null &&
+                (!fecha.HasValue || r.FechaSolicitada == fecha.Value))
+            .Where(r =>
+            {
+                var compatibles = zonasOperador
+                    .Where(z =>
+                        z.Activa &&
+                        string.Equals(
+                            z.Departamento,
+                            r.DomicilioRetiro.Departamento,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        z.CubreDireccion(
+                            r.DomicilioRetiro.Localidad, null))
+                    .ToList();
+
+                return compatibles.Count == 1 &&
+                    compatibles[0].OfreceFranja(
+                        r.HoraDesde,
+                        r.HoraHasta);
+            })
+            .Select(r => new RetiroRutaDto(
+                r.Id,
+                r.Motivo,
+                r.DomicilioRetiro.Localidad,
+                r.Estado.ToString(),
+                r.PesoTotalKg,
+                r.VolumenTotalMetrosCubicos,
+                r.FechaSolicitada,
+                r.HoraDesde,
+                r.HoraHasta))
+            .ToList();
+
+        var entregasRetirosDisponibles = new List<EntregaRetiroRutaDto>();
+
+        foreach (var retiro in listaRetirosParaEntrega)
+        {
+            var compatibles = zonasOperador
+                .Where(z =>
+                    z.Activa &&
+                    string.Equals(
+                        z.Departamento,
+                        retiro.DomicilioDestino.Departamento,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    z.CubreDireccion(
+                        retiro.DomicilioDestino.Localidad, null))
+                .ToList();
+
+            if (compatibles.Count != 1)
+                continue;
+
+            if (hayFiltros &&
+                !compatibles[0].OfreceFranja(
+                    horaDesde!.Value,
+                    horaHasta!.Value))
+                continue;
+
+            entregasRetirosDisponibles.Add(
+                new EntregaRetiroRutaDto(
+                    retiro.Id,
+                    retiro.Motivo,
+                    retiro.DomicilioDestino.Localidad,
+                    retiro.Estado.ToString(),
+                    retiro.PesoTotalKg,
+                    retiro.VolumenTotalMetrosCubicos));
+        }
+
+        var devolucionesDisponibles = new List<DevolucionRutaDto>();
+        foreach (var envio in listaEnvios.Where(e =>
+            e.Estado == EstadoEnvio.EnDevolucion))
+        {
+            var hojaActiva = await hojas.ObtenerPorEnvioActivoAsync(
+                operadorId,
+                envio.Id,
+                ct);
+
+            if (hojaActiva is not null)
+                continue;
+
+            var cuenta = await cuentas.ObtenerAsync(
+                envio.CuentaComercialId,
+                ct);
+
+            if (cuenta is null ||
+                cuenta.OperadorId != operadorId ||
+                !cuenta.Activa ||
+                cuenta.Estado != EstadoCuentaComercial.Confirmada ||
+                cuenta.DireccionRecepcion is null)
+                continue;
+
+            var direccion = cuenta.DireccionRecepcion;
+
+            var compatibles = zonasOperador
+                .Where(z =>
+                    z.Activa &&
+                    string.Equals(
+                        z.Departamento,
+                        direccion.Departamento,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    z.CubreDireccion(direccion.Localidad, null))
+                .ToList();
+
+            if (compatibles.Count != 1)
+                continue;
+
+            if (hayFiltros &&
+                !compatibles[0].OfreceFranja(
+                    horaDesde!.Value,
+                    horaHasta!.Value))
+                continue;
+
+            devolucionesDisponibles.Add(
+                new DevolucionRutaDto(
+                    envio.Id,
+                    envio.ReferenciaExterna,
+                    direccion.Localidad,
+                    envio.Estado.ToString(),
+                    envio.PesoTotalKg,
+                    envio.VolumenTotalMetrosCubicos));
+        }
+
         return new OpcionesHojaDeRutaDto(
             listaRepartidores
                 .Select(x => new RepartidorRutaDto(
@@ -216,6 +397,9 @@ public sealed class ConsultarHojasDeRutaHandler(
                 .ToList(),
 
             enviosDisponibles,
+            retirosDisponibles,
+            devolucionesDisponibles,
+            entregasRetirosDisponibles,
             franjas);
     }
 

@@ -29,4 +29,9 @@ public interface IHojaDeRutaRepository
         Guid operadorId,
         Guid envioId,
         CancellationToken ct);
-}
+
+    Task<HojaDeRuta?> ObtenerPorRetiroEnEntregaActivoAsync(
+        Guid operadorId,
+        Guid retiroId,
+        CancellationToken ct);
+    }

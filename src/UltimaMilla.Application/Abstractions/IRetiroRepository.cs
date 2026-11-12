@@ -12,4 +12,13 @@ public interface IRetiroRepository
         Guid operadorId,
         Guid? cuentaComercialId,
         CancellationToken ct);
+
+    Task<IReadOnlyList<Retiro>> ListarParaPlanificacionAsync(
+        Guid operadorId,
+        CancellationToken ct);
+
+    Task<IReadOnlyList<Retiro>> ListarParaEntregaComercioAsync(
+        Guid operadorId,
+        CancellationToken ct);
+        
 }

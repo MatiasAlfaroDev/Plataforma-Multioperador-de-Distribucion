@@ -1,5 +1,6 @@
 
 using UltimaMilla.Domain.Common;
+using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Domain.Organizacion;
 
@@ -23,9 +24,10 @@ public class CuentaComercial : AuditableEntity, ITenantEntity
 
     public bool Activa { get; private set; }
 
+    public Direccion? DireccionRecepcion { get; private set; }
+
     private CuentaComercial() { }
 
-    // Conserva el comportamiento de los datos iniciales existentes.
     public static CuentaComercial Crear(
         Guid id,
         Guid operadorId,
@@ -41,7 +43,6 @@ public class CuentaComercial : AuditableEntity, ITenantEntity
         };
     }
 
-    // Una solicitud nueva necesita aprobación del operador.
     public static CuentaComercial Solicitar(
         Guid id,
         Guid operadorId,
@@ -55,6 +56,13 @@ public class CuentaComercial : AuditableEntity, ITenantEntity
             Estado = EstadoCuentaComercial.Pendiente,
             Activa = false
         };
+    }
+
+    public void ConfigurarDireccionRecepcion(Direccion direccion)
+    {
+        ArgumentNullException.ThrowIfNull(direccion);
+
+        DireccionRecepcion = direccion;
     }
 
     public void Confirmar()

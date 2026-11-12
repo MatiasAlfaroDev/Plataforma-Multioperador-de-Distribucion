@@ -71,4 +71,21 @@ public sealed class HojaDeRutaRepository(AppDbContext db)
                         p.LiberadaEn == null),
                 ct);
     }
+
+    public Task<HojaDeRuta?> ObtenerPorRetiroEnEntregaActivoAsync(
+        Guid operadorId,
+        Guid retiroId,
+        CancellationToken ct)
+    {
+        return db.HojasDeRuta
+            .Include(x => x.Paradas)
+            .SingleOrDefaultAsync(
+                x => x.OperadorId == operadorId &&
+                    x.Paradas.Any(p =>
+                        p.RetiroId == retiroId &&
+                        p.TipoOperacion ==
+                            TipoOperacionRuta.EntregaRetiroComercio &&
+                        p.LiberadaEn == null),
+                ct);
+    }
 }

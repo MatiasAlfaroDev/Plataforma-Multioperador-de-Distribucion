@@ -186,6 +186,95 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
         _paradas.Add(parada);
     }
 
+    public void AgregarDevolucionComercio(Envio envio)
+    {
+        ArgumentNullException.ThrowIfNull(envio);
+        VerificarEditable();
+
+        if (envio.OperadorId != OperadorId)
+            throw new InvalidOperationException(
+                "El envío pertenece a otro operador.");
+
+        if (envio.Estado != EstadoEnvio.EnDevolucion)
+            throw new InvalidOperationException(
+                "El envío no está disponible para devolución al comercio.");
+
+        if (_paradas.Any(p => p.EnvioId == envio.Id && p.Activa))
+            throw new InvalidOperationException(
+                "El envío ya tiene una parada activa en esta hoja.");
+
+        if (_paradas.Count(p => p.Activa) >= MaximoParadas)
+            throw new InvalidOperationException(
+                "Se alcanzó el máximo de paradas.");
+
+        var bultos = envio.Bultos
+            .Where(b => b.Estado == EstadoBulto.EnDevolucion)
+            .ToList();
+
+        if (bultos.Count == 0)
+            throw new InvalidOperationException(
+                "El envío no tiene bultos para devolver.");
+
+        var peso = bultos.Sum(b => b.PesoKg);
+        var volumen = bultos.Sum(b => b.VolumenMetrosCubicos);
+
+        if (PesoAsignadoKg + peso > CapacidadPesoKg ||
+            VolumenAsignadoM3 + volumen > CapacidadVolumenM3)
+            throw new InvalidOperationException(
+                "La devolución supera la capacidad del vehículo.");
+
+        var siguienteOrden = _paradas.Count == 0
+            ? 1
+            : _paradas.Max(p => p.Orden) + 1;
+
+        _paradas.Add(
+            ParadaRuta.CrearDevolucionComercio(
+                Id, envio.Id, siguienteOrden));
+
+        PesoAsignadoKg += peso;
+        VolumenAsignadoM3 += volumen;
+    }
+
+    public void AgregarEntregaRetiroComercio(Retiro retiro)
+    {
+        ArgumentNullException.ThrowIfNull(retiro);
+        VerificarEditable();
+
+        if (retiro.OperadorId != OperadorId)
+            throw new InvalidOperationException(
+                "El retiro pertenece a otro operador.");
+
+        if (retiro.Estado != EstadoRetiro.EnDeposito)
+            throw new InvalidOperationException(
+                "El retiro debe estar en depósito.");
+
+        if (_paradas.Any(p => p.RetiroId == retiro.Id && p.Activa))
+            throw new InvalidOperationException(
+                "El retiro ya tiene una parada activa en esta hoja.");
+
+        if (_paradas.Count(p => p.Activa) >= MaximoParadas)
+            throw new InvalidOperationException(
+                "Se alcanzó el máximo de paradas.");
+
+        if (PesoAsignadoKg + retiro.PesoTotalKg > CapacidadPesoKg ||
+            VolumenAsignadoM3 + retiro.VolumenTotalMetrosCubicos >
+            CapacidadVolumenM3)
+            throw new InvalidOperationException(
+                "El retiro supera la capacidad del vehículo.");
+
+        var siguienteOrden = _paradas.Count == 0
+            ? 1
+            : _paradas.Max(p => p.Orden) + 1;
+
+        _paradas.Add(
+            ParadaRuta.CrearEntregaRetiroComercio(
+                Id, retiro.Id, siguienteOrden));
+
+        PesoAsignadoKg += retiro.PesoTotalKg;
+        VolumenAsignadoM3 += retiro.VolumenTotalMetrosCubicos;
+    }
+
+
     public void FinalizarParadaRetiro(
         Retiro retiro,
         DateTimeOffset fecha)
@@ -249,9 +338,8 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
         foreach (var parada in activas)
         {
             var existe = horarios.Any(h =>
-                (h.Tipo == TipoOperacionRuta.Entrega &&
-                parada.EnvioId == h.ReferenciaId) ||
-                (h.Tipo == TipoOperacionRuta.Retiro &&
+                h.Tipo == parada.TipoOperacion &&
+                (parada.EnvioId == h.ReferenciaId ||
                 parada.RetiroId == h.ReferenciaId));
 
             if (!existe)
@@ -259,14 +347,17 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
                     "La planificación omite una parada activa.");
         }
 
+        // Conservamos la renumeración en dos pasos
+        // para evitar conflictos de orden entre paradas.
+        PrepararRenumeracionParadas();
+
         for (var i = 0; i < horarios.Count; i++)
         {
             var horario = horarios[i];
 
             var parada = activas.Single(p =>
-                (horario.Tipo == TipoOperacionRuta.Entrega &&
-                p.EnvioId == horario.ReferenciaId) ||
-                (horario.Tipo == TipoOperacionRuta.Retiro &&
+                p.TipoOperacion == horario.Tipo &&
+                (p.EnvioId == horario.ReferenciaId ||
                 p.RetiroId == horario.ReferenciaId));
 
             parada.CambiarOrden(i + 1);
@@ -337,7 +428,29 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
     {
         HoraSalida = horaSalida;
     }
+    public void FinalizarParadaEntregaRetiroComercio(Retiro retiro, DateTimeOffset fecha)
+    {
+        ArgumentNullException.ThrowIfNull(retiro);
 
+        if (retiro.OperadorId != OperadorId)
+            throw new InvalidOperationException(
+                "El retiro pertenece a otro operador.");
+
+        var parada = _paradas.SingleOrDefault(p =>
+            p.RetiroId == retiro.Id &&
+            p.TipoOperacion == TipoOperacionRuta.EntregaRetiroComercio &&
+            p.Activa);
+
+        if (parada is null)
+            throw new InvalidOperationException(
+                "No existe una entrega al comercio activa para este retiro.");
+
+        if (retiro.Estado != EstadoRetiro.EntregadoAlComercio)
+            throw new InvalidOperationException(
+                "La entrega del retiro al comercio no fue confirmada.");
+
+        parada.Liberar(fecha);
+    }
     public void FinalizarParada(Envio envio, DateTimeOffset fecha)
     {
         ArgumentNullException.ThrowIfNull(envio);
@@ -346,20 +459,37 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             throw new InvalidOperationException(
                 "El envío pertenece a otro operador.");
 
-        if (envio.Estado != EstadoEnvio.Entregado &&
-            envio.Estado != EstadoEnvio.EntregadoParcialmente &&
-            envio.Estado != EstadoEnvio.NoEntregado)
-            throw new InvalidOperationException(
-                "El envío debe tener un resultado de entrega registrado.");
-
-        var parada = _paradas.SingleOrDefault(
-            p => p.EnvioId == envio.Id && p.Activa);
+        var parada = _paradas.SingleOrDefault(p =>
+            p.EnvioId == envio.Id && p.Activa);
 
         if (parada is null)
             throw new InvalidOperationException(
                 "No existe una parada activa para este envío.");
 
-        parada.Liberar(fecha.ToUniversalTime());
+        switch (parada.TipoOperacion)
+        {
+            case TipoOperacionRuta.Entrega:
+                if (envio.Estado != EstadoEnvio.Entregado &&
+                    envio.Estado != EstadoEnvio.EntregadoParcialmente &&
+                    envio.Estado != EstadoEnvio.NoEntregado)
+                {
+                    throw new InvalidOperationException(
+                        "El envío no tiene un resultado de entrega registrado.");
+                }
+                break;
+
+            case TipoOperacionRuta.DevolucionComercio:
+                if (envio.Estado != EstadoEnvio.Devuelto)
+                    throw new InvalidOperationException(
+                        "La devolución no fue confirmada.");
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    "La parada no corresponde a una entrega de envío.");
+        }
+
+        parada.Liberar(fecha);
     }
 
     public void VerificarEditable()

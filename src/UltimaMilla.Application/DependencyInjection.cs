@@ -60,6 +60,8 @@ using UltimaMilla.Application.Retiros.Commands.GestionarRetiro;
 using UltimaMilla.Application.Retiros.Commands.RegistrarEventoRetiro;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResumenRetiros;
 using UltimaMilla.Application.Avisos.Commands.RegistrarAvisosRetiro;
+using UltimaMilla.Application.CuentasComerciales.Commands.ConfigurarDireccionRecepcion;
+using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerDireccionRecepcion;
 
 namespace UltimaMilla.Application;
 
@@ -134,6 +136,8 @@ public static class DependencyInjection
         services.AddScoped<ObtenerCumplimientoHandler>();
         services.AddScoped<ObtenerDetalleLiquidacionHandler>();
         services.AddScoped<ObtenerPuntualidadHandler>();
+        services.AddScoped<ConfigurarDireccionRecepcionHandler>();
+        services.AddScoped<ObtenerDireccionRecepcionHandler>();
         return services;
     }
 }

@@ -3,11 +3,13 @@ using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Application.Avisos.Commands.RegistrarAvisosRetiro;
 using UltimaMilla.Domain.Avisos;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Application.Retiros.Commands.GestionarRetiro;
 
 public sealed class GestionarRetiroHandler(
     IRetiroRepository retiros,
+    IHojaDeRutaRepository hojas,
     IUnitOfWork unitOfWork,
     ITenantContext tenant,
     RegistrarAvisosRetiroHandler avisos,
@@ -37,7 +39,30 @@ public sealed class GestionarRetiroHandler(
     {
         var retiro = await ObtenerRetiroAsync(retiroId, ct);
 
+        var hojaActiva = await hojas.ObtenerPorRetiroEnEntregaActivoAsync(
+            retiro.OperadorId,
+            retiro.Id,
+            ct);
+
+        if (hojaActiva is not null &&
+            hojaActiva.Estado != EstadoHojaDeRuta.Despachada)
+        {
+            throw new InvalidOperationException(
+                "La hoja de ruta todavía no fue despachada.");
+        }
+
+        // La entidad Retiro valida la transición
+        // EnDeposito -> EntregadoAlComercio.
         retiro.EntregarAlComercio();
+
+        // Si se entregó mediante una hoja de ruta,
+        // también se finaliza su parada.
+        if (hojaActiva is not null)
+        {
+            hojaActiva.FinalizarParadaEntregaRetiroComercio(
+                retiro,
+                reloj.GetUtcNow());
+        }
 
         await avisos.PrepararAsync(
             retiro.Id,
