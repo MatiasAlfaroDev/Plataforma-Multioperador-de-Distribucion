@@ -152,9 +152,7 @@ public sealed class ConsultarRetirosHandler(
     }
 
     private bool EsOperador() =>
-        tenant.Perfil is
-            Perfiles.AdministradorOperador or
-            Perfiles.Operador;
+        Perfiles.PersonalOperador.Contains(tenant.Perfil);
 
     private bool EsComercio() =>
         tenant.Perfil is
