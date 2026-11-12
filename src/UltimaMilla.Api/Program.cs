@@ -1194,6 +1194,24 @@ api.MapPost("/reglas-operativas", async (
 })
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
 
+// GET /api/motivos-no-entrega → catálogo vigente del operador para la app del repartidor (RF 32).
+// La app lo guarda en el teléfono para elegir el motivo sin conexión.
+api.MapGet("/motivos-no-entrega", async (
+    ITenantContext tenant,
+    ObtenerReglasOperativasVigentesHandler handler,
+    CancellationToken ct) =>
+{
+    var operadorId = tenant.OperadorId ?? throw new UnauthorizedAccessException("Primero hay que elegir un operador.");
+    var reglas = await handler.Handle(new ObtenerReglasOperativasVigentesQuery(operadorId), ct);
+
+    return Results.Ok(new
+    {
+        admiteEntregaParcial = reglas?.AdmiteEntregaParcial ?? false,
+        motivos = reglas?.Motivos.Select(m => m.Descripcion).ToArray() ?? []
+    });
+})
+.RequireAuthorization(policy => policy.RequireRole([Perfiles.Repartidor, .. Perfiles.PersonalOperador]));
+
 api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, CancellationToken ct) =>
 {
     var zonas = await handler.Handle(

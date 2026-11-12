@@ -52,6 +52,11 @@ public class EnviosApi : IEnviosApi
             .ToList();
     }
 
+    public async Task<IReadOnlyList<string>> ListarMotivosNoEntregaAsync(CancellationToken ct = default) =>
+        (await _http.GetFromJsonAsync<CatalogoMotivos>("api/motivos-no-entrega", JsonOptions, ct))?.Motivos ?? [];
+
+    private sealed record CatalogoMotivos(bool AdmiteEntregaParcial, List<string> Motivos);
+
     public async Task<IReadOnlyList<HojaDeRutaItem>> ListarMisHojasAsync(CancellationToken ct = default) =>
         await PedirMisHojasAsync(ct)
         ?? throw new RutaNoDisponibleException("La carga del vehículo es para repartidores: iniciá sesión con un usuario repartidor.");

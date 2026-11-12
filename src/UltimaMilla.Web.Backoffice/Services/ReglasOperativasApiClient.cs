@@ -49,7 +49,10 @@ public sealed record ReglasOperativasVigentesItem(
     bool RequierePruebaEntrega,
     int DiasMaximosParaDevolucion,
     DateTimeOffset VigenciaDesde,
-    IReadOnlyList<MotivoNoEntregaItem> Motivos);
+    IReadOnlyList<MotivoNoEntregaItem> Motivos,
+    bool AdmiteEntregaParcial = false,
+    int AccionBultosPendientes = 0,
+    bool NuevaVisitaConRecargo = false);
 
 public sealed record ActualizarReglasOperativasRequest(
     Guid OperadorId,
@@ -57,4 +60,8 @@ public sealed record ActualizarReglasOperativasRequest(
     int HorasMinimasEntreIntentos,
     bool RequierePruebaEntrega,
     int DiasMaximosParaDevolucion,
-    IReadOnlyList<MotivoNoEntregaItem>? Motivos = null);
+    IReadOnlyList<MotivoNoEntregaItem>? Motivos = null,
+    // RF 33. La API serializa AccionBultosPendientes como número: 0 = nueva visita, 1 = devolver al comercio.
+    bool AdmiteEntregaParcial = false,
+    int AccionBultosPendientes = 0,
+    bool NuevaVisitaConRecargo = false);
