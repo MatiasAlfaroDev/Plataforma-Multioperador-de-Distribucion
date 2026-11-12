@@ -15,7 +15,9 @@ public static class LimiteDeTasa
 {
     private static readonly (string Prefijo, int PorMinuto)[] Reglas =
     [
-        ("/api/seguimiento", 60),
+        // La página de seguimiento del Portal consulta a la API desde el servidor: todos sus visitantes
+        // cuentan como la IP del Portal, por eso el límite es holgado. Frena a un cliente que pegue directo.
+        ("/api/seguimiento", 600),
         ("/api/auth/login", 10)
     ];
 
