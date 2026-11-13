@@ -73,7 +73,7 @@ public static class SeguridadWeb
         app.UseForwardedHeaders();
         app.Use((contexto, siguiente) =>
         {
-            AgregarCabeceras(contexto, esApi: true);
+            AgregarCabeceras(contexto, esApi: !contexto.Request.Path.StartsWithSegments("/docs"));
             return siguiente();
         });
         app.UseCors();
