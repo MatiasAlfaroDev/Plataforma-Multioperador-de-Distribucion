@@ -43,7 +43,19 @@ public sealed record HojaRutaApiDto(
     Guid VehiculoId,
     int CantidadParadas,
     decimal PesoAsignadoKg,
-    bool Despachada);
+    bool Despachada,
+    bool Rendida = false);
+
+/// <summary>RF 22: lo que tiene que volver al depósito al cerrar la hoja.</summary>
+public sealed record RetornoEsperadoApiDto(string Tipo, Guid Id, string Referencia, List<string> Bultos);
+
+public sealed record RendicionApiDto(
+    Guid HojaDeRutaId,
+    string Estado,
+    List<RetornoEsperadoApiDto> Retornos,
+    List<string> ParadasSinResultado);
+
+public sealed record ResultadoRendicionApiDto(int EnviosRetornados, int RetirosRecibidos);
 
 public sealed record FranjaRutaApiDto(
     TimeOnly HoraDesde,
@@ -116,6 +128,46 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
         return resultado?.EnviosActualizados
             ?? throw new InvalidOperationException(
                 "La API no devolvió la cantidad de envíos despachados.");
+    }
+
+    public async Task<RendicionApiDto> ObtenerRendicionAsync(Guid hojaId, CancellationToken ct)
+    {
+        using var respuesta = await http.GetAsync($"api/hojas-de-ruta/{hojaId}/rendicion", ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"No se pudo consultar la rendición. HTTP {(int)respuesta.StatusCode}: {contenido}");
+        }
+
+        return await respuesta.Content.ReadFromJsonAsync<RendicionApiDto>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("La API no devolvió la rendición.");
+    }
+
+    public async Task<ResultadoRendicionApiDto> RendirAsync(
+        Guid hojaId,
+        IReadOnlyList<string> bultosEscaneados,
+        string responsable,
+        CancellationToken ct)
+    {
+        using var solicitud = await CrearSolicitudProtegidaAsync(
+            HttpMethod.Post,
+            $"api/hojas-de-ruta/{hojaId}/rendicion",
+            JsonContent.Create(new { bultosEscaneados, responsable }),
+            ct);
+
+        using var respuesta = await http.SendAsync(solicitud, ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"No se pudo rendir la hoja de ruta. HTTP {(int)respuesta.StatusCode}: {contenido}");
+        }
+
+        return await respuesta.Content.ReadFromJsonAsync<ResultadoRendicionApiDto>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("La API no devolvió el resultado de la rendición.");
     }
 
     public async Task<Guid> CrearAsync(
