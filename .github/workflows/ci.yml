@@ -11,6 +11,23 @@ on:
 jobs:
   build-y-pruebas:
     runs-on: ubuntu-latest
+    # Las pruebas de integración (concurrencia optimista, persistencia) necesitan un PostgreSQL real.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ultimamilla_integracion
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ULTIMAMILLA_INTEGRATION_CONNECTION: Host=localhost;Port=5432;Database=ultimamilla_integracion;Username=postgres;Password=postgres
     steps:
       - uses: actions/checkout@v4
 
@@ -24,8 +41,53 @@ jobs:
       - name: Compilar
         run: dotnet build UltimaMilla.slnx --no-restore -c Release
 
-      - name: Pruebas (unitarias y de arquitectura)
-        run: dotnet test UltimaMilla.slnx --no-build -c Release
+      # El editor puede reescribir el .slnx y dejar afuera proyectos de pruebas: si pasa, que falle acá
+      # con un mensaje claro en lugar de saltearse pruebas en silencio.
+      - name: Verificar que la solución lista los proyectos de pruebas
+        run: |
+          for p in UnitTests Architecture.Tests IntegrationTests; do
+            grep -q "tests/UltimaMilla.$p/UltimaMilla.$p.csproj" UltimaMilla.slnx \
+              || { echo "::error::UltimaMilla.slnx no lista el proyecto $p"; exit 1; }
+          done
+
+      # Cada proyecto de pruebas se ejecuta por ruta, sin depender de lo que liste el .slnx.
+      - name: Pruebas unitarias con cobertura
+        run: >
+          dotnet test tests/UltimaMilla.UnitTests -c Release
+          --settings coverlet.runsettings
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Pruebas de integración con cobertura
+        run: >
+          dotnet test tests/UltimaMilla.IntegrationTests -c Release
+          --settings coverlet.runsettings
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Pruebas de arquitectura
+        run: dotnet test tests/UltimaMilla.Architecture.Tests -c Release
+
+      - name: Reporte de cobertura (Domain y Application)
+        if: always()
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          reportgenerator \
+            -reports:"TestResults/**/coverage.cobertura.xml" \
+            -targetdir:coverage \
+            -reporttypes:"Html;Cobertura;MarkdownSummaryGithub;TextSummary"
+          cat coverage/Summary.txt
+          cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-cobertura
+          path: coverage/
+
+      - name: Exigir más de 70 % en Domain y Application
+        run: bash scripts/verificar-cobertura.sh coverage/Cobertura.xml 70
 
   imagenes-docker:
     runs-on: ubuntu-latest

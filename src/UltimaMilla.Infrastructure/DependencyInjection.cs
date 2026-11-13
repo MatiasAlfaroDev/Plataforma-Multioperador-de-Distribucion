@@ -55,6 +55,7 @@ public static class DependencyInjection
         .AddDefaultTokenProviders();
         services.AddScoped<IEnvioRepository, EnvioRepository>();
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
+        services.AddScoped<IDiscrepanciaRecepcionRepository, DiscrepanciaRecepcionRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
         services.AddScoped<IVersionTarifariaRepository, VersionTarifariaRepository>();
         services.AddScoped<IVersionReglasOperativasRepository, VersionReglasOperativasRepository>();
