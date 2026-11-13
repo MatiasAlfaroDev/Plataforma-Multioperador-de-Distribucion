@@ -51,7 +51,7 @@ El mismo razonamiento alcanza a otros mecanismos con estado compartido:
 | Protección de datos de las cookies | Claves en Redis, con el mismo nombre de aplicación en API, Portal y Backoffice. |
 | Tareas programadas | Lock `SET NX` con vencimiento en Redis (Worker). |
 | Limitación de tasa | Contador por IP y minuto en Redis (`LimiteDeTasa`) para el seguimiento y el login. El limitador de ASP.NET Core cuenta por instancia y con dos réplicas duplicaría el límite. |
-| SignalR | No hay hubs propios. El único SignalR es el circuito de Blazor Server del Portal, que necesita afinidad y no un backplane: Traefik la da con la cookie `UltimaMilla.Afinidad`. |
+| SignalR | El hub del tablero en vivo (`/api/hubs/tablero`) usa Redis como backplane, así un aviso que sale de una réplica llega a las conexiones de la otra. El circuito de Blazor Server del Portal necesita afinidad y no un backplane: Traefik la da con la cookie `UltimaMilla.Afinidad`. |
 
 ## Alternativas consideradas
 
