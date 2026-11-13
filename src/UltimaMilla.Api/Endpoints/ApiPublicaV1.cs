@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using UltimaMilla.Api.Seguridad;
@@ -9,6 +10,7 @@ using UltimaMilla.Application.Envios.Queries.ObtenerDetalleEnvio;
 using UltimaMilla.Application.Retiros.Commands.CrearRetiro;
 using UltimaMilla.Application.Retiros.Queries;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Infrastructure.Persistence;
 
 namespace UltimaMilla.Api.Endpoints;
 
@@ -47,7 +49,11 @@ public static class ApiPublicaV1
                     Description =
                         "Alta y consulta de envíos y retiros desde el sistema del comercio. " +
                         "Se autentica con la clave del comercio en el encabezado X-Api-Key, que se genera desde el " +
-                        "Portal (Usuarios > Clave de API) y se muestra una sola vez."
+                        "Portal (Usuarios > Clave de API) y se muestra una sola vez. " +
+                        "Ambiente de pruebas: la clave de pruebas (Usuarios > Ver clave de pruebas) valida los pedidos igual " +
+                        "que la real pero no guarda nada, y su límite es menor. " +
+                        "Límite de pedidos por minuto y por clave: 120 con clave real, 30 con clave de pruebas; " +
+                        "al superarlo se responde 429 con la cabecera Retry-After."
                 };
 
                 documento.Components ??= new OpenApiComponents();
@@ -88,16 +94,23 @@ public static class ApiPublicaV1
             .WithGroupName(Documento);
 
         // POST /api/v1/envios → alta de un envío. Responde 201 con el id y el token de seguimiento.
+        // Con la clave de pruebas se ejecuta igual (validaciones, tarifa) pero se descarta al final: no queda nada.
         v1.MapPost("/envios", async (
+            HttpContext http,
             CrearEnvioCommand command,
             CrearEnvioHandler handler,
+            AppDbContext db,
             CancellationToken ct) =>
         {
-            var resultado = await handler.Handle(command, ct);
+            var pruebas = ClaveApiAuthenticationHandler.EsEntornoDePruebas(http);
+
+            var resultado = pruebas
+                ? await EjecutarSinGuardarAsync(db, () => handler.Handle(command, ct), ct)
+                : await handler.Handle(command, ct);
 
             return Results.Created(
                 $"/api/v1/envios/{resultado.EnvioId}",
-                new { id = resultado.EnvioId, tokenSeguimiento = resultado.TokenSeguimiento });
+                new { id = resultado.EnvioId, tokenSeguimiento = resultado.TokenSeguimiento, entorno = pruebas ? "pruebas" : "produccion" });
         })
         .WithTags("Envíos")
         .WithSummary("Da de alta un envío")
@@ -105,33 +118,46 @@ public static class ApiPublicaV1
         .RequireAuthorization(PoliticaConClave(Perfiles.OperadorYComercio));
 
         // GET /api/v1/envios → envíos visibles para la clave.
+        // Con la clave de pruebas no se muestran datos reales: la lista viene vacía.
         v1.MapGet("/envios", async (
+            HttpContext http,
             ListarEnviosHandler handler,
             CancellationToken ct) =>
-            Results.Ok(await handler.Handle(new ListarEnviosQuery(null), ct)))
+            ClaveApiAuthenticationHandler.EsEntornoDePruebas(http)
+                ? Results.Ok(Array.Empty<object>())
+                : Results.Ok(await handler.Handle(new ListarEnviosQuery(null), ct)))
         .WithTags("Envíos")
         .WithSummary("Lista los envíos")
         .RequireAuthorization(PoliticaConClave(Perfiles.OperadorYComercio));
 
         // GET /api/v1/envios/{id} → detalle y estado de un envío.
         v1.MapGet("/envios/{envioId:guid}", async (
+            HttpContext http,
             Guid envioId,
             ObtenerDetalleEnvioHandler handler,
             CancellationToken ct) =>
-            Results.Ok(await handler.Handle(new ObtenerDetalleEnvioQuery(envioId), ct)))
+            ClaveApiAuthenticationHandler.EsEntornoDePruebas(http)
+                ? SinDatosEnPruebas()
+                : Results.Ok(await handler.Handle(new ObtenerDetalleEnvioQuery(envioId), ct)))
         .WithTags("Envíos")
         .WithSummary("Consulta el detalle de un envío")
         .RequireAuthorization(PoliticaConClave(Perfiles.OperadorYComercio));
 
-        // POST /api/v1/retiros → solicitud de retiro (RF 37).
+        // POST /api/v1/retiros → solicitud de retiro (RF 37). Con la clave de pruebas no se guarda.
         v1.MapPost("/retiros", async (
+            HttpContext http,
             CrearRetiroCommand command,
             CrearRetiroHandler handler,
+            AppDbContext db,
             CancellationToken ct) =>
         {
-            var id = await handler.Handle(command, ct);
+            var pruebas = ClaveApiAuthenticationHandler.EsEntornoDePruebas(http);
 
-            return Results.Created($"/api/v1/retiros/{id}", new { id });
+            var id = pruebas
+                ? await EjecutarSinGuardarAsync(db, () => handler.Handle(command, ct), ct)
+                : await handler.Handle(command, ct);
+
+            return Results.Created($"/api/v1/retiros/{id}", new { id, entorno = pruebas ? "pruebas" : "produccion" });
         })
         .WithTags("Retiros")
         .WithSummary("Solicita un retiro")
@@ -140,19 +166,26 @@ public static class ApiPublicaV1
 
         // GET /api/v1/retiros → retiros del comercio.
         v1.MapGet("/retiros", async (
+            HttpContext http,
             ConsultarRetirosHandler handler,
             CancellationToken ct) =>
-            Results.Ok(await handler.ListarAsync(ct)))
+            ClaveApiAuthenticationHandler.EsEntornoDePruebas(http)
+                ? Results.Ok(Array.Empty<object>())
+                : Results.Ok(await handler.ListarAsync(ct)))
         .WithTags("Retiros")
         .WithSummary("Lista los retiros")
         .RequireAuthorization(PoliticaConClave(Perfiles.OperadorYComercio));
 
         // GET /api/v1/retiros/{id} → detalle de un retiro.
         v1.MapGet("/retiros/{retiroId:guid}", async (
+            HttpContext http,
             Guid retiroId,
             ConsultarRetirosHandler handler,
             CancellationToken ct) =>
         {
+            if (ClaveApiAuthenticationHandler.EsEntornoDePruebas(http))
+                return SinDatosEnPruebas();
+
             var retiro = await handler.ObtenerAsync(retiroId, ct);
 
             return retiro is null ? Results.NotFound() : Results.Ok(retiro);
@@ -163,6 +196,59 @@ public static class ApiPublicaV1
 
         return app;
     }
+
+    /// <summary>
+    /// Ejecuta la operación completa (validaciones, tarifa, eventos) dentro de una transacción que siempre se
+    /// deshace: es lo que hace que la clave de pruebas se comporte como la real sin dejar datos.
+    /// </summary>
+    private static async Task<T> EjecutarSinGuardarAsync<T>(AppDbContext db, Func<Task<T>> operacion, CancellationToken ct)
+    {
+        await using var transaccion = await db.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            return await operacion();
+        }
+        finally
+        {
+            await transaccion.RollbackAsync(CancellationToken.None);
+        }
+    }
+
+    private static IResult SinDatosEnPruebas() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "En el ambiente de pruebas no se guardan datos.",
+            detail: "Los pedidos hechos con la clave de pruebas se validan pero no se almacenan, así que no hay nada que consultar.");
+
+    /// <summary>
+    /// La clave de pruebas solo sirve en /api/v1: sin esto podría llamar a los endpoints internos, que sí guardan.
+    /// Va después de UseAuthentication.
+    /// </summary>
+    public static IApplicationBuilder UseAislamientoDePruebas(this IApplicationBuilder app) =>
+        app.Use(async (contexto, siguiente) =>
+        {
+            if (ClaveApiAuthenticationHandler.EsLlamadaConClave(contexto) &&
+                contexto.Request.Path.StartsWithSegments("/api/v1"))
+            {
+                contexto.Response.Headers["X-Entorno"] = ClaveApiAuthenticationHandler.EsEntornoDePruebas(contexto)
+                    ? ClaveApiAuthenticationHandler.EntornoPruebas
+                    : ClaveApiAuthenticationHandler.EntornoProduccion;
+            }
+
+            if (ClaveApiAuthenticationHandler.EsEntornoDePruebas(contexto) &&
+                !contexto.Request.Path.StartsWithSegments("/api/v1"))
+            {
+                contexto.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await Results.Problem(
+                        statusCode: StatusCodes.Status403Forbidden,
+                        title: "La clave de pruebas solo sirve en /api/v1.")
+                    .ExecuteAsync(contexto);
+                return;
+            }
+
+            await siguiente();
+        });
 
     /// <summary>Solo con clave de API (sin cookie) y con alguno de los perfiles indicados.</summary>
     private static Action<Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder> PoliticaConClave(

@@ -255,6 +255,7 @@ app.UseExceptionHandler();
 app.UseLimiteDeTasa();
 
 app.UseAuthentication();
+app.UseAislamientoDePruebas();
 app.UseLimitacionDeTasa();
 app.UseAuthorization();
 app.UseAntiforgery();
