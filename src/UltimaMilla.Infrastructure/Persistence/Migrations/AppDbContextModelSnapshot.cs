@@ -1735,6 +1735,12 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("VehiculoId")
                         .HasColumnType("uuid");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<decimal>("VolumenAsignadoM3")
                         .HasPrecision(12, 6)
                         .HasColumnType("numeric(12,6)");

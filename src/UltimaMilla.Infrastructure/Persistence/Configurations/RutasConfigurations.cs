@@ -80,6 +80,10 @@ public sealed class HojaDeRutaConfiguration
         builder.ToTable("hojas_de_ruta");
         builder.HasKey(x => x.Id);
 
+        // Concurrencia optimista con xmin, igual que Envio y Retiro (informe 6.4): dos despachadores
+        // que editan la misma ruta a la vez no pueden pisarse ni pasarse de la capacidad del vehículo.
+        builder.Property<uint>("Version").IsRowVersion();
+
         builder.Property(x => x.Id).ValueGeneratedNever();
 
         builder.Property(x => x.Estado)
