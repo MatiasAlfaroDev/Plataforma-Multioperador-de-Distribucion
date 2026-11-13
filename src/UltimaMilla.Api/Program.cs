@@ -12,6 +12,7 @@ using UltimaMilla.Application.Envios.Commands.CrearEnvio;
 using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
+using UltimaMilla.Application.Envios.Queries.ListarDiscrepanciasRecepcion;
 using UltimaMilla.Application.Envios.Commands.Reprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarSolicitudesReprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
@@ -25,6 +26,7 @@ using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.CrearZona;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
+using UltimaMilla.Application.Rutas.Commands.RendirHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
@@ -125,6 +127,9 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// Seguridad web (RNF 6.3): IP real detrás de Traefik, limitación de tasa, CORS y cabeceras. Ver Seguridad/SeguridadWeb.cs.
+builder.Services.AddSeguridadWeb(builder.Configuration);
+
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -218,10 +223,12 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
     return;
 }
 
+app.UseSeguridadWeb();
 app.UseExceptionHandler();
 app.UseLimiteDeTasa();
 
 app.UseAuthentication();
+app.UseLimitacionDeTasa();
 app.UseAuthorization();
 app.UseAntiforgery();
 
@@ -645,16 +652,27 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
         RecibirEnDepositoHandler handler,
         CancellationToken ct) =>
     {
-        await handler.Handle(
+        var resultado = await handler.Handle(
             new RecibirEnDepositoCommand(
                 envioId,
                 request.IdentificacionesEscaneadas,
                 request.Responsable),
             ct);
 
-        return Results.NoContent();
+        // RF 10: 200 con el detalle; "recibido: false" indica que faltan bultos declarados.
+        return Results.Ok(resultado);
 })
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
+
+api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
+    async (
+        Guid envioId,
+        ListarDiscrepanciasRecepcionHandler handler,
+        CancellationToken ct) =>
+        Results.Ok(await handler.Handle(envioId, ct)))
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
 
 api.MapPost("/envios/{envioId:guid}/retorno-deposito",
     async (
@@ -1386,6 +1404,36 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
+// RF 22: rendición al regresar al depósito. GET muestra lo que tiene que volver; POST lo recibe y cierra la hoja.
+api.MapGet("/hojas-de-ruta/{hojaId:guid}/rendicion",
+    async (Guid hojaId, RendirHojaDeRutaHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.ObtenerAsync(hojaId, ct)))
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
+
+api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
+    async (
+        Guid hojaId,
+        RendirHojaDeRutaRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        RendirHojaDeRutaHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        var resultado = await handler.Handle(
+            new RendirHojaDeRutaCommand(hojaId, request.BultosEscaneados ?? [], request.Responsable ?? string.Empty),
+            ct);
+
+        return Results.Ok(resultado);
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
+
 api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
     async (
         Guid hojaId,
@@ -1653,3 +1701,6 @@ public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOn
 
 public sealed record AgregarRetiroARutaRequest(Guid RetiroId);
 public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId, DateOnly Fecha, TimeOnly HoraSalida, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta,  int MaximoParadas, IReadOnlyList<Guid>? EnviosIds, IReadOnlyList<Guid>? RetirosIds = null, IReadOnlyList<Guid>? DevolucionesIds = null, IReadOnlyList<Guid>? EntregasRetirosIds = null);
+
+/// <summary>RF 22: lo escaneado al volver al depósito y quién lo recibe.</summary>
+public sealed record RendirHojaDeRutaRequest(IReadOnlyList<string>? BultosEscaneados, string? Responsable);

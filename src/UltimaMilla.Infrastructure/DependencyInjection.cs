@@ -56,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<IEnvioRepository, EnvioRepository>();
         services.AddScoped<IBanderas, UltimaMilla.Infrastructure.Plataforma.BanderasService>();
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
+        services.AddScoped<IDiscrepanciaRecepcionRepository, DiscrepanciaRecepcionRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
         services.AddScoped<IVersionTarifariaRepository, VersionTarifariaRepository>();
         services.AddScoped<IVersionReglasOperativasRepository, VersionReglasOperativasRepository>();

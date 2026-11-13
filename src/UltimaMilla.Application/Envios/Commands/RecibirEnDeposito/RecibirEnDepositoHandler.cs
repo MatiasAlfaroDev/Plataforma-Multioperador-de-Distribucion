@@ -9,13 +9,14 @@ namespace UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
 
 public sealed class RecibirEnDepositoHandler(
     IEnvioRepository envios,
+    IDiscrepanciaRecepcionRepository discrepancias,
     IVersionReglasOperativasRepository reglasRepository,
     IUnitOfWork unitOfWork,
     TimeProvider reloj,
     ICacheService cache,
     ITenantContext tenantContext)
 {
-    public async Task Handle(
+    public async Task<ResultadoRecepcion> Handle(
         RecibirEnDepositoCommand command,
         CancellationToken ct)
     {
@@ -83,9 +84,45 @@ public sealed class RecibirEnDepositoHandler(
         var recibidos = escaneados
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (!esperados.SetEquals(recibidos))
-            throw new InvalidOperationException(
-                "Los bultos escaneados no coinciden con los declarados en el envío.");
+        // RF 10: se compara lo escaneado con lo declarado y las diferencias quedan registradas.
+        var faltantes = esperados
+            .Where(codigo => !recibidos.Contains(codigo))
+            .OrderBy(codigo => codigo, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var noDeclarados = recibidos
+            .Where(codigo => !esperados.Contains(codigo))
+            .OrderBy(codigo => codigo, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var ahora = reloj.GetUtcNow();
+        var responsable = command.Responsable.Trim();
+        var registradas = new List<DiscrepanciaRecepcion>();
+
+        foreach (var codigo in faltantes)
+            registradas.Add(DiscrepanciaRecepcion.Registrar(
+                envio, TipoDiscrepanciaRecepcion.BultoFaltante,
+                codigo, responsable, ahora));
+
+        foreach (var codigo in noDeclarados)
+            registradas.Add(DiscrepanciaRecepcion.Registrar(
+                envio, TipoDiscrepanciaRecepcion.BultoNoDeclarado,
+                codigo, responsable, ahora));
+
+        foreach (var discrepancia in registradas)
+            await discrepancias.AgregarAsync(discrepancia, ct);
+
+        var dtos = registradas
+            .Select(d => new DiscrepanciaRecepcionDto(
+                d.Tipo, d.Identificacion, d.Responsable, d.RegistradaEn))
+            .ToList();
+
+        // Faltan bultos declarados: el envío sigue Admitido, pero la discrepancia no se pierde.
+        if (faltantes.Count > 0)
+        {
+            await unitOfWork.GuardarCambiosAsync(ct);
+            return new ResultadoRecepcion(false, dtos);
+        }
 
         // 8. Obtener las reglas operativas.
         if (envio.VersionReglasOperativasId is not Guid versionId)
@@ -103,9 +140,9 @@ public sealed class RecibirEnDepositoHandler(
         envio.Aplicar(
             DisparadorEnvio.RecibirEnDeposito,
             reglas,
-            reloj.GetUtcNow(),
+            ahora,
             "Backoffice",
-            command.Responsable.Trim());
+            responsable);
 
         // 10. Guardar los cambios en PostgreSQL.
         await unitOfWork.GuardarCambiosAsync(ct);
@@ -121,5 +158,7 @@ public sealed class RecibirEnDepositoHandler(
             $"envios:operador:{envio.OperadorId}:cuenta:{envio.CuentaComercialId}";
 
         await cache.EliminarAsync(claveComercio, ct);
+
+        return new ResultadoRecepcion(true, dtos);
     }
 }

@@ -764,4 +764,47 @@ public class HojaDeRutaTests
         Assert.Equal(9m, horarios[1].PesoPosteriorKg);
     }
 
+    // ----- RF 22: rendición al regresar al depósito -----
+
+    [Fact]
+    public void Rendicion_HojaSinDespachar_SeRechaza()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        ruta.AgregarEnvio(CrearEnvio(operadorId));
+
+        Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
+        Assert.Equal(EstadoHojaDeRuta.EnPreparacion, ruta.Estado);
+    }
+
+    [Fact]
+    public void Rendicion_ConParadasSinResultado_SeRechaza()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        ruta.AgregarEnvio(CrearEnvio(operadorId));
+        ruta.MarcarDespachada(DateTimeOffset.UtcNow);
+
+        Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
+        Assert.Equal(EstadoHojaDeRuta.Despachada, ruta.Estado);
+    }
+
+    [Fact]
+    public void Rendicion_ConTodasLasParadasResueltas_CierraLaHoja()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var retiro = CrearRetiroEnDeposito(operadorId);
+        var ahora = DateTimeOffset.UtcNow;
+
+        ruta.AgregarEntregaRetiroComercio(retiro);
+        ruta.MarcarDespachada(ahora);
+        retiro.EntregarAlComercio();
+        ruta.FinalizarParadaEntregaRetiroComercio(retiro, ahora);
+
+        ruta.MarcarRendida();
+
+        Assert.Equal(EstadoHojaDeRuta.Rendida, ruta.Estado);
+        Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
+    }
 }
