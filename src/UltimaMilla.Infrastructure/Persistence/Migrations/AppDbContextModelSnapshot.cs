@@ -765,6 +765,50 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.ToTable("bultos", (string)null);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.DiscrepanciaRecepcion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EnvioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Identificacion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RegistradaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Responsable")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId");
+
+                    b.HasIndex("OperadorId", "EnvioId", "RegistradaEn");
+
+                    b.ToTable("discrepancias_recepcion", (string)null);
+                });
+
             modelBuilder.Entity("UltimaMilla.Domain.Envios.Envio", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2101,6 +2145,15 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .WithMany("Bultos")
                         .HasForeignKey("EnvioId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("UltimaMilla.Domain.Envios.DiscrepanciaRecepcion", b =>
+                {
+                    b.HasOne("UltimaMilla.Domain.Envios.Envio", null)
+                        .WithMany()
+                        .HasForeignKey("EnvioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("UltimaMilla.Domain.Envios.Envio", b =>

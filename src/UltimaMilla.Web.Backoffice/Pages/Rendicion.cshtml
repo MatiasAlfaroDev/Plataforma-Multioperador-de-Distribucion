@@ -1,0 +1,94 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.RendicionModel
+
+@{
+    ViewData["Title"] = "Rendición de hoja de ruta";
+}
+
+<div class="encabezado">
+    <div>
+        <h1>Rendición al regresar al depósito</h1>
+        <p>Escaneá lo que trae el repartidor: los bultos que no se entregaron y los que retiró en domicilios. Si coincide con la hoja, la hoja se cierra.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="aviso error">
+        @Model.Error
+    </div>
+}
+
+<p class="nota">Hoja de ruta <span class="codigo">@Model.HojaId</span></p>
+
+@if (Model.Rendicion is { } rendicion)
+{
+    @if (rendicion.Estado == "Rendida")
+    {
+        <div class="aviso ok">Esta hoja ya fue rendida.</div>
+    }
+    else
+    {
+        @if (rendicion.ParadasSinResultado.Count > 0)
+        {
+            <div class="aviso error">
+                Hay paradas sin resultado: @string.Join(", ", rendicion.ParadasSinResultado).
+                El repartidor tiene que registrarlas y sincronizar la app antes de rendir.
+            </div>
+        }
+
+        <h2>Lo que tiene que volver (@Model.TotalBultos bultos)</h2>
+
+        @if (rendicion.Retornos.Count == 0)
+        {
+            <p>No vuelve nada: todo se entregó. Igual hay que rendir para cerrar la hoja.</p>
+        }
+        else
+        {
+            <div class="tabla">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Referencia</th>
+                            <th>Bultos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var retorno in rendicion.Retornos)
+                        {
+                            <tr>
+                                <td>@(retorno.Tipo == "Retiro" ? "Retirado en domicilio" : "No entregado")</td>
+                                <td>@retorno.Referencia</td>
+                                <td class="codigo">@string.Join(", ", retorno.Bultos)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="HojaId" />
+
+            <div>
+                <label asp-for="Escaneados">Bultos escaneados</label>
+                <textarea asp-for="Escaneados" rows="6" placeholder="Un código por línea"></textarea>
+                <p class="nota">Si falta algún bulto y se perdió, declarar el extravío del envío desde su detalle y volver a rendir.</p>
+            </div>
+
+            <div>
+                <label asp-for="Responsable">Recibe en el depósito</label>
+                <input type="text" asp-for="Responsable" />
+            </div>
+
+            <div class="acciones">
+                <a asp-page="/HojasDeRuta">Cancelar</a>
+                <button type="submit" class="btn-primario" disabled="@(rendicion.ParadasSinResultado.Count > 0)">
+                    Rendir y cerrar la hoja
+                </button>
+            </div>
+        </form>
+    }
+}

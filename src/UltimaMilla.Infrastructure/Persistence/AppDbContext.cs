@@ -36,6 +36,7 @@ public sealed class AppDbContext(
     public DbSet<CuentaComercial> CuentasComerciales => Set<CuentaComercial>();
     public DbSet<Envio> Envios => Set<Envio>();
     public DbSet<EventoEnvio> EventosEnvio => Set<EventoEnvio>();
+    public DbSet<DiscrepanciaRecepcion> DiscrepanciasRecepcion => Set<DiscrepanciaRecepcion>();
     public DbSet<Repartidor> Repartidores => Set<Repartidor>();
     public DbSet<Vehiculo> Vehiculos => Set<Vehiculo>();
     public DbSet<HojaDeRuta> HojasDeRuta => Set<HojaDeRuta>();
@@ -148,6 +149,11 @@ public sealed class AppDbContext(
                 x.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<EntregaAviso>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<DiscrepanciaRecepcion>()
             .HasQueryFilter(x =>
                 AccesoInicializacion ||
                 x.OperadorId == OperadorActualId);

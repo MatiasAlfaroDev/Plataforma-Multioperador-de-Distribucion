@@ -72,11 +72,42 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
 
         try
         {
-            await api.RecibirEnDepositoAsync(
+            var resultado = await api.RecibirEnDepositoAsync(
                 envioId,
                 codigos,
                 responsable ?? string.Empty,
                 ct);
+
+            var faltantes = resultado.Discrepancias
+                .Where(d => d.Tipo == "BultoFaltante")
+                .Select(d => d.Identificacion)
+                .ToList();
+
+            var noDeclarados = resultado.Discrepancias
+                .Where(d => d.Tipo == "BultoNoDeclarado")
+                .Select(d => d.Identificacion)
+                .ToList();
+
+            // RF 10: faltan bultos declarados, el envío sigue Admitido y la discrepancia quedó registrada.
+            if (!resultado.Recibido)
+            {
+                await CargarDatosAsync(ct);
+
+                Error = "No se recibió el envío: faltan bultos declarados (" +
+                    string.Join(", ", faltantes) + ")." +
+                    (noDeclarados.Count > 0
+                        ? " Bultos escaneados que no estaban declarados: " +
+                          string.Join(", ", noDeclarados) + "."
+                        : string.Empty) +
+                    " La discrepancia quedó registrada.";
+
+                return Page();
+            }
+
+            TempData["MensajeExito"] = noDeclarados.Count > 0
+                ? "Envío recibido en depósito. Discrepancia registrada: bultos escaneados que no estaban declarados (" +
+                  string.Join(", ", noDeclarados) + ")."
+                : "Envío recibido en depósito.";
 
             return RedirectToPage();
         }

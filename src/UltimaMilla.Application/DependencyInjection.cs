@@ -5,6 +5,7 @@ using UltimaMilla.Application.Envios.Commands.CrearEnvio;
 using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
+using UltimaMilla.Application.Envios.Queries.ListarDiscrepanciasRecepcion;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Envios.Commands.Reprogramacion;
 using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
@@ -19,6 +20,7 @@ using UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigen
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
+using UltimaMilla.Application.Rutas.Commands.RendirHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
@@ -78,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<ObtenerDetalleEnvioHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();
+        services.AddScoped<ListarDiscrepanciasRecepcionHandler>();
         services.AddScoped<RetornarADepositoHandler>();
         services.AddScoped<SolicitarReprogramacionHandler>();
         services.AddScoped<ConfirmarReprogramacionHandler>();
@@ -106,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<RegistrarReaparicionHandler>();
         services.AddScoped<ObtenerMisHojasDeRutaHandler>();
         services.AddScoped<DespacharMiHojaDeRutaHandler>();
+        services.AddScoped<RendirHojaDeRutaHandler>();
         services.AddScoped<RegistrarPosicionesHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();
         services.AddScoped<EnviarNotificacionDePruebaHandler>();

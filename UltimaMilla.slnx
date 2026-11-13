@@ -10,6 +10,7 @@
     <Project Path="src/UltimaMilla.ReceptorAvisos/UltimaMilla.ReceptorAvisos.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/UltimaMilla.IntegrationTests/UltimaMilla.IntegrationTests.csproj" />
     <Project Path="tests/UltimaMilla.UnitTests/UltimaMilla.UnitTests.csproj" />
     <Project Path="tests/UltimaMilla.Architecture.Tests/UltimaMilla.Architecture.Tests.csproj" />
   </Folder>

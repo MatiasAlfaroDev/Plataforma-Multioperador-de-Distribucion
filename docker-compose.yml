@@ -192,6 +192,10 @@ services:
       Correo__Host: "mailpit"
       Correo__Puerto: "1025"
       Seguimiento__UrlBase: "${URL_SEGUIMIENTO:-http://portal.localhost:8000/seguimiento}"
+      # Push al repartidor cuando le asignan un envío (AvisarAsignacionConsumer). Misma cuenta de servicio que la API.
+      Firebase__CredencialesRuta: "/run/secretos/firebase-cuenta-servicio.json"
+    volumes:
+      - ./docker/secretos:/run/secretos:ro
     depends_on:
       postgres:
         condition: service_healthy

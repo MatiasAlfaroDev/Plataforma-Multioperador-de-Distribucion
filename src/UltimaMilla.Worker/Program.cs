@@ -34,6 +34,7 @@ builder.Services.AddInfrastructure(connectionString, rabbitMq, x =>
     x.AddConsumer<EntregarAvisoConsumer, EntregarAvisoDefinition>();
     x.AddConsumer<EnviarEnlaceSeguimientoConsumer, EnviarEnlaceSeguimientoDefinition>();
     x.AddConsumer<InvalidarSeguimientoConsumer, InvalidarSeguimientoDefinition>();
+    x.AddConsumer<AvisarAsignacionConsumer, AvisarAsignacionDefinition>();
 });
 builder.Services.AddSingleton<IEnviadorCorreo, SmtpEnviadorCorreo>();
 
