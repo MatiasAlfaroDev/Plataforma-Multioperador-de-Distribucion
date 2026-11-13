@@ -62,7 +62,7 @@ builder.Services.AddRazorPages(options =>
     // Letra 3.3: la configuración es del administrador; la planificación, del despachador.
     foreach (var pagina in new[] { "/Zonas", "/EditarZona", "/Tarifas", "/ReglasOperativas", "/SolicitudesComerciales", "/Personal" })
         options.Conventions.AuthorizePage(pagina, "AdministradorOperador");
-    foreach (var pagina in new[] { "/HojasDeRuta", "/Avisos", "/Reportes" })
+    foreach (var pagina in new[] { "/Tablero", "/HojasDeRuta", "/Avisos", "/Reportes" })
         options.Conventions.AuthorizePage(pagina, "Despacho");
 
     options.Conventions.AuthorizeFolder(

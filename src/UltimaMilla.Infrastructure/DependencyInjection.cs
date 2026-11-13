@@ -72,6 +72,7 @@ public static class DependencyInjection
         services.AddScoped<IPublicadorDeEventos, PublicadorDeEventos>();
         services.AddScoped<IDispositivoMovilRepository, DispositivoMovilRepository>();
         services.AddScoped<IPosicionRepartidorRepository, PosicionRepartidorRepository>();
+        services.AddScoped<ITableroRepository, TableroRepository>();
         services.AddScoped<ISuscripcionAvisoRepository, SuscripcionAvisoRepository>();
         services.AddScoped<IEntregaAvisoRepository, EntregaAvisoRepository>();
         services.AddScoped<IReporteEnviosRepository, ReporteEnviosRepository>();

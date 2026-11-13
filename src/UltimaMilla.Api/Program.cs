@@ -82,6 +82,9 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerResumenRetiros;
 using System.Security.Cryptography;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Infrastructure.Observabilidad;
+using UltimaMilla.Api.TiempoReal;
+using UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
+using Microsoft.AspNetCore.SignalR;
 using Serilog;
 using Serilog.Events;
 
@@ -95,7 +98,8 @@ var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(connectionString, rabbitMq);
+// El único consumidor de la API: el del tablero en vivo, que necesita el hub de SignalR (RNF 6.10).
+builder.Services.AddInfrastructure(connectionString, rabbitMq, x => x.AddConsumer<TableroConsumer>());
 
 // Con X-Api-Key autentica la clave del comercio (RF 37); si no, la cookie de siempre.
 const string CookieOClave = "CookieOClaveApi";
@@ -201,6 +205,14 @@ if (!soloInicializar)
         .PersistKeysToStackExchangeRedis(
             redis,
             "UltimaMilla:DataProtection:Keys");
+
+    // Tablero en vivo (RNF 6.10): con dos réplicas, el backplane de Redis lleva cada mensaje a las
+    // conexiones de las dos. El cliente usa WebSockets directo, así no hace falta afinidad en Traefik.
+    builder.Services.AddSignalR().AddStackExchangeRedis(o =>
+    {
+        o.Configuration.ChannelPrefix = RedisChannel.Literal("UltimaMilla:SignalR");
+        o.ConnectionFactory = _ => Task.FromResult<IConnectionMultiplexer>(redis);
+    });
 }
 
 builder.Services.AddHttpContextAccessor();
@@ -252,6 +264,8 @@ app.MapOpenApi();  // contrato en /openapi/v1.json (Scalar se agrega con la API 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHub<TableroHub>("/api/hubs/tablero")
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 app.MapAutenticacionEndpoints();
 app.MapVinculacionesComercialesEndpoints();
 app.MapPersonalEndpoints();
@@ -1594,12 +1608,27 @@ api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/despachar", async (
 
 // POST /api/repartidor/posiciones → lote de posiciones que la app tomó durante la jornada (RF 23),
 // muchas veces con la pantalla apagada o sin señal. Idempotente: reenviar un lote no duplica nada.
+// Las nuevas se avisan al tablero en vivo (RF 29) para que mueva el marcador del repartidor.
 api.MapPost("/repartidor/posiciones", async (
     RegistrarPosicionesCommand command,
     RegistrarPosicionesHandler handler,
+    ITenantContext sesion,
+    IHubContext<TableroHub> tablero,
     CancellationToken ct) =>
-    Results.Ok(new { guardadas = await handler.Handle(command, ct) }))
+{
+    var guardadas = await handler.Handle(command, ct);
+    if (guardadas > 0 && sesion.OperadorId is { } operadorId)
+        await tablero.Clients.Group(TableroHub.Grupo(operadorId)).SendAsync("PosicionActualizada", ct);
+
+    return Results.Ok(new { guardadas });
+})
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
+// GET /api/tablero → foto del tablero de operación en vivo (RF 29): envíos por estado, flota y envíos
+// en riesgo. El Backoffice la vuelve a pedir cuando el hub avisa un cambio.
+api.MapGet("/tablero", async (ObtenerTableroEnVivoHandler handler, CancellationToken ct) =>
+    Results.Ok(await handler.Handle(ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 // PUT /api/repartidor/sincronizacion → al terminar cada sincronización la app avisa cuántos eventos le
 // quedan sin subir; el Worker publica la suma en la métrica sincronizaciones_pendientes (RNF 6.12).
