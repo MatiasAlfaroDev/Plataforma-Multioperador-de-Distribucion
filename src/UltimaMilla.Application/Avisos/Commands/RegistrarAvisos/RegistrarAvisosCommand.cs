@@ -10,4 +10,8 @@ public sealed record RegistrarAvisosCommand(
     Guid EnvioId,
     string TipoEvento,
     string ClaveEvento,
-    DateTimeOffset OcurridoEn);
+    DateTimeOffset OcurridoEn,
+    BultoDelAviso? Bulto = null);
+
+/// <summary>El bulto que originó el aviso (RF 36), solo en avisos de bulto.</summary>
+public sealed record BultoDelAviso(string Identificacion, string EstadoAnterior, string EstadoNuevo, string? Motivo);

@@ -23,6 +23,16 @@ public class ReglasOperativasModel(
     [BindProperty]
     public List<MotivoNoEntregaFormulario> Motivos { get; set; } = [];
 
+    // RF 33: entrega parcial y destino de los bultos pendientes.
+    [BindProperty]
+    public bool AdmiteEntregaParcial { get; set; }
+
+    [BindProperty]
+    public int AccionBultosPendientes { get; set; }
+
+    [BindProperty]
+    public bool NuevaVisitaConRecargo { get; set; }
+
     public bool ReglasEncontradas { get; private set; }
 
     public bool PuedeMostrarFormulario { get; private set; } = true;
@@ -61,6 +71,9 @@ public class ReglasOperativasModel(
             HorasMinimasEntreIntentos = reglas.HorasMinimasEntreIntentos;
             RequierePruebaEntrega = reglas.RequierePruebaEntrega;
             DiasMaximosParaDevolucion = reglas.DiasMaximosParaDevolucion;
+            AdmiteEntregaParcial = reglas.AdmiteEntregaParcial;
+            AccionBultosPendientes = reglas.AccionBultosPendientes;
+            NuevaVisitaConRecargo = reglas.NuevaVisitaConRecargo;
             VigenciaDesde = reglas.VigenciaDesde;
             ReglasEncontradas = true;
 
@@ -145,7 +158,11 @@ public class ReglasOperativasModel(
                     HorasMinimasEntreIntentos,
                     RequierePruebaEntrega,
                     DiasMaximosParaDevolucion,
-                    motivosRequest),
+                    motivosRequest,
+                    AdmiteEntregaParcial,
+                    AccionBultosPendientes,
+                    // El recargo solo tiene sentido si los pendientes vuelven a visitarse.
+                    NuevaVisitaConRecargo && AccionBultosPendientes == 0),
                 ct);
 
             TempData["Mensaje"] =

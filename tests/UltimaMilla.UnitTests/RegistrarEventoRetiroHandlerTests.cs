@@ -421,7 +421,7 @@ public sealed class RegistrarEventoRetiroHandlerTests
             Task.FromResult<SuscripcionAviso?>(null);
 
         public Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(
-            Guid? cuentaComercialId,
+            IReadOnlyCollection<Guid>? cuentas,
             CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<SuscripcionAviso>>([]);
 
@@ -437,6 +437,10 @@ public sealed class RegistrarEventoRetiroHandlerTests
             Guid id, CancellationToken ct) =>
             Task.FromResult<EntregaAviso?>(null);
 
+        public Task<EntregaAviso?> ObtenerAsync(
+            Guid id, IReadOnlyCollection<Guid>? cuentas, CancellationToken ct) =>
+            Task.FromResult<EntregaAviso?>(null);
+
         public Task<bool> ExisteAsync(
             Guid suscripcionId,
             string claveEvento,
@@ -444,7 +448,7 @@ public sealed class RegistrarEventoRetiroHandlerTests
             Task.FromResult(false);
 
         public Task<IReadOnlyList<EntregaAviso>> ListarAsync(
-            Guid? cuentaComercialId,
+            IReadOnlyCollection<Guid>? cuentas,
             EstadoEntregaAviso? estado,
             CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<EntregaAviso>>([]);

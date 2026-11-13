@@ -17,6 +17,7 @@ public sealed class ImportarEnviosCsvHandler(
         string Modalidad,
         string Nombre,
         string? Telefono,
+        string? Email,
         string Calle,
         string NumeroPuerta,
         string Localidad,
@@ -131,6 +132,9 @@ public sealed class ImportarEnviosCsvHandler(
                 encabezados.Contains("DestinatarioTelefono")
                     ? Campo("DestinatarioTelefono")
                     : null,
+                encabezados.Contains("DestinatarioEmail")
+                    ? Campo("DestinatarioEmail")
+                    : null,
                 Campo("Calle"),
                 Campo("Numero"),
                 Campo("Localidad"),
@@ -185,6 +189,7 @@ public sealed class ImportarEnviosCsvHandler(
                 f.Modalidad != primera.Modalidad ||
                 f.Nombre != primera.Nombre ||
                 f.Telefono != primera.Telefono ||
+                f.Email != primera.Email ||
                 f.Calle != primera.Calle ||
                 f.NumeroPuerta != primera.NumeroPuerta ||
                 f.Localidad != primera.Localidad ||
@@ -212,7 +217,8 @@ public sealed class ImportarEnviosCsvHandler(
                 primera.NumeroPuerta,
                 primera.Localidad,
                 primera.Departamento,
-                grupo.Select(f => f.Bulto!).ToArray());
+                grupo.Select(f => f.Bulto!).ToArray(),
+                primera.Email);
 
             try
             {

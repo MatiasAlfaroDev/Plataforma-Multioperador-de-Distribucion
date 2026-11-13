@@ -1,3 +1,4 @@
+using UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
@@ -20,6 +21,7 @@ using UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigen
 using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
+using UltimaMilla.Application.Rutas.Commands.RendirHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
@@ -79,7 +81,6 @@ public static class DependencyInjection
         services.AddScoped<ObtenerDetalleEnvioHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();
-        services.AddScoped<ListarDiscrepanciasRecepcionHandler>();
         services.AddScoped<RetornarADepositoHandler>();
         services.AddScoped<SolicitarReprogramacionHandler>();
         services.AddScoped<ConfirmarReprogramacionHandler>();
@@ -108,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<RegistrarReaparicionHandler>();
         services.AddScoped<ObtenerMisHojasDeRutaHandler>();
         services.AddScoped<DespacharMiHojaDeRutaHandler>();
+        services.AddScoped<RendirHojaDeRutaHandler>();
         services.AddScoped<RegistrarPosicionesHandler>();
         services.AddScoped<RegistrarDispositivoHandler>();
         services.AddScoped<EnviarNotificacionDePruebaHandler>();

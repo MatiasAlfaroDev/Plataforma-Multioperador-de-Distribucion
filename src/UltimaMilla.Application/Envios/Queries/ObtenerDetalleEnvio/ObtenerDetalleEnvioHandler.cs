@@ -24,8 +24,7 @@ public sealed class ObtenerDetalleEnvioHandler(
             "Debe iniciar sesión para consultar un envío.");
     }
 
-    var esOperador = tenantContext.Perfil is
-        Perfiles.AdministradorOperador or Perfiles.Operador;
+    var esOperador = Perfiles.PersonalOperador.Contains(tenantContext.Perfil);
 
     var esComercio = tenantContext.Perfil is
         Perfiles.AdministradorComercio or Perfiles.Comercio;

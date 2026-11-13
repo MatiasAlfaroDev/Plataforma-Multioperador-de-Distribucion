@@ -29,11 +29,33 @@ public sealed record EnvioRutaApiDto(
     TimeOnly? HoraHasta,
     bool TieneCompromiso);
 
+// RF 39: paradas de retiro (se suben bultos) y de entrega de retiros al comercio (se bajan).
+public sealed record RetiroRutaApiDto(
+    Guid Id,
+    string Motivo,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3,
+    DateOnly Fecha,
+    TimeOnly HoraDesde,
+    TimeOnly HoraHasta);
+
+public sealed record EntregaRetiroRutaApiDto(
+    Guid Id,
+    string Motivo,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3);
+
 public sealed record OpcionesHojaRutaApiDto(
     List<RepartidorRutaApiDto> Repartidores,
     List<VehiculoRutaApiDto> Vehiculos,
     List<EnvioRutaApiDto> Envios,
-    List<FranjaRutaApiDto> Franjas);
+    List<FranjaRutaApiDto> Franjas,
+    List<RetiroRutaApiDto>? Retiros = null,
+    List<EntregaRetiroRutaApiDto>? EntregasRetiros = null);
 
 public sealed record HojaRutaApiDto(
     Guid Id,
@@ -43,7 +65,19 @@ public sealed record HojaRutaApiDto(
     Guid VehiculoId,
     int CantidadParadas,
     decimal PesoAsignadoKg,
-    bool Despachada);
+    bool Despachada,
+    bool Rendida = false);
+
+/// <summary>RF 22: lo que tiene que volver al depósito al cerrar la hoja.</summary>
+public sealed record RetornoEsperadoApiDto(string Tipo, Guid Id, string Referencia, List<string> Bultos);
+
+public sealed record RendicionApiDto(
+    Guid HojaDeRutaId,
+    string Estado,
+    List<RetornoEsperadoApiDto> Retornos,
+    List<string> ParadasSinResultado);
+
+public sealed record ResultadoRendicionApiDto(int EnviosRetornados, int RetirosRecibidos);
 
 public sealed record FranjaRutaApiDto(
     TimeOnly HoraDesde,
@@ -58,10 +92,16 @@ public sealed record CrearHojaRutaApiRequest(
     TimeOnly HoraEntregaDesde,
     TimeOnly HoraEntregaHasta,
     int MaximoParadas,
-    IReadOnlyList<Guid> EnviosIds);
+    IReadOnlyList<Guid> EnviosIds,
+    IReadOnlyList<Guid>? RetirosIds = null,
+    IReadOnlyList<Guid>? EntregasRetirosIds = null);
 
 public sealed class HojasDeRutaApiClient(HttpClient http)
 {
+    /// <summary>GET /api/banderas: las funcionalidades habilitadas para el operador de la sesión (aclaración 3.2).</summary>
+    public async Task<Dictionary<string, bool>> ObtenerBanderasAsync(CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<Dictionary<string, bool>>("api/banderas", ct) ?? [];
+
     public async Task<List<OperadorRutaApiDto>> ListarOperadoresAsync(
         CancellationToken ct)
     {
@@ -116,6 +156,46 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
         return resultado?.EnviosActualizados
             ?? throw new InvalidOperationException(
                 "La API no devolvió la cantidad de envíos despachados.");
+    }
+
+    public async Task<RendicionApiDto> ObtenerRendicionAsync(Guid hojaId, CancellationToken ct)
+    {
+        using var respuesta = await http.GetAsync($"api/hojas-de-ruta/{hojaId}/rendicion", ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"No se pudo consultar la rendición. HTTP {(int)respuesta.StatusCode}: {contenido}");
+        }
+
+        return await respuesta.Content.ReadFromJsonAsync<RendicionApiDto>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("La API no devolvió la rendición.");
+    }
+
+    public async Task<ResultadoRendicionApiDto> RendirAsync(
+        Guid hojaId,
+        IReadOnlyList<string> bultosEscaneados,
+        string responsable,
+        CancellationToken ct)
+    {
+        using var solicitud = await CrearSolicitudProtegidaAsync(
+            HttpMethod.Post,
+            $"api/hojas-de-ruta/{hojaId}/rendicion",
+            JsonContent.Create(new { bultosEscaneados, responsable }),
+            ct);
+
+        using var respuesta = await http.SendAsync(solicitud, ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"No se pudo rendir la hoja de ruta. HTTP {(int)respuesta.StatusCode}: {contenido}");
+        }
+
+        return await respuesta.Content.ReadFromJsonAsync<ResultadoRendicionApiDto>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("La API no devolvió el resultado de la rendición.");
     }
 
     public async Task<Guid> CrearAsync(

@@ -82,11 +82,24 @@ rechaza **completo**: nunca se guarda una parte del resultado de una parada y ot
 
 | Caso | Ejemplo | Respuesta del servidor | Qué ve el repartidor |
 | :---- | :---- | :---- | :---- |
-| Bulto ya resuelto o ajeno | Un bulto informado ya no está pendiente en el servidor, o es de otro envío | **400**: "Todos los bultos indicados deben pertenecer al envío y estar pendientes" | "Rechazado" con el motivo; vuelve a descargar la ruta y registra de nuevo |
+| Bulto ya resuelto o ajeno | Un bulto informado ya no está pendiente en el servidor (otro dispositivo lo resolvió), o es de otro envío | **400**: "Conflicto: estos bultos ya no están pendientes: PED-1-2 (Entregado)…", con la identificación y el estado de cada uno | "Rechazado" con los bultos en conflicto; vuelve a descargar la ruta y registra de nuevo |
+| Se escanearon todos los bultos | La app manda `EntregadoParcialmente` pero no quedó ninguno sin entregar | El servidor **deriva** el resultado de los bultos (`MaquinaEstadosBulto.ResultadoDeVisita`) y registra una entrega completa | "Enviado al servidor" |
+| El operador no admite entrega parcial | Sus reglas operativas (RF 33) o la bandera de la plataforma (aclaración 3.2) no la permiten | **400** con el motivo; no 409, porque la app trata el 409 como "ya estaba" y descartaría el evento | "Rechazado": registra la visita como no entregada |
 | Resultado incompleto | No se informa algún bulto pendiente | **400**: "Debe informarse el resultado de todos los bultos pendientes" | "Rechazado" (la app arma las dos listas con todos los pendientes, así que no debería pasar) |
 | Motivo fuera del catálogo | Un bulto no entregado con un motivo que el operador no tiene | **404** con el motivo | "Rechazado" con el motivo |
 | Sin coordenadas o sin prueba | El GPS no dio posición, o falta la prueba que piden las reglas | **400** con el motivo | "Rechazado" con el motivo |
 | Evento sin listas | `Entregado` o `NoEntregado` (también versiones anteriores de la app) | Resultado del **envío completo**, como antes | Igual que antes: compatibilidad hacia atrás |
+
+### Casos del retiro en domicilio (RF 40)
+
+El retiro usa la misma cola del teléfono y la misma política. El evento `Retirado` lleva los bultos
+escaneados, la foto de su estado y la firma de quien los entrega; `NoRetirado`, el motivo.
+
+| Caso | Ejemplo | Respuesta del servidor | Qué ve el repartidor |
+| :---- | :---- | :---- | :---- |
+| Bultos distintos de los declarados | Falta escanear uno, o se escaneó uno que no es del retiro | **400**: "Los bultos escaneados no coinciden con los declarados para el retiro" | "Rechazado" con el motivo |
+| Retiro de otra hoja o de otro repartidor | El despachador lo reasignó mientras no había señal | **400 / 403** con el motivo | "Rechazado" con el motivo |
+| Reintento del mismo evento | Se cortó la conexión antes de la respuesta | **409**: ya estaba (idempotencia por `IdEvento`) | "Enviado al servidor" |
 
 ## Alternativas consideradas
 

@@ -60,6 +60,10 @@ else
             <label for="telefono">Teléfono (opcional)</label>
             <InputText id="telefono" @bind-Value="modelo.DestinatarioTelefono" />
 
+            <label for="emailDestinatario">Correo (opcional, recibe el enlace de seguimiento)</label>
+            <InputText id="emailDestinatario" type="email" @bind-Value="modelo.DestinatarioEmail" />
+            <ValidationMessage For="() => modelo.DestinatarioEmail" />
+
             <div class="campos">
                 <div>
                     <label for="calle">Calle</label>
@@ -380,6 +384,7 @@ else
             modalidad = modelo.Modalidad,
             destinatarioNombre = modelo.DestinatarioNombre,
             destinatarioTelefono = modelo.DestinatarioTelefono,
+            destinatarioEmail = modelo.DestinatarioEmail,
             calle = modelo.Calle,
             numero = modelo.Numero,
             localidad = modelo.Localidad,

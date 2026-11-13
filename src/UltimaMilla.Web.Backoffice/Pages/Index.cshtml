@@ -31,6 +31,52 @@
     <div class="aviso" role="status">@mensajeExito</div>
 }
 
+@if (Model.Retiros.Count > 0)
+{
+    <section>
+        <h2>Retiros a domicilio</h2>
+        <p class="nota">
+            @string.Join(" · ", Model.Retiros.GroupBy(r => r.Estado).Select(g => $"{g.Key}: {g.Count()}"))
+        </p>
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr><th>Fecha</th><th>Motivo</th><th>Localidad</th><th>Bultos</th><th>Estado</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model.Retiros.OrderBy(r => r.FechaSolicitada))
+                    {
+                        var accion = r.Estado switch
+                        {
+                            "Retirado" => ("recibir-deposito", "Recibir en depósito"),
+                            "EnDeposito" => ("entregar-comercio", "Entregar al comercio"),
+                            "NoRetirado" => ("reprogramar", "Reprogramar"),
+                            _ => default
+                        };
+                        <tr>
+                            <td>@r.FechaSolicitada.ToString("dd/MM/yyyy")</td>
+                            <td>@r.Motivo</td>
+                            <td>@r.DomicilioRetiro.Localidad</td>
+                            <td class="num">@r.Bultos.Count</td>
+                            <td>@r.Estado</td>
+                            <td>
+                                @if (accion != default)
+                                {
+                                    <form method="post" asp-page-handler="Retiro" class="inline">
+                                        <input type="hidden" name="retiroId" value="@r.Id" />
+                                        <input type="hidden" name="accion" value="@accion.Item1" />
+                                        <button type="submit">@accion.Item2</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
 @if (Model.Envios.Count == 0)
 {
     <p class="nota">

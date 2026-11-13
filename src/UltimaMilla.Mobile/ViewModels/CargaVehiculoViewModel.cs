@@ -62,6 +62,11 @@ public partial class CargaVehiculoViewModel : ObservableObject
     /// <summary>Los bultos de la hoja elegida, cada uno marcado como cargado o no.</summary>
     public ObservableCollection<BultoCarga> Bultos { get; } = [];
 
+    /// <summary>Las paradas de retiro de la hoja (RF 39): se muestran para saber que la ruta no sale vacía.</summary>
+    public ObservableCollection<ParadaItem> Retiros { get; } = [];
+
+    public bool HayRetiros => Retiros.Count > 0;
+
     /// <summary>Lo escaneado que NO es de esta hoja: hay que bajarlo del vehículo.</summary>
     public ObservableCollection<string> Sobrantes { get; } = [];
 
@@ -101,6 +106,7 @@ public partial class CargaVehiculoViewModel : ObservableObject
     public string TextoDespacho =>
         HojaElegida is { YaDespachada: true } ? "Esta hoja ya fue despachada"
         : Sobrantes.Count > 0 ? "Bajá del vehículo los bultos que sobran"
+        : HayHojaElegida && Bultos.Count == 0 ? "Solo hay retiros: no hay bultos para cargar, podés salir"
         : Faltantes > 0 ? $"Faltan {Faltantes} bultos por cargar"
         : "Carga completa: podés salir";
 
@@ -108,7 +114,8 @@ public partial class CargaVehiculoViewModel : ObservableObject
     public bool PuedeDespachar =>
         !EstaCargando &&
         HojaElegida is { YaDespachada: false } &&
-        Bultos.Count > 0 &&
+        // Una hoja con solo retiros no tiene bultos para cargar en el depósito, pero igual hay que despacharla (RF 39).
+        (Bultos.Count > 0 || HojaElegida.Paradas.Count > 0) &&
         Faltantes == 0 &&
         Sobrantes.Count == 0;
 
@@ -156,13 +163,18 @@ public partial class CargaVehiculoViewModel : ObservableObject
     {
         Bultos.Clear();
         Sobrantes.Clear();
+        Retiros.Clear();
         Mensaje = null;
 
         if (value is not null)
         {
-            foreach (var parada in value.Paradas.OrderBy(p => p.Orden))
+            // RF 39: los bultos de un retiro se suben en el domicilio, no en el depósito.
+            foreach (var parada in value.Paradas.Where(p => p.TipoOperacion != "Retiro").OrderBy(p => p.Orden))
                 foreach (var bulto in parada.Bultos)
                     Bultos.Add(new BultoCarga(Normalizar(bulto), parada.ReferenciaExterna, parada.Destinatario));
+
+            foreach (var retiro in value.Paradas.Where(p => p.TipoOperacion == "Retiro").OrderBy(p => p.Orden))
+                Retiros.Add(retiro);
 
             if (value.YaDespachada)
                 Mensaje = "Esta hoja ya salió del depósito.";
@@ -280,6 +292,7 @@ public partial class CargaVehiculoViewModel : ObservableObject
         OnPropertyChanged(nameof(Progreso));
         OnPropertyChanged(nameof(TextoProgreso));
         OnPropertyChanged(nameof(HaySobrantes));
+        OnPropertyChanged(nameof(HayRetiros));
         OnPropertyChanged(nameof(PuedeDespachar));
         OnPropertyChanged(nameof(TextoDespacho));
         DespacharCommand.NotifyCanExecuteChanged();

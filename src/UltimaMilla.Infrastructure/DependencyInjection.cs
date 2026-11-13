@@ -5,6 +5,7 @@ using MassTransit;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Infrastructure.Mensajeria;
 using UltimaMilla.Infrastructure.Notificaciones;
+using UltimaMilla.Infrastructure.Observabilidad;
 using UltimaMilla.Infrastructure.Persistence;
 using UltimaMilla.Infrastructure.Persistence.Interceptors;
 using UltimaMilla.Infrastructure.Persistence.Seed;
@@ -20,7 +21,7 @@ public static class DependencyInjection
     /// <summary>
     /// Registra EF Core con PostgreSQL, MassTransit con RabbitMQ y las implementaciones de los contratos de Application.
     /// rabbitMq: cadena amqp://usuario:clave@host:5672
-    /// consumidores: el Worker registra acá los suyos; la API no consume nada y no lo pasa.
+    /// consumidores: el Worker registra acá los suyos; la API solo el del tablero en vivo.
     /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -54,6 +55,7 @@ public static class DependencyInjection
         .AddEntityFrameworkStores<AppDbContext>()
         .AddDefaultTokenProviders();
         services.AddScoped<IEnvioRepository, EnvioRepository>();
+        services.AddScoped<IBanderas, UltimaMilla.Infrastructure.Plataforma.BanderasService>();
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<IDiscrepanciaRecepcionRepository, DiscrepanciaRecepcionRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
@@ -70,6 +72,7 @@ public static class DependencyInjection
         services.AddScoped<IPublicadorDeEventos, PublicadorDeEventos>();
         services.AddScoped<IDispositivoMovilRepository, DispositivoMovilRepository>();
         services.AddScoped<IPosicionRepartidorRepository, PosicionRepartidorRepository>();
+        services.AddScoped<ITableroRepository, TableroRepository>();
         services.AddScoped<ISuscripcionAvisoRepository, SuscripcionAvisoRepository>();
         services.AddScoped<IEntregaAvisoRepository, EntregaAvisoRepository>();
         services.AddScoped<IReporteEnviosRepository, ReporteEnviosRepository>();
@@ -112,6 +115,9 @@ public static class DependencyInjection
             x.UsingRabbitMq((ctx, cfg) =>
             {
                 cfg.Host(new Uri(rabbitMq));
+                // Identificador de correlación (RNF 6.12): sale en cada mensaje publicado y se retoma al consumir.
+                cfg.UsePublishFilter(typeof(CorrelacionAlPublicar<>), ctx);
+                cfg.UseConsumeFilter(typeof(CorrelacionAlConsumir<>), ctx);
                 cfg.ConfigureEndpoints(ctx);
             });
         });

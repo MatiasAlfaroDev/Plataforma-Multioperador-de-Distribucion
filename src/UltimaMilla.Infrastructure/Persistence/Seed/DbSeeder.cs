@@ -215,17 +215,34 @@ public static class DbSeeder
         await db.SaveChangesAsync(ct);
 
         // Avisos (RNF 6.9): Tienda Norte en RapiEnvíos escucha todo en el receptor de prueba del compose.
-        if (!await db.SuscripcionesAviso.AnyAsync(ct))
+        // RF 36: una suscripción con el contrato v1 (el de siempre) y otra con el v2, para mostrar que
+        // la v1 no cambia mientras la v2 recibe los avisos por bulto.
+        var cuentaTiendaNorteRapi = Guid.Parse("33333333-0000-0000-0000-000000000001");
+        var suscripcionesDemo = await db.SuscripcionesAviso.IgnoreQueryFilters()
+            .Where(s => s.CuentaComercialId == cuentaTiendaNorteRapi)
+            .Select(s => s.VersionContrato)
+            .ToListAsync(ct);
+
+        if (!suscripcionesDemo.Contains(1))
         {
             db.SuscripcionesAviso.Add(SuscripcionAviso.Crear(
-                RapiEnviosId,
-                Guid.Parse("33333333-0000-0000-0000-000000000001"),
+                RapiEnviosId, cuentaTiendaNorteRapi,
                 "http://receptor-avisos:8080/avisos",
                 SecretoAvisosDemo,
-                TiposAviso.Todos));
-
-            await db.SaveChangesAsync(ct);
+                TiposAviso.Todos.Where(t => !TiposAviso.EsDeBulto(t))));
         }
+
+        if (!suscripcionesDemo.Contains(2))
+        {
+            db.SuscripcionesAviso.Add(SuscripcionAviso.Crear(
+                RapiEnviosId, cuentaTiendaNorteRapi,
+                "http://receptor-avisos:8080/avisos/v2",
+                SecretoAvisosDemo,
+                TiposAviso.Todos,
+                versionContrato: 2));
+        }
+
+        await db.SaveChangesAsync(ct);
     }
     
 }

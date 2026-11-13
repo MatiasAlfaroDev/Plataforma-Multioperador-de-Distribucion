@@ -57,6 +57,8 @@ public sealed class AppDbContext(
     public DbSet<SuscripcionAviso> SuscripcionesAviso => Set<SuscripcionAviso>();
     public DbSet<EntregaAviso> EntregasAviso => Set<EntregaAviso>();
     public DbSet<Retiro> Retiros => Set<Retiro>();
+    public DbSet<UltimaMilla.Domain.Plataforma.BanderaFuncionalidad> BanderasFuncionalidad => Set<UltimaMilla.Domain.Plataforma.BanderaFuncionalidad>();
+    public DbSet<UltimaMilla.Domain.Plataforma.CambioBandera> CambiosBandera => Set<UltimaMilla.Domain.Plataforma.CambioBandera>();
     public DbSet<BultoRetiro> BultosRetiro => Set<BultoRetiro>();
     public DbSet<EventoRetiroMovil> EventosRetiroMovil => Set<EventoRetiroMovil>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)

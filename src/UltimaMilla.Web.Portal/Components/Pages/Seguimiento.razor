@@ -37,7 +37,7 @@
             <div class="card-body">
 
                 <h5 class="card-title">
-                    Envío @seguimiento.Referencia
+                    @(seguimiento.Tipo == "Retiro" ? seguimiento.Referencia : $"Envío {seguimiento.Referencia}")
                 </h5>
 
                 <p>
@@ -46,6 +46,16 @@
                         @seguimiento.Estado
                     </span>
                 </p>
+
+                @if (seguimiento.BultosTotales > 1 && seguimiento.BultosEntregados > 0)
+                {
+                    <p>
+                        <strong>Avance de la entrega:</strong>
+                        @seguimiento.BultosEntregados de @seguimiento.BultosTotales bultos entregados
+                    </p>
+                    <progress max="@seguimiento.BultosTotales" value="@seguimiento.BultosEntregados"
+                              aria-label="Bultos entregados" class="w-full"></progress>
+                }
 
                 <p>
                     <strong>Fecha de creación:</strong>

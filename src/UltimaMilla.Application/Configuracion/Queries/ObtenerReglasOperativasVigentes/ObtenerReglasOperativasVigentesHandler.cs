@@ -1,16 +1,22 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.Application.Configuracion.Queries.ObtenerReglasOperativasVigentes;
 
 public sealed class ObtenerReglasOperativasVigentesHandler(
     IVersionReglasOperativasRepository reglas,
     IMotivoNoEntregaRepository motivosRepository,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICacheService cache)
 {
     public async Task<ReglasOperativasVigentesDto?> Handle(
         ObtenerReglasOperativasVigentesQuery query,
         CancellationToken ct)
     {
+        var clave = ClavesCache.ReglasVigentes(query.OperadorId);
+        if (await cache.ObtenerAsync<ReglasOperativasVigentesDto>(clave, ct) is { } enCache)
+            return enCache;
+
         var ahora = reloj.GetUtcNow();
 
         var version = await reglas.ObtenerVigenteAsync(
@@ -26,7 +32,7 @@ public sealed class ObtenerReglasOperativasVigentesHandler(
             version.Id,
             ct);
 
-        return new ReglasOperativasVigentesDto(
+        var dto = new ReglasOperativasVigentesDto(
             version.Id,
             version.MaximoIntentosEntrega,
             version.HorasMinimasEntreIntentos,
@@ -40,5 +46,8 @@ public sealed class ObtenerReglasOperativasVigentesHandler(
             version.AdmiteEntregaParcial,
             version.AccionBultosPendientes,
             version.NuevaVisitaConRecargo);
+
+        await cache.GuardarAsync(clave, dto, ClavesCache.DuracionConfiguracion, ct);
+        return dto;
     }
 }

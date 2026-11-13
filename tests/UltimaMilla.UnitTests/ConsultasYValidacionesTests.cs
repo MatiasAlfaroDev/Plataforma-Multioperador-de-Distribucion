@@ -177,7 +177,7 @@ public class ConsultasYValidacionesTests
     {
         Assert.True(Falla(RetiroValido() with { DomicilioRetiro = null! }, "DomicilioRetiro"));
         Assert.True(Falla(RetiroValido() with { DomicilioDestino = null! }, "DomicilioDestino"));
-
+        
         var sinCalle = new DireccionRetiroCommand("", "1", "San José de Mayo", "San José");
         Assert.True(Falla(RetiroValido() with { DomicilioRetiro = sinCalle }, "DomicilioRetiro.Calle"));
 
@@ -269,38 +269,46 @@ public class ConsultasYValidacionesTests
     // ===== AlcanceAvisos =====
 
     [Fact]
-    public void El_operador_ve_los_avisos_de_todo_su_operador()
+    public async Task El_operador_ve_los_avisos_de_todo_su_operador()
     {
-        var (operadorId, cuentaId) = AlcanceAvisos.Resolver(Sesion(operadorId: IdOperador, perfil: Perfiles.AdministradorOperador));
+        var alcance = await AlcanceAvisos.ResolverAsync(
+            Sesion(operadorId: IdOperador, perfil: Perfiles.AdministradorOperador), _cuentas, CancellationToken.None);
 
-        Assert.Equal(IdOperador, operadorId);
-        Assert.Null(cuentaId);
-        Assert.Null(AlcanceAvisos.Resolver(Sesion(operadorId: IdOperador, perfil: Perfiles.Operador)).CuentaComercialId);
+        Assert.Equal(IdOperador, alcance.OperadorId);
+        Assert.Null(alcance.Cuentas);
+        Assert.Equal(IdOperador, alcance.OperadorDeCuenta(Guid.NewGuid()));
     }
 
     [Fact]
-    public void El_comercio_ve_solo_los_avisos_de_su_cuenta()
+    public async Task El_comercio_ve_solo_los_avisos_de_sus_cuentas_confirmadas()
     {
-        var cuenta = Guid.NewGuid();
+        var otroOperador = Guid.NewGuid();
+        var confirmada = Cuenta(Guid.NewGuid(), otroOperador);
+        var pendiente = Cuenta(Guid.NewGuid(), IdOperador, activa: false, estado: EstadoCuentaComercial.Pendiente);
+        _cuentas.PorComercio.AddRange([confirmada, pendiente]);
 
-        var (operadorId, cuentaId) = AlcanceAvisos.Resolver(
-            Sesion(operadorId: IdOperador, comercioId: cuenta, perfil: Perfiles.Comercio));
+        var alcance = await AlcanceAvisos.ResolverAsync(
+            Sesion(comercioId: IdComercio, perfil: Perfiles.Comercio), _cuentas, CancellationToken.None);
 
-        Assert.Equal(IdOperador, operadorId);
-        Assert.Equal(cuenta, cuentaId);
+        Assert.Null(alcance.OperadorId);
+        Assert.Equal(otroOperador, alcance.OperadorDeCuenta(confirmada.Id));
+        Assert.Null(alcance.OperadorDeCuenta(pendiente.Id));
     }
 
     [Fact]
-    public void El_alcance_de_avisos_se_rechaza_sin_sesion_operador_cuenta_o_permiso()
+    public async Task El_alcance_de_avisos_se_rechaza_sin_sesion_operador_comercio_o_permiso()
     {
-        Assert.Throws<UnauthorizedAccessException>(() =>
-            AlcanceAvisos.Resolver(Sesion(autenticado: false)));
-        Assert.Throws<UnauthorizedAccessException>(() =>
-            AlcanceAvisos.Resolver(Sesion(perfil: Perfiles.Operador)));
-        Assert.Throws<UnauthorizedAccessException>(() =>
-            AlcanceAvisos.Resolver(Sesion(operadorId: IdOperador, perfil: Perfiles.Comercio)));
-        Assert.Throws<UnauthorizedAccessException>(() =>
-            AlcanceAvisos.Resolver(Sesion(operadorId: IdOperador, perfil: Perfiles.Repartidor)));
+        foreach (var sesion in new[]
+                 {
+                     Sesion(autenticado: false),
+                     Sesion(perfil: Perfiles.Operador),
+                     Sesion(operadorId: IdOperador, perfil: Perfiles.Comercio),
+                     Sesion(operadorId: IdOperador, perfil: Perfiles.Repartidor)
+                 })
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                AlcanceAvisos.ResolverAsync(sesion, _cuentas, CancellationToken.None));
+        }
     }
 
     // ===== ListarCuentasComerciales / ListarSolicitudesPendientes =====

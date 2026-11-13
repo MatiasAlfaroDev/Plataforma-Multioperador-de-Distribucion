@@ -18,6 +18,7 @@ public static class AutenticacionEndpoints
     private const string CuentaComercialClaim = "cuenta_comercial_id";
     private const string ComercioClaim = "comercio_id";
     private const string PerfilComercioClaim = "perfil_comercio";
+    private const string AplicacionClaim = "aplicacion";
 
     public static RouteGroupBuilder MapAutenticacionEndpoints(
         this IEndpointRouteBuilder app)
@@ -365,6 +366,8 @@ grupo.MapPost("/registro-operador", async (
             };
 
             var requiereSeleccion = false;
+            // Recuerda la aplicación para que /seleccionar-operador no entregue un perfil ajeno a ella.
+            claims.Add(new Claim(AplicacionClaim, aplicacion));
 
             if (aplicacion == "portal")
             {
@@ -404,10 +407,8 @@ grupo.MapPost("/registro-operador", async (
                     .Where(m =>
                         m.UsuarioId == usuario.Id &&
                         m.Activa &&
-                        (m.Perfil == Perfiles.AdministradorOperador ||
-                         m.Perfil == Perfiles.Operador ||
-                         // Entra solo a Mensajes fallidos (RNF 6.8).
-                         m.Perfil == Perfiles.AdministradorPlataforma))
+                        // El administrador de plataforma entra solo a Mensajes fallidos (RNF 6.8).
+                        Perfiles.Backoffice.Contains(m.Perfil))
                     .ToListAsync();
 
                 if (membresias.Count == 0)
@@ -523,11 +524,12 @@ grupo.MapPost("/registro-operador", async (
                     m.UsuarioId == usuarioId &&
                     m.Activa);
 
-            if (membresia is null)
+            if (membresia is null || !PerfilPermitidoEnAplicacion(context, membresia.Perfil))
                 return Results.Forbid();
 
             var claims = new List<Claim>
             {
+                new(AplicacionClaim, context.User.FindFirstValue(AplicacionClaim) ?? string.Empty),
                 new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                 new(
                     ClaimTypes.Name,
@@ -612,7 +614,10 @@ grupo.MapPost("/seleccionar-comercio", async (
             ClaimTypes.Name,
             usuario.UserName ?? usuario.Email ?? string.Empty),
         new(ComercioClaim, vinculacion.ComercioId.ToString()),
-        new(PerfilComercioClaim, vinculacion.Perfil)
+        new(PerfilComercioClaim, vinculacion.Perfil),
+        // Sin el rol, los endpoints con RequireRole devolvían 403 tras elegir el comercio.
+        new(ClaimTypes.Role, vinculacion.Perfil),
+        new(AplicacionClaim, "portal")
     };
 
     await IniciarSesionAsync(context, claims);
@@ -661,6 +666,17 @@ grupo.MapPost("/seleccionar-comercio", async (
             context.User.FindFirstValue(ClaimTypes.NameIdentifier),
             out usuarioId);
     }
+
+    // Una sesión iniciada en el Backoffice no puede tomar una membresía de repartidor, ni al revés.
+    private static bool PerfilPermitidoEnAplicacion(HttpContext context, string perfil) =>
+        context.User.FindFirstValue(AplicacionClaim) switch
+        {
+            "backoffice" => Perfiles.Backoffice.Contains(perfil),
+            "movil" => perfil == Perfiles.Repartidor,
+            "portal" => false,
+            // ponytail: cookies emitidas antes de este claim; vencen solas.
+            _ => true
+        };
 
     private static Task IniciarSesionAsync(
         HttpContext context,

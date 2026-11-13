@@ -21,7 +21,8 @@ public sealed class CrearRetiroHandler(
     ITenantContext tenantContext,
     IOperadorActivo operadorActivo,
     TimeProvider reloj,
-    RegistrarAvisosRetiroHandler avisos)
+    RegistrarAvisosRetiroHandler avisos,
+    IBanderas banderas)
 {
     public async Task<Guid> Handle(
         CrearRetiroCommand command,
@@ -59,6 +60,10 @@ public sealed class CrearRetiroHandler(
             throw new UnauthorizedAccessException(
                 "No tiene una cuenta comercial activa y confirmada.");
         }
+
+        // Aclaración 3.2: el retiro a domicilio puede no estar habilitado para este operador.
+        if (!await banderas.EstaHabilitadaAsync(Banderas.RetiroDomicilio, vinculacion.OperadorId, ct))
+            throw new ConflictoException("El operador no ofrece retiros a domicilio.");
 
         operadorActivo.SeleccionarOperador(vinculacion.OperadorId);
 
@@ -124,11 +129,11 @@ public sealed class CrearRetiroHandler(
                 command.DomicilioRetiro.Numero,
                 command.DomicilioRetiro.Localidad,
                 command.DomicilioRetiro.Departamento),
-            new Direccion(
-                command.DomicilioDestino.Calle,
-                command.DomicilioDestino.Numero,
-                command.DomicilioDestino.Localidad,
-                command.DomicilioDestino.Departamento),
+            command.DomicilioDestino is { } destino
+                ? new Direccion(destino.Calle, destino.Numero, destino.Localidad, destino.Departamento)
+                : cuenta.DireccionRecepcion
+                    ?? throw new InvalidOperationException(
+                        "Indicá el domicilio de destino o configurá la dirección de recepción del comercio para este operador."),
             command.Fecha,
             command.HoraDesde,
             command.HoraHasta,

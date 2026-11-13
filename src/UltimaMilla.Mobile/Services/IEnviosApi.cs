@@ -25,9 +25,18 @@ public interface IEnviosApi
     /// <summary>Las hojas de ruta de hoy del repartidor logueado, con los bultos de cada parada (para cargar el vehículo).</summary>
     Task<IReadOnlyList<HojaDeRutaItem>> ListarMisHojasAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Catálogo de motivos de no entrega del operador (RF 32) y si puede registrar entregas parciales:
+    /// lo permiten las reglas del operador y la bandera de la plataforma (aclaración 3.2).
+    /// </summary>
+    Task<CatalogoMotivos> ObtenerCatalogoAsync(CancellationToken ct = default);
+
     /// <summary>Despacha la hoja con los bultos escaneados. Devuelve si salió bien y el mensaje para mostrar.</summary>
     /// <summary>Manda un lote de posiciones de la jornada (RF 23).</summary>
     Task<ResultadoEnvio> EnviarPosicionesAsync(IReadOnlyList<PosicionPendiente> posiciones, CancellationToken ct = default);
+
+    /// <summary>Cuántos eventos quedan sin subir (métrica de sincronizaciones pendientes, RNF 6.12).</summary>
+    Task InformarPendientesAsync(int pendientes, CancellationToken ct = default);
 
     Task<(bool Ok, string Mensaje)> DespacharAsync(Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default);
 

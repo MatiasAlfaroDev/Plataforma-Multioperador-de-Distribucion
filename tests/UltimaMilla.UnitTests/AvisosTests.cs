@@ -7,8 +7,13 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Avisos;
 using UltimaMilla.Application.Avisos.Commands.EntregarAviso;
 using UltimaMilla.Application.Avisos.Commands.RegistrarAvisos;
+using UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
 using UltimaMilla.Application.Avisos.Commands.ReintentarAvisosFallidos;
 using UltimaMilla.Application.Avisos.Eventos;
+using UltimaMilla.Application.Common;
+using UltimaMilla.Application.CuentasComerciales;
+using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
+using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Avisos;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
@@ -300,6 +305,55 @@ public class AvisosTests
         Assert.Equal(1, _unidad.Guardados);
     }
 
+    // ----- Reenvío manual -----
+
+    [Fact]
+    public async Task El_comercio_reenvia_un_aviso_fallido_de_su_cuenta_con_el_operador_de_la_cuenta()
+    {
+        var entrega = Fallida(AgregarEntregaPendiente(), 1, Ahora);
+        var operadorActivo = new OperadorActivoFalso();
+        var cuentas = new CuentasDelComercio(new CuentaComercialDto(
+            _envio.CuentaComercialId, _envio.OperadorId, "Operador", Guid.NewGuid(), "Comercio",
+            true, EstadoCuentaComercial.Confirmada));
+
+        await new ReenviarAvisoHandler(_entregas, cuentas, _publicador, _unidad,
+                new SesionFalsa(null, Guid.NewGuid(), Perfiles.Comercio), operadorActivo)
+            .Handle(new ReenviarAvisoCommand(entrega.Id), CancellationToken.None);
+
+        Assert.Equal(EstadoEntregaAviso.Pendiente, entrega.Estado);
+        Assert.Equal(_envio.OperadorId, Assert.Single(operadorActivo.Seleccionados));
+        Assert.Equal(entrega.Id, Assert.IsType<AvisoPendiente>(Assert.Single(_publicador.Publicados)).EntregaAvisoId);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task El_comercio_no_ve_los_avisos_de_otra_cuenta()
+    {
+        var entrega = Fallida(AgregarEntregaPendiente(), 1, Ahora);
+
+        await Assert.ThrowsAsync<NoEncontradoException>(() =>
+            new ReenviarAvisoHandler(_entregas, new CuentasDelComercio(), _publicador, _unidad,
+                    new SesionFalsa(null, Guid.NewGuid(), Perfiles.Comercio), new OperadorActivoFalso())
+                .Handle(new ReenviarAvisoCommand(entrega.Id), CancellationToken.None));
+
+        Assert.Equal(EstadoEntregaAviso.Fallida, entrega.Estado);
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task El_operador_reenvia_sin_cambiar_de_operador()
+    {
+        var entrega = Fallida(AgregarEntregaPendiente(), 1, Ahora);
+        var operadorActivo = new OperadorActivoFalso();
+
+        await new ReenviarAvisoHandler(_entregas, new CuentasDelComercio(), _publicador, _unidad,
+                new SesionFalsa(_envio.OperadorId, null, Perfiles.Despachador), operadorActivo)
+            .Handle(new ReenviarAvisoCommand(entrega.Id), CancellationToken.None);
+
+        Assert.Equal(EstadoEntregaAviso.Pendiente, entrega.Estado);
+        Assert.Empty(operadorActivo.Seleccionados);
+    }
+
     // ----- Dobles de prueba -----
 
     private sealed class EnviosEnMemoria(Envio envio) : IEnvioRepository
@@ -350,9 +404,9 @@ public class AvisosTests
         public Task<SuscripcionAviso?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(s => s.Id == id));
 
-        public Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(Guid? cuentaComercialId, CancellationToken ct) =>
+        public Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(IReadOnlyCollection<Guid>? cuentas, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<SuscripcionAviso>>(
-                Lista.Where(s => cuentaComercialId is null || s.CuentaComercialId == cuentaComercialId).ToList());
+                Lista.Where(s => cuentas is null || cuentas.Contains(s.CuentaComercialId)).ToList());
 
         public Task AgregarAsync(SuscripcionAviso suscripcion, CancellationToken ct)
         {
@@ -368,14 +422,17 @@ public class AvisosTests
         public Task<EntregaAviso?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(e => e.Id == id));
 
+        public Task<EntregaAviso?> ObtenerAsync(Guid id, IReadOnlyCollection<Guid>? cuentas, CancellationToken ct) =>
+            Task.FromResult(Lista.FirstOrDefault(e => e.Id == id && (cuentas is null || cuentas.Contains(e.CuentaComercialId))));
+
         public Task<bool> ExisteAsync(Guid suscripcionId, string claveEvento, CancellationToken ct) =>
             Task.FromResult(Lista.Any(e => e.SuscripcionId == suscripcionId && e.ClaveEvento == claveEvento));
 
-        public Task<IReadOnlyList<EntregaAviso>> ListarAsync(Guid? cuentaComercialId, EstadoEntregaAviso? estado, CancellationToken ct)
+        public Task<IReadOnlyList<EntregaAviso>> ListarAsync(IReadOnlyCollection<Guid>? cuentas, EstadoEntregaAviso? estado, CancellationToken ct)
         {
             var query = Lista.AsQueryable();
-            if (cuentaComercialId is not null)
-                query = query.Where(e => e.CuentaComercialId == cuentaComercialId);
+            if (cuentas is not null)
+                query = query.Where(e => cuentas.Contains(e.CuentaComercialId));
             if (estado is not null)
                 query = query.Where(e => e.Estado == estado);
 
@@ -442,5 +499,33 @@ public class AvisosTests
             UltimoCuerpo = cuerpo;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class SesionFalsa(Guid? operadorId, Guid? comercioId, string perfil) : ITenantContext
+    {
+        public Guid? UsuarioId => Guid.NewGuid();
+        public Guid? OperadorId => operadorId;
+        public Guid? ComercioId => comercioId;
+        public string? Perfil => perfil;
+        public bool EstaAutenticado => true;
+    }
+
+    private sealed class OperadorActivoFalso : IOperadorActivo
+    {
+        public List<Guid> Seleccionados { get; } = [];
+
+        public void SeleccionarOperador(Guid operadorId) => Seleccionados.Add(operadorId);
+    }
+
+    private sealed class CuentasDelComercio(params CuentaComercialDto[] cuentas) : ICuentaComercialRepository
+    {
+        public Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(Guid comercioId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<CuentaComercialDto>>(cuentas);
+
+        public Task<CuentaComercial?> ObtenerAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<CuentaComercialDto>> ListarResumenAsync(Guid operadorId, Guid? cuentaComercialId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<CuentaComercial?> ObtenerPorOperadorYComercioAsync(Guid operadorId, Guid comercioId, CancellationToken ct) => throw new NotSupportedException();
+        public Task AgregarAsync(CuentaComercial cuenta, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SolicitudPendienteDto>> ListarSolicitudesPendientesAsync(Guid operadorId, CancellationToken ct) => throw new NotSupportedException();
     }
 }

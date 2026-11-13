@@ -13,10 +13,15 @@ public sealed class SuscripcionAvisoRepository(AppDbContext db) : ISuscripcionAv
     public Task<SuscripcionAviso?> ObtenerAsync(Guid id, CancellationToken ct) =>
         db.SuscripcionesAviso.FirstOrDefaultAsync(s => s.Id == id, ct);
 
-    public async Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(Guid? cuentaComercialId, CancellationToken ct)
+    public async Task<IReadOnlyList<SuscripcionAviso>> ListarAsync(IReadOnlyCollection<Guid>? cuentasComerciales, CancellationToken ct)
     {
-        return await db.SuscripcionesAviso
-            .Where(s => cuentaComercialId == null || s.CuentaComercialId == cuentaComercialId)
+        // La sesión del comercio no tiene operador: sin ignorar el filtro no vería nada. Las cuentas
+        // ya vienen validadas como suyas (AlcanceAvisos).
+        var query = cuentasComerciales is null
+            ? db.SuscripcionesAviso
+            : db.SuscripcionesAviso.IgnoreQueryFilters().Where(s => cuentasComerciales.Contains(s.CuentaComercialId));
+
+        return await query
             .OrderBy(s => s.CreadoEn)
             .ToListAsync(ct);
     }

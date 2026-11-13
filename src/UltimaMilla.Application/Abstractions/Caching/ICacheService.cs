@@ -15,4 +15,8 @@ public interface ICacheService
     Task EliminarAsync(
         string clave,
         CancellationToken ct = default);
+
+    Task EliminarPorPrefijoAsync(
+        string prefijo,
+        CancellationToken ct = default);
 }

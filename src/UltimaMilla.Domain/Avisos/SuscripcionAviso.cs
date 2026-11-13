@@ -24,6 +24,14 @@ public sealed class SuscripcionAviso : AuditableEntity, ITenantEntity
 
     public bool Activa { get; private set; }
 
+    /// <summary>
+    /// RF 36: versión del contrato de los avisos. 1 = formato original, que los sistemas de los comercios
+    /// ya consumen y no cambia; 2 = agrega el detalle de bultos y los avisos por bulto.
+    /// </summary>
+    public int VersionContrato { get; private set; } = 1;
+
+    public const int UltimaVersionContrato = 2;
+
     // Constructor vacío que necesita EF Core.
     private SuscripcionAviso() { }
 
@@ -35,8 +43,12 @@ public sealed class SuscripcionAviso : AuditableEntity, ITenantEntity
         Guid cuentaComercialId,
         string url,
         string secreto,
-        IEnumerable<string> tiposEvento)
+        IEnumerable<string> tiposEvento,
+        int versionContrato = 1)
     {
+        if (versionContrato is < 1 or > UltimaVersionContrato)
+            throw new ArgumentException($"La versión del contrato debe ser entre 1 y {UltimaVersionContrato}.", nameof(versionContrato));
+
         if (operadorId == Guid.Empty)
             throw new ArgumentException("El operador es obligatorio.", nameof(operadorId));
 
@@ -75,6 +87,7 @@ public sealed class SuscripcionAviso : AuditableEntity, ITenantEntity
             Url = url.Trim(),
             Secreto = secreto,
             TiposEvento = tipos,
+            VersionContrato = versionContrato,
             Activa = true
         };
     }
@@ -82,7 +95,9 @@ public sealed class SuscripcionAviso : AuditableEntity, ITenantEntity
     /// <summary>
     /// Determina si esta suscripción escucha un tipo de evento específico.
     /// </summary>
-    public bool Escucha(string tipoEvento) => Activa && TiposEvento.Contains(tipoEvento);
+    /// Un suscriptor del contrato 1 nunca recibe avisos de bulto (RF 36).
+    public bool Escucha(string tipoEvento) =>
+        Activa && TiposEvento.Contains(tipoEvento) && (VersionContrato >= 2 || !TiposAviso.EsDeBulto(tipoEvento));
 
     /// <summary>
     /// Desactiva la suscripción.

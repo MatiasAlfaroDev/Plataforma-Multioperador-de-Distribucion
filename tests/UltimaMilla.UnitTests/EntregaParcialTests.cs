@@ -1,438 +1,160 @@
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
-using Xunit;
 
 namespace UltimaMilla.UnitTests;
 
-/// <summary>Entrega parcial: un envío con varios bultos donde solo algunos llegan al destinatario.</summary>
-public sealed class EntregaParcialTests
+/// <summary>RF 31 a 34: estado por bulto, envío derivado de los bultos y destino de los pendientes.</summary>
+public class EntregaParcialTests
 {
-    private static readonly DateTimeOffset Ahora = new(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
-
-    private readonly Guid _operadorId = Guid.NewGuid();
-    private readonly VersionReglasOperativas _reglas;
-    private readonly Envio _envio;
-    private readonly MotivoNoEntrega _motivo;
-    private readonly List<Guid> _ids;
-
-    public EntregaParcialTests()
-    {
-        var cuenta = CuentaComercial.Crear(
-            Guid.NewGuid(),
-            _operadorId,
-            Guid.NewGuid());
-
-        _reglas = VersionReglasOperativas.Crear(
-            _operadorId,
-            maximoIntentosEntrega: 3,
-            horasMinimasEntreIntentos: 24,
-            requierePruebaEntrega: true,
-            diasMaximosParaDevolucion: 7,
-            vigenciaDesde: Ahora.AddDays(-1),
-            admiteEntregaParcial: true);
-
-        _envio = Envio.Crear(
-            cuenta,
-            "PARC-1",
-            Modalidad.Estandar,
-            new Destinatario("Ana Pérez", "099123456"),
-            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo"),
-            [new NuevoBulto(1m, 10, 10, 10), new NuevoBulto(2m, 10, 10, 10), new NuevoBulto(3m, 10, 10, 10)],
-            Ahora);
-
-        _envio.AsignarReglasOperativas(_reglas.Id);
-
-        _motivo = MotivoNoEntrega.Crear(
-            _operadorId, _reglas.Id, "AUSENTE", "Destinatario ausente", requiereDevolucion: false);
-
-        Aplicar(DisparadorEnvio.RecibirEnDeposito);
-        Aplicar(DisparadorEnvio.AsignarARuta);
-        Aplicar(DisparadorEnvio.Despachar);
-
-        _ids = _envio.Bultos.Select(b => b.Id).ToList();
-    }
-
-    private void Aplicar(DisparadorEnvio disparador) =>
-        _envio.Aplicar(disparador, _reglas, Ahora, "Prueba", "Operario");
-
-    private static PruebaEntrega Prueba() =>
-        PruebaEntrega.Crear("Receptor", null, "firma-1", null, Ahora, -34.9m, -56.16m);
-
-    private (Guid BultoId, MotivoNoEntrega Motivo, string Evidencia) NoEntregado(
-        Guid bultoId, string evidencia = "foto-1") =>
-        (bultoId, _motivo, evidencia);
-
-    private void EntregaParcial(
-        IReadOnlyCollection<Guid>? entregados,
-        IReadOnlyCollection<(Guid BultoId, MotivoNoEntrega Motivo, string Evidencia)>? noEntregados,
-        PruebaEntrega? prueba) =>
-        _envio.Aplicar(
-            DisparadorEnvio.RegistrarEntregaParcial,
-            _reglas,
-            Ahora,
-            "Prueba",
-            "Repartidor",
-            pruebaEntrega: prueba,
-            bultosEntregados: entregados,
-            bultosNoEntregados: noEntregados);
-
-    private EstadoBulto EstadoDe(Guid bultoId) =>
-        _envio.Bultos.Single(b => b.Id == bultoId).Estado;
-
-    // ----- Envio.Aplicar(RegistrarEntregaParcial) -----
-
-    [Fact]
-    public void EntregaParcial_RegistraResultadosPorBultoYActualizaLosEstados()
-    {
-        EntregaParcial(
-            [_ids[0]],
-            [NoEntregado(_ids[1]), NoEntregado(_ids[2], "foto-2")],
-            Prueba());
-
-        Assert.Equal(EstadoEnvio.EntregadoParcialmente, _envio.Estado);
-        Assert.Equal(1, _envio.IntentosRealizados);
-
-        var intento = Assert.Single(_envio.Intentos);
-        Assert.False(intento.Entregado);
-        Assert.NotNull(intento.PruebaEntrega);
-        Assert.Equal(3, intento.ResultadosBultos.Count);
-        Assert.Single(intento.ResultadosBultos, r => r.Entregado);
-
-        var fallidos = intento.ResultadosBultos.Where(r => !r.Entregado).ToList();
-        Assert.Equal(2, fallidos.Count);
-        Assert.All(fallidos, r => Assert.Equal(_motivo.Id, r.MotivoNoEntregaId));
-        Assert.Contains(fallidos, r => r.ReferenciaEvidenciaFallo == "foto-2");
-
-        Assert.Equal(EstadoBulto.Entregado, EstadoDe(_ids[0]));
-        Assert.Equal(EstadoBulto.Pendiente, EstadoDe(_ids[1]));
-        Assert.Equal(EstadoBulto.Pendiente, EstadoDe(_ids[2]));
-
-        Assert.Equal(_motivo.Id, _envio.UltimoMotivoNoEntregaId);
-        Assert.False(_envio.UltimoMotivoRequiereDevolucion);
-        Assert.Equal(DisparadorEnvio.RegistrarEntregaParcial, _envio.Eventos.Last().Disparador);
-    }
-
-    [Fact]
-    public void EntregaParcial_ConMotivosDistintos_NoGuardaUnUnicoMotivoYMarcaDevolucion()
-    {
-        var otro = MotivoNoEntrega.Crear(
-            _operadorId, _reglas.Id, "DIRECCION", "Dirección incorrecta", requiereDevolucion: true);
-
-        EntregaParcial(
-            [_ids[0]],
-            [NoEntregado(_ids[1]), (_ids[2], otro, "foto-2")],
-            Prueba());
-
-        Assert.Null(_envio.UltimoMotivoNoEntregaId);
-        Assert.True(_envio.UltimoMotivoRequiereDevolucion);
-    }
-
-    [Fact]
-    public void EntregaParcial_SinPrueba_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0]], [NoEntregado(_ids[1]), NoEntregado(_ids[2])], null));
-    }
-
-    [Fact]
-    public void EntregaParcial_ConPruebaSinFirmaNiFotografia_FallaSiLasReglasLaExigen()
-    {
-        var vacia = PruebaEntrega.Crear("Receptor", null, null, null, Ahora, -34.9m, -56.16m);
-
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0]], [NoEntregado(_ids[1]), NoEntregado(_ids[2])], vacia));
-    }
-
-    [Fact]
-    public void EntregaParcial_SinListaDeNoEntregados_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            EntregaParcial([_ids[0]], null, Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_SinBultosEntregados_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            EntregaParcial([], [NoEntregado(_ids[1])], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_ConBultosEntregadosRepetidos_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0], _ids[0]], [NoEntregado(_ids[1])], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_SiSeEntreganTodosLosBultos_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0], _ids[1], _ids[2]], [], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_ConUnBultoQueNoEsDelEnvio_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([Guid.NewGuid()], [NoEntregado(_ids[1]), NoEntregado(_ids[2])], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_SinBultosNoEntregados_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0]], [], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_ConBultosNoEntregadosRepetidos_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0]], [NoEntregado(_ids[1]), NoEntregado(_ids[1])], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_SiNoSeInformanTodosLosPendientes_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0]], [NoEntregado(_ids[1])], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_ConMotivoDeOtroOperador_Falla()
-    {
-        var ajeno = MotivoNoEntrega.Crear(
-            Guid.NewGuid(), _reglas.Id, "AJENO", "Motivo de otro operador", requiereDevolucion: false);
-
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0]], [(_ids[1], ajeno, "foto-1"), NoEntregado(_ids[2])], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_ConEvidenciaVacia_Falla()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            EntregaParcial([_ids[0]], [NoEntregado(_ids[1], "  "), NoEntregado(_ids[2])], Prueba()));
-    }
-
-    [Fact]
-    public void EntregaParcial_NoSeAplicaSiElEnvioNoEstaEnTransito()
-    {
-        var otro = Envio.Crear(
-            CuentaComercial.Crear(Guid.NewGuid(), _operadorId, Guid.NewGuid()),
-            "PARC-2",
-            Modalidad.Estandar,
-            new Destinatario("Ana Pérez", "099123456"),
-            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo"),
-            [new NuevoBulto(1m, 10, 10, 10), new NuevoBulto(2m, 10, 10, 10)],
-            Ahora);
-        otro.AsignarReglasOperativas(_reglas.Id);
-
-        Assert.Throws<InvalidOperationException>(() =>
-            otro.Aplicar(
-                DisparadorEnvio.RegistrarEntregaParcial,
-                _reglas,
-                Ahora,
-                "Prueba",
-                "Repartidor",
-                pruebaEntrega: Prueba(),
-                bultosEntregados: [otro.Bultos.First().Id],
-                bultosNoEntregados: [(otro.Bultos.Last().Id, _motivo, "foto-1")]));
-    }
-
-    // ----- IntentoEntrega -----
-
-    [Fact]
-    public void IntentoFallo_Valido_GuardaMotivoYEvidenciaSinEspacios()
-    {
-        var motivoId = Guid.NewGuid();
-
-        var intento = IntentoEntrega.RegistrarFallo(
-            _operadorId, Guid.NewGuid(), 1, motivoId, "  foto-1  ", Ahora);
-
-        Assert.False(intento.Entregado);
-        Assert.Equal(motivoId, intento.MotivoNoEntregaId);
-        Assert.Equal("foto-1", intento.ReferenciaEvidenciaFallida);
-        Assert.Equal(Ahora, intento.OcurridoEn);
-        Assert.Equal(1, intento.Numero);
-    }
-
-    [Fact]
-    public void IntentoFallo_ConMotivoVacio_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarFallo(_operadorId, Guid.NewGuid(), 1, Guid.Empty, "foto", Ahora));
-    }
-
-    [Fact]
-    public void IntentoFallo_SinEvidencia_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarFallo(_operadorId, Guid.NewGuid(), 1, Guid.NewGuid(), " ", Ahora));
-    }
-
-    [Fact]
-    public void IntentoFallo_ConNumeroNoPositivo_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarFallo(_operadorId, Guid.NewGuid(), 0, Guid.NewGuid(), "foto", Ahora));
-    }
-
-    [Fact]
-    public void IntentoFallo_SinOperador_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarFallo(Guid.Empty, Guid.NewGuid(), 1, Guid.NewGuid(), "foto", Ahora));
-    }
-
-    [Fact]
-    public void IntentoEntrega_SinPrueba_Falla()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            IntentoEntrega.RegistrarEntrega(_operadorId, Guid.NewGuid(), 1, null!));
-    }
-
-    [Fact]
-    public void IntentoEntrega_Valido_QuedaEntregadoConLaPrueba()
-    {
-        var prueba = Prueba();
-
-        var intento = IntentoEntrega.RegistrarEntrega(_operadorId, Guid.NewGuid(), 2, prueba);
-
-        Assert.True(intento.Entregado);
-        Assert.Same(prueba, intento.PruebaEntrega);
-        Assert.Equal(prueba.OcurridoEn, intento.OcurridoEn);
-        Assert.Empty(intento.ResultadosBultos);
-    }
-
-    [Fact]
-    public void IntentoParcial_Valido_CreaUnResultadoPorBulto()
-    {
-        var intento = IntentoEntrega.RegistrarEntregaParcial(
-            _operadorId,
-            Guid.NewGuid(),
-            1,
-            [Guid.NewGuid()],
-            [(Guid.NewGuid(), Guid.NewGuid(), "  foto  ")],
-            Prueba());
-
-        Assert.Equal(2, intento.ResultadosBultos.Count);
-        var fallido = Assert.Single(intento.ResultadosBultos, r => !r.Entregado);
-        Assert.Equal("foto", fallido.ReferenciaEvidenciaFallo);
-        Assert.NotNull(fallido.MotivoNoEntregaId);
-        Assert.All(intento.ResultadosBultos, r => Assert.Equal(intento.Id, r.IntentoEntregaId));
-    }
-
-    [Fact]
-    public void IntentoParcial_SinBultosEntregados_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarEntregaParcial(
-                _operadorId, Guid.NewGuid(), 1,
-                [],
-                [(Guid.NewGuid(), Guid.NewGuid(), "foto")],
-                Prueba()));
-    }
-
-    [Fact]
-    public void IntentoParcial_SinBultosNoEntregados_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarEntregaParcial(
-                _operadorId, Guid.NewGuid(), 1,
-                [Guid.NewGuid()],
-                [],
-                Prueba()));
-    }
-
-    [Fact]
-    public void IntentoParcial_ConIdentificacionVacia_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarEntregaParcial(
-                _operadorId, Guid.NewGuid(), 1,
-                [Guid.Empty],
-                [(Guid.NewGuid(), Guid.NewGuid(), "foto")],
-                Prueba()));
-    }
-
-    [Fact]
-    public void IntentoParcial_ConBultoRepetido_Falla()
-    {
-        var repetido = Guid.NewGuid();
-
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarEntregaParcial(
-                _operadorId, Guid.NewGuid(), 1,
-                [repetido],
-                [(repetido, Guid.NewGuid(), "foto")],
-                Prueba()));
-    }
-
-    [Fact]
-    public void IntentoParcial_ConMotivoVacio_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarEntregaParcial(
-                _operadorId, Guid.NewGuid(), 1,
-                [Guid.NewGuid()],
-                [(Guid.NewGuid(), Guid.Empty, "foto")],
-                Prueba()));
-    }
-
-    [Fact]
-    public void IntentoParcial_ConEvidenciaVacia_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            IntentoEntrega.RegistrarEntregaParcial(
-                _operadorId, Guid.NewGuid(), 1,
-                [Guid.NewGuid()],
-                [(Guid.NewGuid(), Guid.NewGuid(), " ")],
-                Prueba()));
-    }
-
-    [Fact]
-    public void IntentoParcial_SinPrueba_Falla()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            IntentoEntrega.RegistrarEntregaParcial(
-                _operadorId, Guid.NewGuid(), 1,
-                [Guid.NewGuid()],
-                [(Guid.NewGuid(), Guid.NewGuid(), "foto")],
-                null!));
-    }
-
-    // ----- PruebaEntrega -----
-
-    [Fact]
-    public void PruebaEntrega_LimpiaEspaciosYGuardaLosDatos()
-    {
-        var prueba = PruebaEntrega.Crear(
-            "  Receptor  ", " 1234567-8 ", " firma ", " foto ", Ahora, -34.9m, -56.16m);
-
-        Assert.Equal("Receptor", prueba.NombreReceptor);
-        Assert.Equal("1234567-8", prueba.DocumentoReceptor);
-        Assert.Equal("firma", prueba.ReferenciaFirma);
-        Assert.Equal("foto", prueba.ReferenciaFotografia);
-    }
-
-    [Fact]
-    public void PruebaEntrega_SinReceptor_Falla()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            PruebaEntrega.Crear(" ", null, "firma", null, Ahora, 0m, 0m));
-    }
+    private static readonly DateTimeOffset Alta = new(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
-    [InlineData(91, 0)]
-    [InlineData(-91, 0)]
-    [InlineData(0, 181)]
-    [InlineData(0, -181)]
-    public void PruebaEntrega_ConCoordenadasInvalidas_Falla(int latitud, int longitud)
+    [InlineData(3, 0, DisparadorEnvio.RegistrarIntentoFallido)]
+    [InlineData(3, 2, DisparadorEnvio.RegistrarEntregaParcial)]
+    [InlineData(3, 3, DisparadorEnvio.Entregar)]
+    [InlineData(1, 1, DisparadorEnvio.Entregar)]
+    public void El_resultado_de_la_visita_se_deriva_de_los_bultos(int pendientes, int entregados, DisparadorEnvio esperado) =>
+        Assert.Equal(esperado, MaquinaEstadosBulto.ResultadoDeVisita(pendientes, entregados));
+
+    [Fact]
+    public void Cada_estado_de_bulto_tiene_una_salida_salvo_los_finales()
     {
-        Assert.Throws<ArgumentException>(() =>
-            PruebaEntrega.Crear("Receptor", null, "firma", null, Ahora, latitud, longitud));
+        // La máquina es declarativa (Stateless) y se puede recorrer: Entregado y Devuelto no tienen salida.
+        var estado = EstadoBulto.Pendiente;
+        var info = MaquinaEstadosBulto.Crear(() => estado, e => estado = e).GetInfo();
+
+        var conSalida = info.States
+            .Where(s => s.Transitions.Any())
+            .Select(s => (EstadoBulto)s.UnderlyingState)
+            .ToHashSet();
+
+        Assert.Equal(
+            new HashSet<EstadoBulto> { EstadoBulto.Pendiente, EstadoBulto.EnDevolucion, EstadoBulto.Extraviado },
+            conSalida);
+    }
+
+    [Fact]
+    public void Entrega_parcial_deja_historial_por_bulto_con_motivo()
+    {
+        var (envio, reglas, motivo) = EnvioEnTransito(admiteParcial: true);
+        var bultos = envio.Bultos.ToList();
+
+        EntregarParcial(envio, reglas, motivo, bultos[0].Id, bultos[1].Id);
+
+        Assert.Equal(EstadoEnvio.EntregadoParcialmente, envio.Estado);
+        Assert.Equal(2, envio.BultosEntregados);
+        Assert.Equal(1, envio.BultosPendientes);
+
+        Assert.Equal(2, envio.EventosBulto.Count(e => e.Resultado == ResultadoBulto.Entregado));
+        var noEntregado = Assert.Single(envio.EventosBulto, e => e.Resultado == ResultadoBulto.NoEntregado);
+        Assert.Equal(bultos[2].Identificacion, noEntregado.Identificacion);
+        Assert.Equal(motivo.Descripcion, noEntregado.Motivo);
+        Assert.Equal(EstadoBulto.Pendiente, noEntregado.EstadoNuevo);
+    }
+
+    [Fact]
+    public void Un_bulto_que_no_esta_pendiente_es_conflicto_y_se_lo_nombra()
+    {
+        var (envio, _, _) = EnvioEnTransito(admiteParcial: true);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            envio.ValidarBultosEntregaParcial([Guid.NewGuid()]));
+
+        Assert.Contains("ya no están pendientes", ex.Message);
+        Assert.Contains("no pertenece al envío", ex.Message);
+    }
+
+    [Fact]
+    public void Extravio_y_reaparicion_se_trasladan_a_los_bultos_pendientes()
+    {
+        var (envio, reglas, motivo) = EnvioEnTransito(admiteParcial: true);
+        var bultos = envio.Bultos.ToList();
+        EntregarParcial(envio, reglas, motivo, bultos[0].Id);
+
+        envio.Aplicar(DisparadorEnvio.DeclararExtraviado, reglas, Alta.AddHours(3), "Backoffice", "Despachador",
+            justificacion: "No aparece en el depósito");
+
+        Assert.Equal(EstadoBulto.Entregado, bultos[0].Estado);
+        Assert.All(bultos.Skip(1), b => Assert.Equal(EstadoBulto.Extraviado, b.Estado));
+
+        envio.Aplicar(DisparadorEnvio.Reaparecer, reglas, Alta.AddHours(4), "Backoffice", "Despachador");
+
+        Assert.All(bultos.Skip(1), b => Assert.Equal(EstadoBulto.Pendiente, b.Estado));
+        Assert.Equal(EstadoBulto.Entregado, bultos[0].Estado);
+    }
+
+    [Fact]
+    public void Tras_la_entrega_parcial_los_pendientes_pueden_volver_a_una_hoja_de_ruta()
+    {
+        // RF 34: EntregadoParcialmente → depósito → Reprogramado → AsignadoARuta.
+        var (envio, reglas, motivo) = EnvioEnTransito(admiteParcial: true);
+        EntregarParcial(envio, reglas, motivo, envio.Bultos.First().Id);
+
+        envio.Aplicar(DisparadorEnvio.RetornarADeposito, reglas, Alta.AddHours(3), "Deposito", "Operario");
+        Assert.True(envio.AdmiteNuevaVisita(reglas));
+
+        envio.Aplicar(DisparadorEnvio.Reprogramar, reglas, Alta.AddHours(3), "Sistema", "Reglas operativas");
+        envio.AgregarRecargoNuevaVisita(150m);
+        envio.Aplicar(DisparadorEnvio.AsignarARuta, reglas, Alta.AddHours(4), "Backoffice", "Despachador");
+
+        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
+        Assert.Equal(150m, envio.RecargoNuevasVisitas);
+        Assert.Equal(2, envio.BultosPendientes);
+    }
+
+    [Fact]
+    public void Con_devolucion_al_comercio_los_pendientes_pasan_a_devolucion()
+    {
+        var (envio, reglas, motivo) = EnvioEnTransito(admiteParcial: true, AccionBultosPendientes.DevolverAlComercio);
+        EntregarParcial(envio, reglas, motivo, envio.Bultos.First().Id);
+        envio.Aplicar(DisparadorEnvio.RetornarADeposito, reglas, Alta.AddHours(3), "Deposito", "Operario");
+
+        Assert.True(envio.PuedeIniciarDevolucion(reglas));
+        envio.Aplicar(DisparadorEnvio.IniciarDevolucion, reglas, Alta.AddHours(3), "Sistema", "Reglas operativas");
+
+        Assert.Equal(2, envio.BultosEnDevolucion);
+        Assert.Equal(1, envio.BultosEntregados);
+    }
+
+    private static void EntregarParcial(Envio envio, VersionReglasOperativas reglas, MotivoNoEntrega motivo, params Guid[] entregados)
+    {
+        var noEntregados = envio.Bultos
+            .Where(b => b.Estado == EstadoBulto.Pendiente && !entregados.Contains(b.Id))
+            .Select(b => (b.Id, motivo, "foto-bulto"))
+            .ToList();
+
+        envio.Aplicar(
+            DisparadorEnvio.RegistrarEntregaParcial,
+            reglas,
+            Alta.AddHours(2),
+            "Mobile",
+            "Mobile",
+            pruebaEntrega: PruebaEntrega.Crear("Ana", null, "firma", null, Alta.AddHours(2), -34.9m, -56.1m),
+            bultosEntregados: entregados,
+            bultosNoEntregados: noEntregados);
+    }
+
+    private static (Envio, VersionReglasOperativas, MotivoNoEntrega) EnvioEnTransito(
+        bool admiteParcial,
+        AccionBultosPendientes accion = AccionBultosPendientes.NuevaVisita)
+    {
+        var operadorId = Guid.NewGuid();
+        var cuenta = CuentaComercial.Crear(Guid.NewGuid(), operadorId, Guid.NewGuid());
+        var reglas = VersionReglasOperativas.Crear(operadorId, 3, 0, true, 5, Alta.AddDays(-1),
+            admiteEntregaParcial: admiteParcial, accionBultosPendientes: accion);
+        var motivo = MotivoNoEntrega.Crear(operadorId, reglas.Id, "DANADO", "Bulto dañado", requiereDevolucion: false);
+
+        var envio = Envio.Crear(cuenta, "PED-31", Modalidad.Estandar, new Destinatario("Ana", null),
+            new Direccion("Av. Italia", "1234", "Montevideo", "Montevideo"),
+            [new NuevoBulto(1m, 10, 10, 10), new NuevoBulto(2m, 10, 10, 10), new NuevoBulto(3m, 10, 10, 10)],
+            Alta);
+        envio.AsignarReglasOperativas(reglas.Id);
+
+        envio.Aplicar(DisparadorEnvio.RecibirEnDeposito, reglas, Alta.AddMinutes(10), "Backoffice", "Operario");
+        envio.Aplicar(DisparadorEnvio.AsignarARuta, reglas, Alta.AddMinutes(20), "Backoffice", "Despachador");
+        envio.Aplicar(DisparadorEnvio.Despachar, reglas, Alta.AddMinutes(30), "Mobile", "Repartidor");
+
+        return (envio, reglas, motivo);
     }
 }

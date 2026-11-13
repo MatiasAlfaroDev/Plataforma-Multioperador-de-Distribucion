@@ -1,6 +1,7 @@
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using UltimaMilla.Web.Portal;
 using UltimaMilla.Web.Portal.Components;
 using UltimaMilla.Web.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -48,6 +49,8 @@ builder.Services.AddAuthorization(options =>
                   "perfil_comercio",
                   "AdministradorComercio",
                   "Comercio"));
+    options.AddPolicy("AdministradorComercio", policy =>
+        policy.RequireClaim("perfil_comercio", "AdministradorComercio"));
 });
 builder.Services.AddCascadingAuthenticationState();
 
@@ -79,8 +82,12 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation())
     .UseOtlpExporter();
 
+// Seguridad web (RNF 6.3): cabeceras y límite de consultas de seguimiento por visitante.
+builder.Services.AddSeguridadWebPortal(builder.Configuration);
+
 var app = builder.Build();
 
+app.UseSeguridadWebPortal();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -89,14 +96,4 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 
-app.MapGet("/prueba-auth", (HttpContext context) =>
-{
-    return Results.Ok(new
-    {
-        Autenticado = context.User.Identity?.IsAuthenticated ?? false,
-        Usuario = context.User.Identity?.Name,
-        OperadorId = context.User.FindFirst("operador_id")?.Value,
-        Perfil = context.User.FindFirst("perfil")?.Value
-    });
-});
 app.Run();
