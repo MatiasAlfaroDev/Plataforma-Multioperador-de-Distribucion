@@ -9,6 +9,18 @@ public sealed record OperadorItem(
     string Nombre,
     string ColorPrimario);
 
+/// <summary>Una diferencia entre lo declarado y lo escaneado al recibir (RF 10). Tipo: BultoFaltante o BultoNoDeclarado.</summary>
+public sealed record DiscrepanciaRecepcionItem(
+    string Tipo,
+    string Identificacion,
+    string Responsable,
+    DateTimeOffset RegistradaEn);
+
+/// <summary>Resultado de POST /api/envios/{id}/recepcion. Recibido es false si faltan bultos declarados.</summary>
+public sealed record ResultadoRecepcionItem(
+    bool Recibido,
+    IReadOnlyList<DiscrepanciaRecepcionItem> Discrepancias);
+
 /// <summary>Datos que devuelve GET /api/envios.</summary>
 public sealed record EnvioItem(
     Guid Id,
@@ -183,7 +195,7 @@ public sealed class EnviosApiClient(HttpClient http)
         }
     }
 
-    public async Task RecibirEnDepositoAsync(
+    public async Task<ResultadoRecepcionItem> RecibirEnDepositoAsync(
         Guid envioId,
         IReadOnlyList<string> identificaciones,
         string responsable,
@@ -210,6 +222,10 @@ public sealed class EnviosApiClient(HttpClient http)
                 null,
                 respuesta.StatusCode);
         }
+
+        return await respuesta.Content
+            .ReadFromJsonAsync<ResultadoRecepcionItem>(ct)
+            ?? new ResultadoRecepcionItem(true, []);
     }
 
     public async Task RetornarADepositoAsync(
