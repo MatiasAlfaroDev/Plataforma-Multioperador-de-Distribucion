@@ -1,4 +1,3 @@
-
 @page
 @model UltimaMilla.Web.Backoffice.Pages.HojasDeRutaModel
 
@@ -317,12 +316,70 @@
                     </tbody>
                 </table>
             </div>
+            
+        }
+
+
+        <h3 class="mt-6">Retiros para entregar al comercio</h3>
+
+        <p class="nota">
+            Retiros que ya fueron recibidos en depósito y deben
+            devolverse al comercio mediante una nueva hoja de ruta.
+        </p>
+
+        @if (Model.RetirosParaEntregar.Count == 0)
+        {
+            <div class="aviso">
+                <i class="ph ph-info"></i>
+                <p>No hay retiros en depósito pendientes de entrega.</p>
+            </div>
+        }
+        else
+        {
+            <div class="tabla">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Motivo</th>
+                            <th>Identificador del retiro</th>
+                            <th>Peso (kg)</th>
+                            <th>Bultos</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var retiro in Model.RetirosParaEntregar)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox"
+                                           name="Formulario.EntregasRetirosIds"
+                                           value="@retiro.Id"
+                                           checked="@(Model.Formulario.EntregasRetirosIds.Contains(retiro.Id))" />
+                                </td>
+                                <td>@retiro.Motivo</td>
+                                <td class="codigo">@retiro.Id</td>
+                                <td class="num">@retiro.PesoTotalKg.ToString("N2")</td>
+                                <td class="num">@retiro.Bultos.Count</td>
+                                <td>
+                                    <a asp-page="/DetalleRetiro"
+                                       asp-route-id="@retiro.Id"
+                                       class="btn-secundario py-1.5 text-sm">
+                                        Ver detalle
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
 
         <div class="mt-6">
             <button type="submit"
                     class="btn-primario"
-                    disabled="@(Model.Envios.Count == 0 && Model.Retiros.Count == 0)">
+                    disabled="@(Model.Envios.Count == 0 && Model.Retiros.Count == 0 && Model.RetirosParaEntregar.Count == 0)">
                 Crear y asignar hoja de ruta
             </button>
         </div>

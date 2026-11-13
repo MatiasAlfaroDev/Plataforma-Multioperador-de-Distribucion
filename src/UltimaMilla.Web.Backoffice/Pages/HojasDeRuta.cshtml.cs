@@ -26,6 +26,8 @@ public sealed class HojasDeRutaModel(
 
     public List<RetiroBackofficeDto> Retiros { get; private set; } = [];
 
+    public List<RetiroBackofficeDto> RetirosParaEntregar { get; private set; } = [];
+
     public List<HojaRutaApiDto> Hojas { get; private set; } = [];
 
     public List<FranjaRutaApiDto> Franjas { get; private set; } = [];
@@ -34,6 +36,9 @@ public sealed class HojasDeRutaModel(
 
     [BindProperty]
     public FormularioHojaRuta Formulario { get; set; } = new();
+
+    public List<Guid> EntregasRetirosIds { get; set; } = [];
+    
 
     public async Task OnGetAsync(
         Guid? envioId,
@@ -63,6 +68,7 @@ public sealed class HojasDeRutaModel(
     {
         Formulario.EnviosIds ??= [];
         Formulario.RetirosIds ??= [];
+        Formulario.EntregasRetirosIds ??= [];
 
         if (OperadorIdSesion == Guid.Empty)
         {
@@ -86,13 +92,13 @@ public sealed class HojasDeRutaModel(
         }
 
         if (Formulario.EnviosIds.Count == 0 &&
-            Formulario.RetirosIds.Count == 0)
-        {
-            ModelState.AddModelError(
-                "",
-                "Seleccioná al menos un envío o un retiro.");
-        }
-
+        Formulario.RetirosIds.Count == 0 &&
+        Formulario.EntregasRetirosIds.Count == 0)
+    {
+        ModelState.AddModelError(
+            "",
+            "Seleccioná al menos un envío, retiro o entrega al comercio.");
+    }
         var franjaValida = IntentarObtenerFranja(
             Formulario.FranjaSeleccionada,
             out var horaDesde,
@@ -123,7 +129,9 @@ public sealed class HojasDeRutaModel(
                 horaHasta,
                 Formulario.MaximoParadas,
                 Formulario.EnviosIds,
-                Formulario.RetirosIds);
+                Formulario.RetirosIds,
+                null,
+                Formulario.EntregasRetirosIds);
 
             var hojaId = await api.CrearAsync(solicitud, ct);
 
@@ -216,6 +224,14 @@ public sealed class HojasDeRutaModel(
                 .ToList();
 
             Hojas = await api.ListarAsync(operadorId, ct);
+
+            RetirosParaEntregar = retiros
+            .Where(r =>
+                r.OperadorId == operadorId &&
+                r.Estado == "EnDeposito")
+            .OrderBy(r => r.FechaSolicitada)
+            .ThenBy(r => r.HoraDesde)
+            .ToList();
         }
         catch (Exception ex) when (
             ex is HttpRequestException ||
@@ -291,5 +307,6 @@ public sealed class HojasDeRutaModel(
         public List<Guid> EnviosIds { get; set; } = [];
 
         public List<Guid> RetirosIds { get; set; } = [];
+        public List<Guid> EntregasRetirosIds { get; set; } = [];
     }
 }

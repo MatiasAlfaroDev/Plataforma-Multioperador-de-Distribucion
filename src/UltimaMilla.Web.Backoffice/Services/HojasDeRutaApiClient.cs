@@ -59,7 +59,9 @@ public sealed record CrearHojaRutaApiRequest(
     TimeOnly HoraEntregaHasta,
     int MaximoParadas,
     IReadOnlyList<Guid> EnviosIds,
-    IReadOnlyList<Guid> RetirosIds);
+    IReadOnlyList<Guid> RetirosIds,
+    IReadOnlyList<Guid>? DevolucionesIds = null,
+    IReadOnlyList<Guid>? EntregasRetirosIds = null);
 
 public sealed class HojasDeRutaApiClient(HttpClient http)
 {
