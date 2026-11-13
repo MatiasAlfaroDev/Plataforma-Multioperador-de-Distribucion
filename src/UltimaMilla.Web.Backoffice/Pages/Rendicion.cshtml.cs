@@ -36,13 +36,13 @@ public sealed class RendicionModel(HojasDeRutaApiClient api) : PageModel
     public async Task<IActionResult> OnPostAsync(CancellationToken ct)
     {
         // Un código por línea (o separados por coma), como sale de una pistola lectora.
-        var codigos = Escaneados
-            .Split(['\n', '\r', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        var codigos = (Escaneados ?? string.Empty)
+    .Split(['\n', '\r', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
 
         try
         {
-            var resultado = await api.RendirAsync(HojaId, codigos, Responsable, ct);
+            var resultado = await api.RendirAsync(HojaId, codigos, Responsable ?? string.Empty, ct);
 
             TempData["Exito"] =
                 $"Hoja rendida. {resultado.EnviosRetornados} envío(s) volvieron al depósito y " +
