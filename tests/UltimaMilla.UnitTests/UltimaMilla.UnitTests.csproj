@@ -10,6 +10,9 @@
     <ProjectReference Include="..\..\src\UltimaMilla.Infrastructure\UltimaMilla.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\src\UltimaMilla.Api\Seguridad\ClavesDePruebas.cs" Link="ClavesDePruebas.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />

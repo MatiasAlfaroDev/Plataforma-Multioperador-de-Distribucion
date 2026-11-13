@@ -256,6 +256,27 @@ app.UseLimiteDeTasa();
 
 app.UseAuthentication();
 app.UseAislamientoDePruebas();
+// El contrato interno de la API no es público: sólo lo ve el personal del operador autenticado.
+// El de comercios (/openapi/comercios.json) sigue abierto porque lo lee /docs.
+app.Use(async (contexto, siguiente) =>
+{
+    if (contexto.Request.Path.Equals("/openapi/v1.json", StringComparison.OrdinalIgnoreCase))
+    {
+        if (contexto.User.Identity?.IsAuthenticated != true)
+        {
+            contexto.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        if (!Perfiles.Backoffice.Any(contexto.User.IsInRole))
+        {
+            contexto.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+    }
+
+    await siguiente();
+});
 app.UseLimitacionDeTasa();
 app.UseAuthorization();
 app.UseAntiforgery();
