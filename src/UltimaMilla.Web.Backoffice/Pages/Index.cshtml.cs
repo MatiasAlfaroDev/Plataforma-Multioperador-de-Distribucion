@@ -93,13 +93,14 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
             {
                 await CargarDatosAsync(ct);
 
-                Error = "No se recibió el envío: faltan bultos declarados (" +
-                    string.Join(", ", faltantes) + ")." +
-                    (noDeclarados.Count > 0
-                        ? " Bultos escaneados que no estaban declarados: " +
-                          string.Join(", ", noDeclarados) + "."
-                        : string.Empty) +
-                    " La discrepancia quedó registrada.";
+                var partes = new List<string>();
+                if (faltantes.Count > 0)
+                    partes.Add("faltan bultos declarados (" + string.Join(", ", faltantes) + ")");
+                if (noDeclarados.Count > 0)
+                    partes.Add("se escanearon bultos que no estaban declarados (" + string.Join(", ", noDeclarados) + ")");
+
+                Error = "No se recibió el envío: " + string.Join("; ", partes) +
+                    ". La discrepancia quedó registrada.";
 
                 return Page();
             }
