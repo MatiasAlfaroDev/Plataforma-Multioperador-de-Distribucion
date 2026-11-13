@@ -12,6 +12,7 @@ using UltimaMilla.Infrastructure.Caching;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Infrastructure;
 using UltimaMilla.Infrastructure.Mensajeria;
+using UltimaMilla.Infrastructure.Observabilidad;
 using UltimaMilla.Worker;
 using UltimaMilla.Worker.Consumidores;
 using UltimaMilla.Worker.Tareas;
@@ -57,12 +58,14 @@ builder.Services.AddHostedService<ReintentoDeAvisos>();
 builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
 // Telemetría (RNF 6.12): la traza que empieza en la API sigue por MassTransit hasta el consumidor y el POST al comercio.
-builder.Logging.AddOpenTelemetry(o => o.IncludeFormattedMessage = true);
+builder.Services.AddRegistroEstructurado();
 
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddAttributes([new("service.instance.id", Environment.MachineName)]))
     .WithTracing(t => t.AddSource("MassTransit").AddSource("Npgsql").AddHttpClientInstrumentation())
-    .WithMetrics(m => m.AddMeter("MassTransit").AddMeter(AvisosMetrics.MeterName).AddMeter(CacheMetrics.MeterName).AddMeter("System.Runtime").AddHttpClientInstrumentation())
+    .WithMetrics(m => m.AddMeter("MassTransit").AddMeter(AvisosMetrics.MeterName).AddMeter(CacheMetrics.MeterName).AddMeter(SincronizacionMetrics.MeterName).AddMeter("System.Runtime").AddHttpClientInstrumentation())
     .UseOtlpExporter();
 
-builder.Build().Run();
+var host = builder.Build();
+SincronizacionMetrics.Observar(host.Services.GetRequiredService<IConnectionMultiplexer>());
+host.Run();
