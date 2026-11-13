@@ -26,6 +26,7 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         builder.Property(e => e.Modalidad).HasConversion<string>().HasMaxLength(16);
         builder.Property(e => e.Estado).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.TarifaCalculada).HasPrecision(12, 2);
+        builder.Property(e => e.RecargoNuevasVisitas).HasPrecision(12, 2);
         builder.HasOne<VersionTarifaria>()
             .WithMany()
             .HasForeignKey(e => e.VersionTarifariaId)
@@ -52,6 +53,7 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
         {
             d.Property(x => x.Nombre).HasColumnName("destinatario_nombre").HasMaxLength(200).IsRequired();
             d.Property(x => x.Telefono).HasColumnName("destinatario_telefono").HasMaxLength(30);
+            d.Property(x => x.Email).HasColumnName("destinatario_email").HasMaxLength(200);
         });
         builder.Navigation(e => e.Destinatario).IsRequired();
 
@@ -75,6 +77,15 @@ public sealed class EnvioConfiguration : IEntityTypeConfiguration<Envio>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Navigation(e => e.Eventos)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Historial por bulto (RF 31).
+        builder.HasMany(e => e.EventosBulto)
+            .WithOne()
+            .HasForeignKey(e => e.EnvioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(e => e.EventosBulto)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         // Intentos de entrega asociados al envío.

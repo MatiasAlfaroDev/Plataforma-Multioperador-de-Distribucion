@@ -8,4 +8,6 @@ public sealed record RegistrarEventoRetiroCommand(
     IReadOnlyList<string>? IdentificacionesBultos,
     string? ReferenciaFotografia,
     string? ReferenciaFirma,
-    string? MotivoFallo);
+    string? MotivoFallo,
+    // La app puede mandar los Id de los bultos (los recibe en la hoja de ruta) en lugar de sus códigos.
+    IReadOnlyList<Guid>? IdsBultos = null);

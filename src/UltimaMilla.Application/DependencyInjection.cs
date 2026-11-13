@@ -1,3 +1,4 @@
+using UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
@@ -80,7 +81,6 @@ public static class DependencyInjection
         services.AddScoped<ObtenerDetalleEnvioHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();
-        services.AddScoped<ListarDiscrepanciasRecepcionHandler>();
         services.AddScoped<RetornarADepositoHandler>();
         services.AddScoped<SolicitarReprogramacionHandler>();
         services.AddScoped<ConfirmarReprogramacionHandler>();

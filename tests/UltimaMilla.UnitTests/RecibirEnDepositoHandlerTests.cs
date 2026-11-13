@@ -380,5 +380,9 @@ public sealed class RecibirEnDepositoHandlerTests
         public Task EliminarAsync(
             string clave, CancellationToken ct = default) =>
             Task.CompletedTask;
+
+        public Task EliminarPorPrefijoAsync(
+            string prefijo, CancellationToken ct = default) =>
+            Task.CompletedTask;
     }
 }

@@ -75,6 +75,28 @@
             </div>
         </div>
 
+        <h2>Entrega parcial</h2>
+
+        <div class="campos">
+            <div>
+                <label asp-for="AdmiteEntregaParcial">Admite entrega parcial de bultos</label>
+                <input asp-for="AdmiteEntregaParcial" type="checkbox" style="width:auto" />
+            </div>
+
+            <div>
+                <label asp-for="AccionBultosPendientes">Bultos pendientes</label>
+                <select asp-for="AccionBultosPendientes">
+                    <option value="0">Nueva visita</option>
+                    <option value="1">Devolver al comercio</option>
+                </select>
+            </div>
+
+            <div>
+                <label asp-for="NuevaVisitaConRecargo">La nueva visita tiene recargo</label>
+                <input asp-for="NuevaVisitaConRecargo" type="checkbox" style="width:auto" />
+            </div>
+        </div>
+
         <h2>Motivos de no entrega</h2>
 
         <p class="nota">

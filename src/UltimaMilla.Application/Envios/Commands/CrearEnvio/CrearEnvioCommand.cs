@@ -11,6 +11,7 @@ public sealed record CrearEnvioCommand(
     string Numero,
     string Localidad,
     string Departamento,
-    IReadOnlyList<BultoCommand> Bultos);
+    IReadOnlyList<BultoCommand> Bultos,
+    string? DestinatarioEmail = null);
 
 public sealed record BultoCommand(decimal PesoKg, int AltoCm, int AnchoCm, int ProfundidadCm);

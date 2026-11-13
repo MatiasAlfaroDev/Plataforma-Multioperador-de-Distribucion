@@ -49,6 +49,8 @@ builder.Services.AddAuthorization(options =>
                   "perfil_comercio",
                   "AdministradorComercio",
                   "Comercio"));
+    options.AddPolicy("AdministradorComercio", policy =>
+        policy.RequireClaim("perfil_comercio", "AdministradorComercio"));
 });
 builder.Services.AddCascadingAuthenticationState();
 
@@ -94,14 +96,4 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 
-app.MapGet("/prueba-auth", (HttpContext context) =>
-{
-    return Results.Ok(new
-    {
-        Autenticado = context.User.Identity?.IsAuthenticated ?? false,
-        Usuario = context.User.Identity?.Name,
-        OperadorId = context.User.FindFirst("operador_id")?.Value,
-        Perfil = context.User.FindFirst("perfil")?.Value
-    });
-});
 app.Run();

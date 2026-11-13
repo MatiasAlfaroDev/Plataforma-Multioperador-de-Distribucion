@@ -43,6 +43,8 @@ public static class MauiProgram
                 UseCookies = true
             };
 
+        builder.Services.AddTransient<CorrelacionHandler>();
+
         // HttpClient tipado hacia la API, configurado como en la demo BeatScan.
         builder.Services.AddHttpClient<IEnviosApi, EnviosApi>(c =>
         {
@@ -50,7 +52,8 @@ public static class MauiProgram
             c.Timeout = TimeSpan.FromSeconds(20);
             c.DefaultRequestVersion = System.Net.HttpVersion.Version11;
             c.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
-        }).ConfigurePrimaryHttpMessageHandler(CrearHandlerConCookies);
+        }).ConfigurePrimaryHttpMessageHandler(CrearHandlerConCookies)
+          .AddHttpMessageHandler<CorrelacionHandler>();
 
         // HttpClient para el inicio de sesión (misma dirección y misma bolsa de cookies).
         builder.Services.AddHttpClient<IAuthApi, AuthApi>(c =>

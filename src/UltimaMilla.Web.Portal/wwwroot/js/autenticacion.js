@@ -74,35 +74,84 @@ async registrar(
         return await respuesta.json();
     },
 
-    async obtenerMembresias() {
-        const respuesta = await fetch("/api/auth/membresias", {
+    async misComercios() {
+        const respuesta = await fetch("/api/auth/mis-comercios", {
             method: "GET",
             credentials: "same-origin"
         });
 
         if (!respuesta.ok) {
-            throw new Error("No se pudieron obtener las membresías.");
+            throw new Error("No se pudieron obtener los comercios.");
         }
 
         return await respuesta.json();
     },
 
-    async seleccionarOperador(membresiaId) {
-        const respuesta = await fetch("/api/auth/seleccionar-operador", {
+    async seleccionarComercio(comercioId) {
+        const respuesta = await fetch("/api/auth/seleccionar-comercio", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             credentials: "same-origin",
-            body: JSON.stringify({ membresiaId })
+            body: JSON.stringify({ comercioId })
         });
 
         if (!respuesta.ok) {
-            throw new Error("No se pudo seleccionar el operador.");
+            throw new Error("No se pudo seleccionar el comercio.");
         }
 
         return await respuesta.json();
     },
+
+    async listarUsuariosComercio() {
+        const respuesta = await fetch("/api/comercio/usuarios", {
+            method: "GET",
+            credentials: "same-origin"
+        });
+
+        if (!respuesta.ok) {
+            throw new Error(`No se pudieron cargar los usuarios (HTTP ${respuesta.status}).`);
+        }
+
+        return await respuesta.json();
+    },
+
+    async altaUsuarioComercio(datos) {
+        const respuestaToken = await fetch("/api/antiforgery/token", {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        if (!respuestaToken.ok) {
+            throw new Error("No se pudo obtener el token de seguridad.");
+        }
+
+        const { token } = await respuestaToken.json();
+
+        const respuesta = await fetch("/api/comercio/usuarios", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": token
+            },
+            credentials: "same-origin",
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            let mensaje = `No se pudo dar de alta (HTTP ${respuesta.status}).`;
+            try {
+                const problema = await respuesta.json();
+                mensaje = problema.detail ?? problema.title ?? mensaje;
+            } catch {
+                // Mantener el mensaje HTTP.
+            }
+            throw new Error(mensaje);
+        }
+    },
+
     async obtenerCuentasComerciales() {
     const respuesta = await fetch("/api/cuentas-comerciales", {
         method: "GET",

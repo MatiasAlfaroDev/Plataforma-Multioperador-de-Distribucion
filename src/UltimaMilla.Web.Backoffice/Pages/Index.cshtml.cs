@@ -8,6 +8,8 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
 {
     public IReadOnlyList<EnvioItem> Envios { get; private set; } = [];
 
+    public IReadOnlyList<RetiroTableroItem> Retiros { get; private set; } = [];
+
     public string? Error { get; private set; }
 
     public string OperadorNombre =>
@@ -24,6 +26,7 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         try
         {
             Envios = await api.ListarEnviosAsync(ct);
+            Retiros = await api.ListarRetirosAsync(ct);
         }
         catch (HttpRequestException ex)
         {
@@ -35,6 +38,24 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         {
             Error = "La sesión no está disponible. Iniciá sesión nuevamente.";
         }
+    }
+
+    public async Task<IActionResult> OnPostRetiroAsync(Guid retiroId, string accion, CancellationToken ct)
+    {
+        if (accion is not ("recibir-deposito" or "entregar-comercio" or "reprogramar"))
+            return BadRequest();
+
+        try
+        {
+            await api.GestionarRetiroAsync(retiroId, accion, ct);
+            TempData["MensajeExito"] = "Retiro actualizado.";
+        }
+        catch (HttpRequestException ex)
+        {
+            TempData["MensajeExito"] = ex.Message;
+        }
+
+        return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostRecibirAsync(

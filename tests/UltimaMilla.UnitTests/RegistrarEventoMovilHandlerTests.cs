@@ -7,6 +7,7 @@ using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Rutas;
 using UltimaMilla.Application.Abstractions.Caching;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.UnitTests;
 
@@ -28,6 +29,8 @@ public class RegistrarEventoMovilHandlerTests
     private readonly MotivoNoEntrega _motivo;
     private readonly HojasEnMemoria _hojas = new();
     private readonly HojaDeRuta _hoja;
+    private readonly RepartidoresEnMemoria _repartidores = new();
+    private readonly SesionDePrueba _sesion = new(Guid.NewGuid());
 
     public RegistrarEventoMovilHandlerTests()
     {
@@ -85,6 +88,8 @@ public class RegistrarEventoMovilHandlerTests
             operadorId,
             "Repartidor de prueba",
             "099123456");
+        repartidor.VincularUsuario(_sesion.UsuarioIdFijo);
+        _repartidores.Lista.Add(repartidor);
 
         var vehiculo = Vehiculo.Crear(
             operadorId,
@@ -129,7 +134,48 @@ public class RegistrarEventoMovilHandlerTests
             _publicador,
             new RegistrarEventoMovilValidator(),
             new RelojFijo(Alta.AddHours(5)),
-            new CacheEnMemoria());
+            new CacheEnMemoria(),
+            _repartidores,
+            _sesion,
+            new BanderasHabilitadas());
+    }
+
+    [Fact]
+    public async Task Otro_repartidor_no_puede_registrar_la_entrega()
+    {
+        _sesion.UsuarioIdFijo = Guid.NewGuid();
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _handler.Handle(Entrega(Guid.NewGuid()), CancellationToken.None));
+    }
+
+    private sealed class BanderasHabilitadas : IBanderas
+    {
+        public Task<bool> EstaHabilitadaAsync(string bandera, Guid operadorId, CancellationToken ct) => Task.FromResult(true);
+    }
+
+    private sealed class SesionDePrueba(Guid usuarioId) : ITenantContext
+    {
+        public Guid UsuarioIdFijo { get; set; } = usuarioId;
+        public Guid? UsuarioId => UsuarioIdFijo;
+        public Guid? OperadorId => null;
+        public Guid? ComercioId => null;
+        public string? Perfil => Perfiles.Repartidor;
+        public bool EstaAutenticado => true;
+    }
+
+    private sealed class RepartidoresEnMemoria : IRepartidorRepository
+    {
+        public List<Repartidor> Lista { get; } = [];
+
+        public Task<Repartidor?> ObtenerAsync(Guid operadorId, Guid repartidorId, CancellationToken ct) =>
+            Task.FromResult(Lista.FirstOrDefault(r => r.OperadorId == operadorId && r.Id == repartidorId));
+
+        public Task<Repartidor?> ObtenerPorUsuarioAsync(Guid operadorId, Guid usuarioId, CancellationToken ct) =>
+            Task.FromResult(Lista.FirstOrDefault(r => r.OperadorId == operadorId && r.UsuarioId == usuarioId));
+
+        public Task<IReadOnlyList<Repartidor>> ListarActivosAsync(Guid operadorId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Repartidor>>(Lista.Where(r => r.OperadorId == operadorId).ToList());
     }
 
     private RegistrarEventoMovilCommand Entrega(
@@ -637,6 +683,15 @@ public class RegistrarEventoMovilHandlerTests
         CancellationToken ct = default)
     {
         _datos[clave] = valor!;
+        return Task.CompletedTask;
+    }
+
+    public Task EliminarPorPrefijoAsync(
+        string prefijo,
+        CancellationToken ct = default)
+    {
+        foreach (var clave in _datos.Keys.Where(k => k.StartsWith(prefijo)).ToList())
+            _datos.Remove(clave);
         return Task.CompletedTask;
     }
 

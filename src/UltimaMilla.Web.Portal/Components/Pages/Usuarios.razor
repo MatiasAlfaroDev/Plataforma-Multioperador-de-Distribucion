@@ -1,0 +1,168 @@
+@page "/usuarios"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "AdministradorComercio")]
+@inject IJSRuntime JS
+
+<PageTitle>Usuarios - Última Milla</PageTitle>
+
+<div class="encabezado">
+    <div>
+        <h1>Usuarios del comercio</h1>
+        <p>Las personas que cargan envíos y consultan la información de tu comercio.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="aviso error"><i class="ph ph-x-circle"></i><span>@error</span></div>
+}
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="aviso ok"><i class="ph ph-check-circle"></i><span>@mensaje</span></div>
+}
+
+<div class="tarjeta">
+    @if (usuarios.Count == 0)
+    {
+        <p class="nota">Cargando usuarios...</p>
+    }
+    else
+    {
+        <div class="tabla">
+            <table>
+                <thead><tr><th>Nombre</th><th>Email</th><th>Perfil</th></tr></thead>
+                <tbody>
+                    @foreach (var u in usuarios)
+                    {
+                        <tr>
+                            <td>@u.Nombre</td>
+                            <td>@u.Email</td>
+                            <td>@(u.Perfil == "AdministradorComercio" ? "Administrador" : "Usuario")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="tarjeta">
+    <h2>Dar de alta</h2>
+    <form @onsubmit="Alta" @onsubmit:preventDefault>
+        <div class="campos">
+            <div>
+                <label for="nombre">Nombre completo</label>
+                <input id="nombre" @bind="nombre" required />
+            </div>
+            <div>
+                <label for="email">Correo electrónico</label>
+                <input id="email" type="email" @bind="email" required />
+            </div>
+            <div>
+                <label for="password">Contraseña inicial</label>
+                <input id="password" type="password" autocomplete="new-password" @bind="password" />
+                <p class="nota">Se puede dejar vacía si la persona ya tiene cuenta.</p>
+            </div>
+            <div>
+                <label for="perfil">Perfil</label>
+                <select id="perfil" @bind="perfil">
+                    <option value="Comercio">Usuario</option>
+                    <option value="AdministradorComercio">Administrador</option>
+                </select>
+            </div>
+        </div>
+        <div class="acciones">
+            <button type="submit" class="primario" disabled="@procesando"><i class="ph ph-user-plus"></i>Dar de alta</button>
+        </div>
+    </form>
+</div>
+
+<div class="tarjeta">
+    <h2>Integración por API</h2>
+    <p class="nota">
+        Tu sistema puede solicitar envíos y retiros llamando a <code>POST /api/envios</code> y <code>POST /api/retiros</code>
+        con el encabezado <code>X-Api-Key</code>. La clave actúa con tu usuario y se muestra una sola vez;
+        generar otra invalida la anterior.
+    </p>
+    @if (claveApi is not null)
+    {
+        <p><code>@claveApi</code></p>
+    }
+    <button @onclick="GenerarClaveAsync"><i class="ph ph-key"></i>Generar clave de API</button>
+</div>
+
+@code {
+    private string? claveApi;
+
+    private async Task GenerarClaveAsync()
+    {
+        try
+        {
+            claveApi = await JS.InvokeAsync<string>("retirosPortal.generarClaveApi");
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private List<UsuarioDto> usuarios = new();
+    private string nombre = "", email = "", password = "", perfil = "Comercio";
+    private string? error, mensaje;
+    private bool procesando;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        try
+        {
+            usuarios = await JS.InvokeAsync<List<UsuarioDto>>("autenticacionPortal.listarUsuariosComercio") ?? new();
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        StateHasChanged();
+    }
+
+    private async Task Alta()
+    {
+        procesando = true;
+        error = mensaje = null;
+        try
+        {
+            await JS.InvokeVoidAsync("autenticacionPortal.altaUsuarioComercio", new
+            {
+                nombreCompleto = nombre,
+                email,
+                password = string.IsNullOrWhiteSpace(password) ? null : password,
+                perfil
+            });
+            mensaje = $"{email} dado de alta.";
+            nombre = email = password = "";
+            await CargarAsync();
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+
+    private sealed class UsuarioDto
+    {
+        public Guid Id { get; set; }
+        public string Nombre { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Perfil { get; set; } = "";
+    }
+}

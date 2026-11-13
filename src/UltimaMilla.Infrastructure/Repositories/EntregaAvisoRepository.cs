@@ -13,12 +13,18 @@ public sealed class EntregaAvisoRepository(AppDbContext db) : IEntregaAvisoRepos
     public Task<bool> ExisteAsync(Guid suscripcionId, string claveEvento, CancellationToken ct) =>
         db.EntregasAviso.AnyAsync(e => e.SuscripcionId == suscripcionId && e.ClaveEvento == claveEvento, ct);
 
-    public async Task<IReadOnlyList<EntregaAviso>> ListarAsync(Guid? cuentaComercialId, EstadoEntregaAviso? estado, CancellationToken ct)
-    {
-        var query = db.EntregasAviso.AsQueryable();
+    public Task<EntregaAviso?> ObtenerAsync(Guid id, IReadOnlyCollection<Guid>? cuentasComerciales, CancellationToken ct) =>
+        cuentasComerciales is null
+            ? ObtenerAsync(id, ct)
+            : db.EntregasAviso.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(e => e.Id == id && cuentasComerciales.Contains(e.CuentaComercialId), ct);
 
-        if (cuentaComercialId != null)
-            query = query.Where(e => e.CuentaComercialId == cuentaComercialId);
+    public async Task<IReadOnlyList<EntregaAviso>> ListarAsync(IReadOnlyCollection<Guid>? cuentasComerciales, EstadoEntregaAviso? estado, CancellationToken ct)
+    {
+        // Sesión de comercio: sin operador, se ignora el filtro y se restringe a sus cuentas (AlcanceAvisos).
+        var query = cuentasComerciales is null
+            ? db.EntregasAviso.AsQueryable()
+            : db.EntregasAviso.IgnoreQueryFilters().Where(e => cuentasComerciales.Contains(e.CuentaComercialId));
 
         if (estado != null)
             query = query.Where(e => e.Estado == estado);

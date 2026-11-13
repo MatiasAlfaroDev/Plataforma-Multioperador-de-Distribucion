@@ -1,0 +1,256 @@
+@page "/retiros"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "ComercioPortal")]
+@inject IJSRuntime JS
+
+<PageTitle>Retiros a domicilio - Última Milla</PageTitle>
+
+<div class="encabezado">
+    <div>
+        <h1>Retiros a domicilio</h1>
+        <p>Pedile al operador que retire bultos en el domicilio de tu comprador y los traiga a tu comercio.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="aviso @(exito ? "ok" : "error")">
+        <i class="ph @(exito ? "ph-check-circle" : "ph-x-circle")"></i>
+        <span>@mensaje</span>
+    </div>
+}
+
+<h2>Mis retiros</h2>
+
+@if (cargando)
+{
+    <p>Cargando…</p>
+}
+else if (retiros.Count == 0)
+{
+    <p class="nota">Todavía no solicitaste retiros.</p>
+}
+else
+{
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Domicilio</th>
+                    <th>Bultos</th>
+                    <th>Estado</th>
+                    <th>Tarifa</th>
+                    <th>Seguimiento</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in retiros)
+                {
+                    <tr>
+                        <td>@r.FechaSolicitada.ToString("dd/MM/yyyy") @r.HoraDesde.ToString("HH:mm")–@r.HoraHasta.ToString("HH:mm")</td>
+                        <td>@r.DomicilioRetiro.Calle @r.DomicilioRetiro.Numero, @r.DomicilioRetiro.Localidad</td>
+                        <td>@r.Bultos.Count</td>
+                        <td>@r.Estado</td>
+                        <td>@(r.TarifaCalculada?.ToString("C2") ?? "-")</td>
+                        <td>
+                            @if (enlaces.TryGetValue(r.Id, out var enlace))
+                            {
+                                <a href="@enlace" target="_blank">Abrir enlace</a>
+                            }
+                            else
+                            {
+                                <button @onclick="() => GenerarEnlaceAsync(r.Id)"><i class="ph ph-link"></i>Enlace para el comprador</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<h2>Solicitar retiro</h2>
+
+@if (!cargando && cuentas.Count == 0)
+{
+    <p class="nota">Ninguno de tus operadores ofrece retiros a domicilio por ahora.</p>
+}
+
+<form @onsubmit="SolicitarAsync" @onsubmit:preventDefault>
+    <div class="campos">
+        <div>
+            <label for="cuenta">Operador</label>
+            <select id="cuenta" @bind="cuentaId" required>
+                @foreach (var c in cuentas)
+                {
+                    <option value="@c.Id">@c.OperadorNombre</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="motivo">Motivo</label>
+            <input id="motivo" @bind="motivo" placeholder="Cambio de talle" required />
+        </div>
+        <div>
+            <label for="fecha">Fecha</label>
+            <input id="fecha" type="date" @bind="fecha" required />
+        </div>
+        <div>
+            <label for="desde">Desde</label>
+            <input id="desde" type="time" @bind="horaDesde" required />
+        </div>
+        <div>
+            <label for="hasta">Hasta</label>
+            <input id="hasta" type="time" @bind="horaHasta" required />
+        </div>
+    </div>
+
+    <fieldset>
+        <legend>Domicilio del comprador</legend>
+        <div class="campos">
+            <div><label for="calle">Calle</label><input id="calle" @bind="calle" required /></div>
+            <div><label for="numero">Número</label><input id="numero" @bind="numero" /></div>
+            <div><label for="localidad">Localidad</label><input id="localidad" @bind="localidad" required /></div>
+            <div><label for="departamento">Departamento</label><input id="departamento" @bind="departamento" required /></div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Bultos</legend>
+        @foreach (var b in bultos)
+        {
+            <div class="campos">
+                <div><label>Identificación</label><input @bind="b.Identificacion" required /></div>
+                <div><label>Peso (kg)</label><input type="number" step="0.1" min="0.1" @bind="b.PesoKg" required /></div>
+                <div><label>Alto (cm)</label><input type="number" min="1" @bind="b.AltoCm" required /></div>
+                <div><label>Ancho (cm)</label><input type="number" min="1" @bind="b.AnchoCm" required /></div>
+                <div><label>Profundidad (cm)</label><input type="number" min="1" @bind="b.ProfundidadCm" required /></div>
+            </div>
+        }
+        <button type="button" @onclick="() => bultos.Add(new BultoFormulario())"><i class="ph ph-plus"></i>Agregar bulto</button>
+    </fieldset>
+
+    <p class="nota">El retiro llega a la dirección de recepción que configuraste para ese operador.</p>
+
+    <div class="acciones">
+        <button type="submit" class="primario" disabled="@guardando"><i class="ph ph-truck"></i>Solicitar retiro</button>
+    </div>
+</form>
+
+@code {
+    // La API serializa EstadoCuentaComercial como número: 1 = Confirmada.
+    private const int CuentaConfirmada = 1;
+
+    private List<RetiroItem> retiros = [];
+    private List<CuentaItem> cuentas = [];
+    private readonly Dictionary<Guid, string> enlaces = [];
+    private readonly List<BultoFormulario> bultos = [new()];
+    private Guid cuentaId;
+    private string motivo = "", calle = "", numero = "", localidad = "", departamento = "";
+    private DateOnly fecha = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+    private TimeOnly horaDesde = new(9, 0), horaHasta = new(13, 0);
+    private bool cargando = true, guardando, exito;
+    private string? mensaje;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        cargando = true;
+        try
+        {
+            retiros = await JS.InvokeAsync<List<RetiroItem>>("retirosPortal.listar");
+            // Aclaración 3.2: solo los operadores que tienen habilitado el retiro a domicilio.
+            var banderas = await JS.InvokeAsync<Dictionary<Guid, Dictionary<string, bool>>>("retirosPortal.banderas");
+            cuentas = (await JS.InvokeAsync<List<CuentaItem>>("autenticacionPortal.obtenerCuentasComerciales"))
+                .Where(c => c.Activa && c.Estado == CuentaConfirmada)
+                .Where(c => !banderas.TryGetValue(c.OperadorId, out var b) || b.GetValueOrDefault("retiro-domicilio", true))
+                .ToList();
+            if (cuentaId == Guid.Empty && cuentas.Count > 0)
+                cuentaId = cuentas[0].Id;
+        }
+        catch (JSException ex)
+        {
+            exito = false;
+            mensaje = ex.Message;
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SolicitarAsync()
+    {
+        if (guardando)
+            return;
+
+        guardando = true;
+        try
+        {
+            var direccion = new { calle, numero, localidad, departamento };
+            var resultado = await JS.InvokeAsync<ResultadoOperacion>("retirosPortal.solicitar", new
+            {
+                cuentaComercialId = cuentaId,
+                motivo,
+                domicilioRetiro = direccion,
+                // Sin destino: la API usa la dirección de recepción del comercio para ese operador.
+                fecha = fecha.ToString("yyyy-MM-dd"),
+                horaDesde = horaDesde.ToString("HH:mm:ss"),
+                horaHasta = horaHasta.ToString("HH:mm:ss"),
+                bultos
+            });
+
+            exito = resultado.Exito;
+            mensaje = resultado.Mensaje;
+            if (exito)
+                await CargarAsync();
+        }
+        catch (JSException ex)
+        {
+            exito = false;
+            mensaje = ex.Message;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private async Task GenerarEnlaceAsync(Guid id)
+    {
+        try
+        {
+            enlaces[id] = await JS.InvokeAsync<string>("retirosPortal.enlacePublico", id);
+        }
+        catch (JSException ex)
+        {
+            exito = false;
+            mensaje = ex.Message;
+        }
+    }
+
+    private sealed class BultoFormulario
+    {
+        public string Identificacion { get; set; } = "";
+        public decimal PesoKg { get; set; } = 1;
+        public int AltoCm { get; set; } = 20;
+        public int AnchoCm { get; set; } = 20;
+        public int ProfundidadCm { get; set; } = 20;
+    }
+
+    private sealed record DireccionItem(string Calle, string Numero, string Localidad, string Departamento);
+    private sealed record BultoItem(Guid Id, string Identificacion);
+    private sealed record RetiroItem(
+        Guid Id, DateOnly FechaSolicitada, TimeOnly HoraDesde, TimeOnly HoraHasta, string Estado,
+        DireccionItem DomicilioRetiro, decimal? TarifaCalculada, List<BultoItem> Bultos);
+    private sealed record CuentaItem(Guid Id, Guid OperadorId, string OperadorNombre, bool Activa, int Estado);
+    private sealed record ResultadoOperacion(bool Exito, string Mensaje);
+}

@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Abstractions.Caching;
 
 namespace UltimaMilla.Application.Envios.Queries.ConsultarSeguimientoPublico;
 
 public sealed class ConsultarSeguimientoPublicoHandler(
-    IEnvioRepository envios)
+    IEnvioRepository envios,
+    ICacheService cache)
 {
     public async Task<SeguimientoPublicoDto?> Handle(
         string token,
@@ -32,6 +34,11 @@ public sealed class ConsultarSeguimientoPublicoHandler(
         var tokenHash = Convert.ToHexString(
             SHA256.HashData(tokenBytes));
 
+        // Aclaración 3.1: el caso de uso con más volumen. Lo invalida el Worker al procesar cada evento del envío.
+        var clave = ClavesCache.Seguimiento(tokenHash);
+        if (await cache.ObtenerAsync<SeguimientoPublicoDto>(clave, ct) is { } enCache)
+            return enCache;
+
         var envio = await envios.ObtenerPorTokenSeguimientoAsync(
             tokenHash, ct);
 
@@ -50,7 +57,7 @@ public sealed class ConsultarSeguimientoPublicoHandler(
             .OrderBy(e => e.Fecha)
             .ToList();
 
-        return new SeguimientoPublicoDto(
+        var seguimiento = new SeguimientoPublicoDto(
             envio.ReferenciaExterna,
             envio.Estado.ToString(),
             envio.FechaAlta,
@@ -59,6 +66,11 @@ public sealed class ConsultarSeguimientoPublicoHandler(
             envio.HoraEntregaHasta,
             envio.FechaReprogramada,
             envio.FranjaReprogramada,
-            historial);
+            historial,
+            envio.CantidadBultos,
+            envio.BultosEntregados);
+
+        await cache.GuardarAsync(clave, seguimiento, ClavesCache.DuracionSeguimiento, ct);
+        return seguimiento;
     }
 }

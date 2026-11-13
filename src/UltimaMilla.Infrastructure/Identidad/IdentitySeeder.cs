@@ -37,6 +37,9 @@ public static class IdentitySeeder
             Perfiles.AdministradorPlataforma,
             Perfiles.AdministradorOperador,
             Perfiles.Operador,
+            Perfiles.Despachador,
+            Perfiles.OperarioDeposito,
+            Perfiles.AdministradorComercio,
             Perfiles.Comercio,
             Perfiles.Repartidor
         })
@@ -73,51 +76,23 @@ public static class IdentitySeeder
             DbSeeder.LogisticaSurId,
             null);
 
-        await CrearUsuarioAsync(
-            "tienda.norte@demo.local",
-            "Tienda Norte",
-            Perfiles.Comercio,
-            DbSeeder.RapiEnviosId,
-            Guid.Parse("33333333-0000-0000-0000-000000000001"));
+        // Comercios: entran al Portal por su vínculo con el comercio (UsuarioComercio), no por el operador.
+        await VincularComercioAsync(
+            await CrearUsuarioAsync("tienda.norte@demo.local", "Tienda Norte", Perfiles.AdministradorComercio, null, null),
+            DbSeeder.TiendaNorteId,
+            Perfiles.AdministradorComercio);
 
-        await CrearUsuarioAsync(
-            "tienda.norte@demo.local",
-            "Tienda Norte",
-            Perfiles.Comercio,
-            DbSeeder.LogisticaSurId,
-            Guid.Parse("33333333-0000-0000-0000-000000000002"));
-        
-                // Administrador demo de Moda Express.
         var administradorModa = await CrearUsuarioAsync(
-            "admin@modaexpress.test",
-            "Administrador Moda Express",
-            Perfiles.Comercio,
-            DbSeeder.RapiEnviosId,
-            Guid.Parse("33333333-0000-0000-0000-000000000003"));
-        
-        var modaExpressId = Guid.Parse(
-    "22222222-0000-0000-0000-000000000002");
+            "admin@modaexpress.test", "Administrador Moda Express", Perfiles.AdministradorComercio, null, null);
+        await VincularComercioAsync(administradorModa, DbSeeder.ModaExpressId, Perfiles.AdministradorComercio);
+        // Trabaja también para Tienda Norte: demuestra la selección de comercio al iniciar sesión.
+        await VincularComercioAsync(administradorModa, DbSeeder.TiendaNorteId, Perfiles.Comercio);
 
-var vinculacionModa = await db.UsuariosComercios
-    .FirstOrDefaultAsync(uc =>
-        uc.UsuarioId == administradorModa.Id &&
-        uc.ComercioId == modaExpressId, ct);
-
-if (vinculacionModa is null)
-{
-    db.UsuariosComercios.Add(new UsuarioComercio
-    {
-        UsuarioId = administradorModa.Id,
-        ComercioId = modaExpressId,
-        Perfil = Perfiles.AdministradorComercio,
-        Activa = true
-    });
-}
-else
-{
-    vinculacionModa.Perfil = Perfiles.AdministradorComercio;
-    vinculacionModa.Activa = true;
-}
+        // Personal del operador (letra 3.3): despachador y operario de depósito.
+        await CrearUsuarioAsync("despachador.rapi@demo.local", "Despachador RapiEnvíos", Perfiles.Despachador, DbSeeder.RapiEnviosId, null);
+        await CrearUsuarioAsync("deposito.rapi@demo.local", "Depósito RapiEnvíos", Perfiles.OperarioDeposito, DbSeeder.RapiEnviosId, null);
+        await CrearUsuarioAsync("despachador.sur@demo.local", "Despachador Logística Sur", Perfiles.Despachador, DbSeeder.LogisticaSurId, null);
+        await CrearUsuarioAsync("deposito.sur@demo.local", "Depósito Logística Sur", Perfiles.OperarioDeposito, DbSeeder.LogisticaSurId, null);
 
         // Repartidores de demo: inician sesión en la app y quedan vinculados al
         // "Repartidor de prueba" de su operador (el que sembró DbSeeder).
@@ -139,6 +114,28 @@ else
                 null),
             DbSeeder.LogisticaSurId);
 
+        async Task VincularComercioAsync(Usuario usuario, Guid comercioId, string perfil)
+        {
+            var vinculacion = await db.UsuariosComercios
+                .FirstOrDefaultAsync(uc => uc.UsuarioId == usuario.Id && uc.ComercioId == comercioId, ct);
+
+            if (vinculacion is null)
+            {
+                db.UsuariosComercios.Add(new UsuarioComercio
+                {
+                    UsuarioId = usuario.Id,
+                    ComercioId = comercioId,
+                    Perfil = perfil,
+                    Activa = true
+                });
+            }
+            else
+            {
+                vinculacion.Perfil = perfil;
+                vinculacion.Activa = true;
+            }
+        }
+
         async Task VincularRepartidorAsync(Usuario usuario, Guid operadorId)
         {
             var yaVinculado = await db.Repartidores
@@ -159,7 +156,7 @@ else
             string email,
             string nombre,
             string perfil,
-            Guid operadorId,
+            Guid? operadorId,
             Guid? cuentaComercialId)
         {
             var usuario = await userManager.FindByEmailAsync(email);
@@ -196,6 +193,10 @@ else
                 Verificar(await userManager.AddToRoleAsync(usuario, perfil));
             }
 
+            // Los usuarios de comercio no tienen membresía de operador.
+            if (operadorId is null)
+                return usuario;
+
             var existeMembresia = await db.MembresiasUsuarios
                 .AnyAsync(m =>
                     m.UsuarioId == usuario.Id &&
@@ -208,7 +209,7 @@ else
                 db.MembresiasUsuarios.Add(new MembresiaUsuario
                 {
                     UsuarioId = usuario.Id,
-                    OperadorId = operadorId,
+                    OperadorId = operadorId.Value,
                     CuentaComercialId = cuentaComercialId,
                     Perfil = perfil,
                     Activa = true

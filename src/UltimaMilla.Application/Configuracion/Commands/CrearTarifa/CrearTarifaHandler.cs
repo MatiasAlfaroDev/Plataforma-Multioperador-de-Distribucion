@@ -1,4 +1,5 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Domain.Configuracion;
 
 namespace UltimaMilla.Application.Configuracion.Commands.CrearTarifa;
@@ -8,7 +9,8 @@ public sealed class CrearTarifaHandler(
     IVersionTarifariaRepository tarifas,
     IZonaCoberturaRepository zonas,
     IUnitOfWork unitOfWork,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICacheService cache)
 {
     public async Task<Guid> Handle(
         CrearTarifaCommand command,
@@ -126,6 +128,8 @@ public sealed class CrearTarifaHandler(
                 nuevaVersionId = version.Id;
             },
             ct);
+
+        await cache.EliminarPorPrefijoAsync(ClavesCache.PrefijoTarifas(command.OperadorId), ct);
 
         return nuevaVersionId;
     }

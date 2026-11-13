@@ -74,6 +74,7 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
         .IgnoreQueryFilters()
         .AsNoTracking()
         .Include(e => e.Eventos)
+        .Include(e => e.Bultos)
         .AsSplitQuery()
         .FirstOrDefaultAsync(
             e => e.TokenSeguimientoHash == tokenHash,

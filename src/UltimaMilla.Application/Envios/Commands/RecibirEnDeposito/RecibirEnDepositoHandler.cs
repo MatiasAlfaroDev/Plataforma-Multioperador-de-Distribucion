@@ -41,9 +41,7 @@ public sealed class RecibirEnDepositoHandler(
         }
 
         // 3. Validar los permisos del usuario.
-        if (tenantContext.Perfil is not (
-            Perfiles.AdministradorOperador or
-            Perfiles.Operador))
+        if (!Perfiles.Deposito.Contains(tenantContext.Perfil))
         {
             throw new UnauthorizedAccessException(
                 "No tiene permisos para recibir envíos en depósito.");

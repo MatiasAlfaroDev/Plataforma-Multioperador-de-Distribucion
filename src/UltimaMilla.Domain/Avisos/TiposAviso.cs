@@ -23,6 +23,14 @@ public static class TiposAviso
     public const string EnvioDevuelto = "envio.devuelto";
     public const string EnvioExtraviado = "envio.extraviado";
 
+    // Avisos por bulto (RF 36): solo para suscripciones con contrato v2.
+    public const string BultoEntregado = "bulto.entregado";
+    public const string BultoNoEntregado = "bulto.no_entregado";
+    public const string BultoEnDevolucion = "bulto.en_devolucion";
+    public const string BultoDevuelto = "bulto.devuelto";
+    public const string BultoExtraviado = "bulto.extraviado";
+    public const string BultoReaparecido = "bulto.reaparecido";
+
     // Avisos de retiros a domicilio (RF41).
     public const string RetiroSolicitado = "retiro.solicitado";
     public const string RetiroAsignadoARuta = "retiro.asignado_a_ruta";
@@ -53,8 +61,27 @@ public static class TiposAviso
         RetiroRetirado,
         RetiroNoRetirado,
         RetiroEnDeposito,
-        RetiroEntregadoAlComercio
+        RetiroEntregadoAlComercio,
+        BultoEntregado,
+        BultoNoEntregado,
+        BultoEnDevolucion,
+        BultoDevuelto,
+        BultoExtraviado,
+        BultoReaparecido
     ];
+
+    public static bool EsDeBulto(string tipo) => tipo.StartsWith("bulto.", StringComparison.Ordinal);
+
+    public static string DeResultadoBulto(ResultadoBulto resultado) => resultado switch
+    {
+        ResultadoBulto.Entregado => BultoEntregado,
+        ResultadoBulto.NoEntregado => BultoNoEntregado,
+        ResultadoBulto.EnDevolucion => BultoEnDevolucion,
+        ResultadoBulto.Devuelto => BultoDevuelto,
+        ResultadoBulto.Extraviado => BultoExtraviado,
+        ResultadoBulto.Reaparecido => BultoReaparecido,
+        _ => throw new ArgumentOutOfRangeException(nameof(resultado))
+    };
 
     /// <summary>
     /// Tipo de aviso correspondiente a cada estado.

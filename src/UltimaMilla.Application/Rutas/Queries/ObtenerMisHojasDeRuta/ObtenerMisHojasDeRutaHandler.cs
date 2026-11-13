@@ -159,6 +159,10 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                                 .Select(b => b.Identificacion)
                                 .OrderBy(x => x)
                                 .ToList(),
+                            // RF 40: la app escanea estos bultos al retirarlos en el domicilio.
+                            retiro.Bultos
+                                .Select(b => new MiBultoDto(b.Id, b.Identificacion))
+                                .ToList(),
                             RetiroId: retiro.Id,
                             TipoOperacion: parada.TipoOperacion.ToString()));
 

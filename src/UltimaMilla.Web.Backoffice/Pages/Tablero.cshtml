@@ -1,0 +1,163 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.TableroModel
+
+@{
+    ViewData["Title"] = "Tablero en vivo";
+}
+
+<link rel="stylesheet" href="~/lib/leaflet/leaflet.css" />
+
+<div class="space-y-8">
+    <header class="encabezado mb-0">
+        <div class="space-y-1">
+            <h1 class="font-display text-2xl font-bold tracking-tight">Tablero en vivo</h1>
+            <p class="nota">Envíos del día, posición de la flota y envíos en riesgo de no llegar en su ventana.</p>
+        </div>
+        <span id="conexion" class="chip"><i class="ph ph-circle-notch"></i>Conectando…</span>
+    </header>
+
+    <p id="error" class="aviso error" role="alert" hidden></p>
+
+    <section id="estados" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" aria-label="Envíos por estado"></section>
+
+    <section class="grid gap-6 xl:grid-cols-[3fr_2fr]">
+        <div class="space-y-3">
+            <h2 class="font-display text-xl font-semibold">Flota</h2>
+            <div id="mapa" class="h-[420px] rounded-2xl border border-borde"></div>
+            <p id="flota-vacia" class="nota" hidden>Ningún repartidor informó su posición en las últimas dos horas.</p>
+        </div>
+
+        <div class="space-y-3">
+            <h2 class="font-display text-xl font-semibold">En riesgo</h2>
+            <div class="tabla">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr><th class="p-3">Envío</th><th class="p-3">Ventana</th><th class="p-3 text-right">Margen</th></tr>
+                    </thead>
+                    <tbody id="riesgo"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <p class="nota">Actualizado <span id="generado">—</span></p>
+</div>
+
+<script src="~/lib/leaflet/leaflet.js"></script>
+<script src="~/lib/signalr.min.js"></script>
+<script>
+(() => {
+    const ESTADOS = {
+        Admitido: "Admitidos", EnDeposito: "En depósito", AsignadoARuta: "Asignados a ruta",
+        EnTransito: "En tránsito", Entregado: "Entregados", EntregadoParcialmente: "Entregados parcialmente",
+        NoEntregado: "No entregados", Reprogramado: "Reprogramados", EnDevolucion: "En devolución",
+        Devuelto: "Devueltos", Extraviado: "Extraviados"
+    };
+
+    const $ = id => document.getElementById(id);
+    const el = (tag, clase, texto) => {
+        const e = document.createElement(tag);
+        if (clase) e.className = clase;
+        if (texto !== undefined) e.textContent = texto;
+        return e;
+    };
+    const hora = t => t.slice(0, 5);
+
+    const mapa = L.map("mapa").setView([-34.88, -56.17], 12);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap"
+    }).addTo(mapa);
+    const marcadores = L.layerGroup().addTo(mapa);
+
+    function pintar(t) {
+        const estados = $("estados");
+        estados.replaceChildren(...Object.keys(ESTADOS)
+            .map(clave => [clave, t.estados.find(e => e.estado === clave)?.cantidad ?? 0])
+            .filter(([clave, n]) => n > 0 || ["EnTransito", "Entregado", "NoEntregado"].includes(clave))
+            .map(([clave, n]) => {
+                const tarjeta = el("div", "tarjeta");
+                tarjeta.append(el("p", "text-sm text-suave", ESTADOS[clave]), el("p", "mt-1 text-3xl font-bold num text-left", n));
+                return tarjeta;
+            }));
+
+        marcadores.clearLayers();
+        for (const p of t.flota) {
+            L.circleMarker([p.latitud, p.longitud], { radius: 9, weight: 2 })
+                .bindTooltip(`${p.repartidor} · ${new Date(p.registradaEn).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" })}`)
+                .addTo(marcadores);
+        }
+        $("flota-vacia").hidden = t.flota.length > 0;
+
+        const filas = t.enRiesgo.map(e => {
+            const tr = el("tr", "border-t border-borde");
+            const envio = el("td", "p-3");
+            const enlace = el("a", "codigo", e.referencia);
+            enlace.href = `/DetalleEnvio/${encodeURIComponent(e.envioId)}`;
+            envio.append(enlace, el("div", "text-sm text-suave", `${e.destinatario} · ${e.direccion}`));
+            const ventana = el("td", "p-3", `${e.fecha} ${hora(e.horaDesde)}–${hora(e.horaHasta)}`);
+            const margen = el("td", "p-3 text-right");
+            margen.append(el("span", e.vencido ? "chip chip-peligro" : "chip chip-alerta",
+                e.vencido ? "Vencido" : `${e.minutosRestantes} min`));
+            tr.append(envio, ventana, margen);
+            return tr;
+        });
+        if (filas.length === 0) {
+            const tr = el("tr");
+            tr.append(Object.assign(el("td", "p-4 text-suave", "Ningún envío en riesgo."), { colSpan: 3 }));
+            filas.push(tr);
+        }
+        $("riesgo").replaceChildren(...filas);
+
+        $("generado").textContent = new Date(t.generadoEn).toLocaleTimeString("es-UY");
+    }
+
+    async function cargar() {
+        try {
+            const r = await fetch("/api/tablero", { credentials: "same-origin" });
+            if (!r.ok) throw new Error(`La API respondió ${r.status}.`);
+            pintar(await r.json());
+            $("error").hidden = true;
+        } catch (e) {
+            $("error").textContent = `No se pudo actualizar el tablero. ${e.message}`;
+            $("error").hidden = false;
+        }
+    }
+
+    // Una ráfaga de cambios (una hoja que se despacha mueve muchos envíos) se resuelve con un solo pedido.
+    let pendiente;
+    const recargar = () => { clearTimeout(pendiente); pendiente = setTimeout(cargar, 500); };
+
+    function conexion(texto, clase, icono) {
+        const c = $("conexion");
+        c.className = `chip ${clase}`;
+        c.replaceChildren(el("i", `ph ${icono}`), document.createTextNode(texto));
+    }
+
+    // WebSockets directo, sin negociación: cualquier réplica de la API atiende la conexión y no hace falta afinidad.
+    const hub = new signalR.HubConnectionBuilder()
+        .withUrl("/api/hubs/tablero", { skipNegotiation: true, transport: signalR.HttpTransportType.WebSockets })
+        .withAutomaticReconnect({ nextRetryDelayInMilliseconds: c => Math.min(1000 * 2 ** c.previousRetryCount, 15000) })
+        .build();
+    hub.on("EnvioCambiado", recargar);
+    hub.on("PosicionActualizada", recargar);
+    hub.onreconnecting(() => conexion("Reconectando…", "chip-alerta", "ph-arrows-clockwise"));
+    hub.onreconnected(() => { conexion("En vivo", "chip-exito", "ph-broadcast"); cargar(); });
+    hub.onclose(() => conexion("Sin conexión", "chip-peligro", "ph-plugs"));
+
+    async function conectar() {
+        try {
+            await hub.start();
+            conexion("En vivo", "chip-exito", "ph-broadcast");
+        } catch {
+            conexion("Sin conexión", "chip-peligro", "ph-plugs");
+            setTimeout(conectar, 5000);
+        }
+    }
+
+    cargar();
+    conectar();
+    // El margen de los envíos en riesgo corre aunque no cambie nada.
+    setInterval(cargar, 60000);
+})();
+</script>

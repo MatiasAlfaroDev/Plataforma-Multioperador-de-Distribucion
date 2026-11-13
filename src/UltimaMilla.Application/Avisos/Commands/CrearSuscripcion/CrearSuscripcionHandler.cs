@@ -15,25 +15,32 @@ public sealed class CrearSuscripcionHandler(
     ICuentaComercialRepository cuentas,
     IUnitOfWork unitOfWork,
     ITenantContext sesion,
+    IOperadorActivo operadorActivo,
     IValidator<CrearSuscripcionCommand> validator)
 {
     public async Task<Guid> Handle(CrearSuscripcionCommand command, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(command, ct);
 
-        var (operadorId, cuentaSesion) = AlcanceAvisos.Resolver(sesion);
+        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct);
 
-        if (sesion.Perfil == Perfiles.Operador)
+        if (alcance.Cuentas is null && sesion.Perfil != Perfiles.AdministradorOperador)
             throw new UnauthorizedAccessException("Solo el comercio o el administrador del operador configuran avisos.");
 
-        var cuentaId = cuentaSesion ?? command.CuentaComercialId ?? throw new ArgumentException("Hay que indicar la cuenta comercial.");
+        var cuentaId = command.CuentaComercialId ?? throw new ArgumentException("Hay que indicar la cuenta comercial.");
+        var operadorId = alcance.OperadorDeCuenta(cuentaId)
+            ?? throw new NoEncontradoException("La cuenta comercial no existe.");
+
+        // La sesión del comercio no tiene operador: se fija el de la cuenta, ya validada como suya.
+        if (alcance.Cuentas is not null)
+            operadorActivo.SeleccionarOperador(operadorId);
 
         _ = await cuentas.ObtenerAsync(cuentaId, ct)
             ?? throw new NoEncontradoException("La cuenta comercial no existe."); // el filtro por operador impide usar una cuenta de otro
 
         // El secreto lo genera la plataforma: con él el comercio verifica la firma de cada aviso.
         var secreto = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
-        var s = SuscripcionAviso.Crear(operadorId, cuentaId, command.Url, secreto, command.TiposEvento);
+        var s = SuscripcionAviso.Crear(operadorId, cuentaId, command.Url, secreto, command.TiposEvento, command.VersionContrato);
         await suscripciones.AgregarAsync(s, ct);
         await unitOfWork.GuardarCambiosAsync(ct);
 

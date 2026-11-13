@@ -70,13 +70,14 @@
 
         try
         {
-            await JS.InvokeVoidAsync(
+            var resultado = await JS.InvokeAsync<ResultadoLogin>(
                 "autenticacionPortal.login",
                 email,
                 password);
 
-            // Recarga completa para que Blazor reconozca la cookie.
-            Navegacion.NavigateTo("/", forceLoad: true);
+            // Recarga completa para que Blazor reconozca la cookie. Si el usuario trabaja para
+            // más de un comercio, primero elige con cuál operar.
+            Navegacion.NavigateTo(resultado.RequiereSeleccion ? "/seleccionar-comercio" : "/", forceLoad: true);
         }
         catch (JSException ex)
         {
@@ -87,5 +88,10 @@
             password = "";
             procesando = false;
         }
+    }
+
+    private sealed class ResultadoLogin
+    {
+        public bool RequiereSeleccion { get; set; }
     }
 }
