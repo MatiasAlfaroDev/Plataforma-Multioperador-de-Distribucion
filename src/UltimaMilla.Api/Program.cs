@@ -12,6 +12,7 @@ using UltimaMilla.Application.Envios.Commands.CrearEnvio;
 using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 using UltimaMilla.Application.Envios.Commands.RecibirEnDeposito;
+using UltimaMilla.Application.Envios.Queries.ListarDiscrepanciasRecepcion;
 using UltimaMilla.Application.Envios.Commands.Reprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarSolicitudesReprogramacion;
 using UltimaMilla.Application.Envios.Queries.ListarEnvios;
@@ -642,15 +643,26 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
         RecibirEnDepositoHandler handler,
         CancellationToken ct) =>
     {
-        await handler.Handle(
+        var resultado = await handler.Handle(
             new RecibirEnDepositoCommand(
                 envioId,
                 request.IdentificacionesEscaneadas,
                 request.Responsable),
             ct);
 
-        return Results.NoContent();
+        // RF 10: 200 con el detalle; "recibido: false" indica que faltan bultos declarados.
+        return Results.Ok(resultado);
 })
+.RequireAuthorization(policy => policy.RequireRole(
+    Perfiles.AdministradorOperador,
+    Perfiles.Operador));
+
+api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
+    async (
+        Guid envioId,
+        ListarDiscrepanciasRecepcionHandler handler,
+        CancellationToken ct) =>
+        Results.Ok(await handler.Handle(envioId, ct)))
 .RequireAuthorization(policy => policy.RequireRole(
     Perfiles.AdministradorOperador,
     Perfiles.Operador));

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cobertura medida solo sobre las capas que exige el opcional (Domain y Application). -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[UltimaMilla.Domain]*,[UltimaMilla.Application]*</Include>
+          <!-- Sin lógica que probar: DTOs de lectura y registro de dependencias. -->
+          <Exclude>[UltimaMilla.Application]*Dto,[UltimaMilla.Application]*.DependencyInjection</Exclude>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
