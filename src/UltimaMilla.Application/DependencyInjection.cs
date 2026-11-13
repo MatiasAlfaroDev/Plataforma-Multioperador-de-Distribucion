@@ -144,6 +144,8 @@ public static class DependencyInjection
         services.AddScoped<ObtenerPuntualidadHandler>();
         services.AddScoped<ConfigurarDireccionRecepcionHandler>();
         services.AddScoped<ObtenerDireccionRecepcionHandler>();
+        services.AddScoped<ListarDiscrepanciasRecepcionHandler>();
+        services.AddScoped<ObtenerTableroEnVivoHandler>();
         return services;
     }
 }
