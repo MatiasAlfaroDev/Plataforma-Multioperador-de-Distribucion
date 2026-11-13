@@ -1,8 +1,6 @@
-using System.Net;
 using System.Security.Claims;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.RateLimiting;
+using StackExchange.Redis;
 
 namespace UltimaMilla.Api.Seguridad;
 
@@ -43,27 +41,6 @@ public static class SeguridadWeb
             }
         }));
 
-        services.AddRateLimiter(o =>
-        {
-            o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            o.OnRejected = async (contexto, ct) =>
-            {
-                if (contexto.Lease.TryGetMetadata(MetadataName.RetryAfter, out var espera))
-                {
-                    contexto.HttpContext.Response.Headers.RetryAfter =
-                        ((int)Math.Ceiling(espera.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                }
-
-                await Results.Problem(
-                        statusCode: StatusCodes.Status429TooManyRequests,
-                        title: "Demasiadas solicitudes. Probá de nuevo en unos segundos.")
-                    .ExecuteAsync(contexto.HttpContext);
-            };
-
-            o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(contexto =>
-                Particion(contexto, opciones));
-        });
-
         return services;
     }
 
@@ -88,7 +65,7 @@ public static class SeguridadWeb
     public static WebApplication UseLimitacionDeTasa(this WebApplication app)
     {
         if (app.Services.GetRequiredService<OpcionesSeguridadWeb>().LimitarTasa)
-            app.UseRateLimiter();
+            app.UseMiddleware<LimitadorDeTasaDistribuido>();
 
         return app;
     }
@@ -124,35 +101,100 @@ public static class SeguridadWeb
 
     /// <summary>
     /// A qué "balde" cuenta cada pedido. Los intentos de acceso y el seguimiento público se cuentan por IP
-    /// (son anónimos y son los que se usan para adivinar contraseñas o tokens); el resto, por usuario
-    /// (o por IP si no hay sesión). Las sondas de salud de Traefik no se limitan.
+    /// (son anónimos y son los que se usan para adivinar contraseñas o tokens); las llamadas con clave de API,
+    /// por clave y con su propio límite (API pública); el resto, por usuario (o por IP si no hay sesión).
+    /// Las sondas de salud de Traefik no se limitan (null).
     /// </summary>
-    public static RateLimitPartition<string> Particion(HttpContext contexto, OpcionesSeguridadWeb opciones)
+    public static CuotaDeTasa? Cuota(HttpContext contexto, OpcionesSeguridadWeb opciones)
     {
         var ruta = contexto.Request.Path;
         var ip = contexto.Connection.RemoteIpAddress?.ToString() ?? "desconocida";
 
         if (ruta.StartsWithSegments("/live") || ruta.StartsWithSegments("/ready") || ruta.StartsWithSegments("/health"))
-            return RateLimitPartition.GetNoLimiter("sondas");
+            return null;
 
         if (ruta.StartsWithSegments("/api/auth/login") || ruta.StartsWithSegments("/api/auth/registro")
             || ruta.StartsWithSegments("/api/auth/registro-comercio") || ruta.StartsWithSegments("/api/auth/registro-operador"))
-            return Ventana($"acceso:{ip}", opciones.AccesoPorMinuto);
+            return new CuotaDeTasa($"acceso:{ip}", opciones.AccesoPorMinuto);
 
         if (ruta.StartsWithSegments("/api/seguimiento"))
-            return Ventana($"seguimiento:{ip}", opciones.SeguimientoPorMinuto);
+            return new CuotaDeTasa($"seguimiento:{ip}", opciones.SeguimientoPorMinuto);
 
         var usuario = contexto.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Ventana(usuario is null ? $"general:{ip}" : $"usuario:{usuario}", opciones.GeneralPorMinuto);
-    }
 
-    private static RateLimitPartition<string> Ventana(string clave, int permitidosPorMinuto) =>
-        RateLimitPartition.GetFixedWindowLimiter(clave, _ => new FixedWindowRateLimiterOptions
+        // Limitación diferenciada para la API pública: cada clave de comercio tiene su propio cupo.
+        if (usuario is not null && contexto.User.Identity?.AuthenticationType == ClaveApiAuthenticationHandler.Esquema)
+            return new CuotaDeTasa($"clave:{usuario}", opciones.ClaveApiPorMinuto);
+
+        return usuario is null
+            ? new CuotaDeTasa($"general:{ip}", opciones.GeneralPorMinuto)
+            : new CuotaDeTasa($"usuario:{usuario}", opciones.GeneralPorMinuto);
+    }
+}
+
+/// <summary>Un balde de la limitación de tasa: su identificador y cuántos pedidos permite por minuto.</summary>
+public sealed record CuotaDeTasa(string Clave, int PorMinuto);
+
+/// <summary>
+/// Limitación de tasa con el contador en Redis (aclaración 3.1). El limitador que trae ASP.NET Core cuenta en
+/// cada instancia, así que con dos instancias detrás del balanceador el límite real sería el doble. Acá todas
+/// las instancias suman en el mismo contador: ventana fija de un minuto, un INCR atómico por pedido.
+/// Si Redis no está disponible, se deja pasar el pedido (igual que el caché, el sistema sigue funcionando).
+/// </summary>
+public sealed class LimitadorDeTasaDistribuido(
+    RequestDelegate siguiente,
+    OpcionesSeguridadWeb opciones,
+    IServiceProvider servicios,
+    ILogger<LimitadorDeTasaDistribuido> logger)
+{
+    // INCR y, si es el primer pedido de la ventana, el vencimiento de la clave. En un script para que sea atómico.
+    private const string Script =
+        "local n = redis.call('INCR', KEYS[1]) if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end return n";
+
+    public async Task InvokeAsync(HttpContext contexto)
+    {
+        var cuota = SeguridadWeb.Cuota(contexto, opciones);
+        var redis = servicios.GetService<IConnectionMultiplexer>();
+
+        if (cuota is null || redis is null || !redis.IsConnected)
         {
-            PermitLimit = permitidosPorMinuto,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0
-        });
+            await siguiente(contexto);
+            return;
+        }
+
+        var ahora = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var ventana = ahora / 60;
+        long cuenta;
+
+        try
+        {
+            var resultado = await redis.GetDatabase().ScriptEvaluateAsync(
+                Script,
+                [new RedisKey($"limite-tasa:{cuota.Clave}:{ventana}")],
+                [70]);
+            cuenta = (long)resultado;
+        }
+        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        {
+            logger.LogWarning(ex, "Limitación de tasa sin Redis: el pedido pasa sin contar.");
+            await siguiente(contexto);
+            return;
+        }
+
+        if (cuenta > cuota.PorMinuto)
+        {
+            var segundosRestantes = 60 - (ahora % 60);
+            contexto.Response.Headers.RetryAfter = segundosRestantes.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            await Results.Problem(
+                    statusCode: StatusCodes.Status429TooManyRequests,
+                    title: "Demasiadas solicitudes. Probá de nuevo en unos segundos.")
+                .ExecuteAsync(contexto);
+            return;
+        }
+
+        await siguiente(contexto);
+    }
 }
 
 /// <summary>Valores por defecto pensados para no molestar el uso normal ni la demo; se cambian por configuración.</summary>
@@ -172,6 +214,9 @@ public sealed class OpcionesSeguridadWeb
 
     /// <summary>El resto de la API, por usuario (o por IP sin sesión).</summary>
     public int GeneralPorMinuto { get; set; } = 600;
+
+    /// <summary>API pública: cada clave de comercio, por minuto. Es menor que el de un usuario porque son integraciones automáticas.</summary>
+    public int ClaveApiPorMinuto { get; set; } = 120;
 
     /// <summary>Orígenes de navegador que pueden llamar a la API desde otro dominio. Vacío: ninguno.</summary>
     public string[] OrigenesPermitidos { get; set; } = [];
