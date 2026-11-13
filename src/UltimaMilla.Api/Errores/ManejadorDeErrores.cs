@@ -81,8 +81,15 @@ public sealed class ManejadorDeErrores(
             DbUpdateConcurrencyException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "El recurso fue modificado por otra operación. Recargá y reintentá."
+                Title = "Otro usuario modificó este recurso al mismo tiempo. Recargue e intente de nuevo."
             },
+
+            DbUpdateException { InnerException: Npgsql.PostgresException { SqlState: "23505" } } =>
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Otro usuario modificó este recurso al mismo tiempo. Recargue e intente de nuevo."
+                },
 
             ArgumentException or InvalidOperationException => new ProblemDetails
             {
