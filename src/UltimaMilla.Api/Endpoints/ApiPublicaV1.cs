@@ -60,6 +60,12 @@ public static class ApiPublicaV1
                     Description = "Clave de API del usuario del comercio."
                 };
 
+                // El segmento de versión va fijo en la documentación: /api/v1/..., no /api/v{version}/...
+                var rutas = new OpenApiPaths();
+                foreach (var (ruta, item) in documento.Paths)
+                    rutas[ruta.Replace("v{version}", "v1", StringComparison.Ordinal)] = item;
+                documento.Paths = rutas;
+
                 return Task.CompletedTask;
             });
         });
@@ -95,6 +101,7 @@ public static class ApiPublicaV1
         })
         .WithTags("Envíos")
         .WithSummary("Da de alta un envío")
+        .Produces(StatusCodes.Status201Created)
         .RequireAuthorization(PoliticaConClave(Perfiles.OperadorYComercio));
 
         // GET /api/v1/envios → envíos visibles para la clave.
@@ -128,6 +135,7 @@ public static class ApiPublicaV1
         })
         .WithTags("Retiros")
         .WithSummary("Solicita un retiro")
+        .Produces(StatusCodes.Status201Created)
         .RequireAuthorization(PoliticaConClave(Perfiles.PersonalComercio));
 
         // GET /api/v1/retiros → retiros del comercio.
