@@ -97,6 +97,16 @@ externa. No agregues esas dependencias a esos dos proyectos.
   deja un `EventoEnvio`, y `EventosDeEstadoInterceptor` publica un `EstadoEnvioCambiado` por cada uno
   en el outbox, que es lo que convierte en avisos el Worker. El interceptor solo funciona con
   `SaveChangesAsync`.
+- **Tablero en vivo (RF 29, RNF 6.10):** hub `TableroHub` en `Api/TiempoReal/`, mapeado en `/api/hubs/tablero`
+  (así entra por el `PathPrefix(/api)` de Traefik desde el host del Backoffice, con la misma cookie). Cada
+  conexión va al grupo de su operador, tomado del claim `operador_id`. Backplane de Redis para las dos réplicas
+  y cliente con WebSockets sin negociación (no hace falta afinidad). `TableroConsumer` es el **único consumidor
+  de la API**: lleva cada `EstadoEnvioCambiado` al grupo; el navegador vuelve a pedir `GET /api/tablero`.
+- **Observabilidad (RNF 6.12):** Serilog en API y Worker (`Infrastructure/Observabilidad/RegistroEstructurado.cs`),
+  a consola y por OTLP al Collector. `X-Correlation-Id`: la app lo manda (uno por sincronización), la API lo toma o
+  genera, los filtros de MassTransit lo copian a cada mensaje y lo retoman al consumir (`Correlacion.cs`). La
+  profundidad de las colas la recoge el Collector del plugin `rabbitmq_prometheus`; las sincronizaciones
+  pendientes las informa la app (`PUT /api/repartidor/sincronizacion`) y el Worker las publica como métrica.
 - **Web.Portal** (Blazor InteractiveServer) y **Web.Backoffice** (Razor Pages) **no** referencian
   Application ni Infrastructure: hablan con la API por HTTP a través de su propio
   `Services/EnviosApiClient`, configurado con `Api:BaseUrl`.
@@ -222,8 +232,9 @@ línea 289 en adelante son tres imágenes en base64 que pesan 350 KB; hay que le
 `diagrama-arquitectura.md`, más `img/` con los cuatro diagramas del informe exportados a PNG:
 `arquitectura-logica`, `modelo-dominio`, `despliegue` y `maquina-estados`.
 
-`Docs/Decisiones/` tiene ADR-001 a ADR-006: ADR-003 (conflictos de sincronización, también por bulto
-y retiro), ADR-004 (el cambio de requerimientos), ADR-005 (caché) y ADR-006 (banderas).
+`Docs/Decisiones/` tiene ADR-001 a ADR-008: ADR-003 (conflictos de sincronización, también por bulto
+y retiro), ADR-004 (el cambio de requerimientos), ADR-005 (caché), ADR-006 (banderas), ADR-007 (outbox:
+consistencia entre la base y los eventos) y ADR-008 (modo de renderizado de Blazor).
 `Docs/Cambio-Requerimientos.md` es el cambio del 30/10 (RF 31 a 41) con las aclaraciones de caché y
 banderas, y prevalece sobre la letra donde difieren.
 

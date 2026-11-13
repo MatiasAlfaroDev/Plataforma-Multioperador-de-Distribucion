@@ -8,6 +8,18 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  # Profundidad de las colas (RNF 6.12): el plugin rabbitmq_prometheus, que la imagen trae habilitado,
+  # publica los mensajes en espera de cada cola; ninguna aplicación tiene que medirlo.
+  prometheus/rabbitmq:
+    config:
+      scrape_configs:
+        - job_name: rabbitmq
+          scrape_interval: 15s
+          metrics_path: /metrics/detailed
+          params:
+            family: [queue_coarse_metrics]
+          static_configs:
+            - targets: ["rabbitmq:15692"]
 
 processors:
   batch: {}
@@ -25,7 +37,7 @@ service:
       processors: [batch]
       exporters: [otlp/lgtm]
     metrics:
-      receivers: [otlp]
+      receivers: [otlp, prometheus/rabbitmq]
       processors: [batch]
       exporters: [otlp/lgtm]
     logs:

@@ -81,6 +81,12 @@ using UltimaMilla.Application.Retiros.Commands.RegistrarEventoRetiro;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResumenRetiros;
 using System.Security.Cryptography;
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Infrastructure.Observabilidad;
+using UltimaMilla.Api.TiempoReal;
+using UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
+using Microsoft.AspNetCore.SignalR;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,7 +98,8 @@ var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(connectionString, rabbitMq);
+// El único consumidor de la API: el del tablero en vivo, que necesita el hub de SignalR (RNF 6.10).
+builder.Services.AddInfrastructure(connectionString, rabbitMq, x => x.AddConsumer<TableroConsumer>());
 
 // Con X-Api-Key autentica la clave del comercio (RF 37); si no, la cookie de siempre.
 const string CookieOClave = "CookieOClaveApi";
@@ -149,7 +156,7 @@ builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSe
 // Telemetría (RNF 6.12): logs, métricas y trazas salen por OTLP al Collector, y es él el que
 // decide el backend (docker/otel-collector-config.yaml). El destino y el nombre del servicio
 // los pone el compose: OTEL_EXPORTER_OTLP_ENDPOINT y OTEL_SERVICE_NAME.
-builder.Logging.AddOpenTelemetry(o => o.IncludeFormattedMessage = true);
+builder.Services.AddRegistroEstructurado();
 builder.Services.AddOpenTelemetry()
     // Las réplicas comparten OTEL_SERVICE_NAME; sin un id de instancia propio (el hostname del contenedor)
     // Prometheus suma sus series como si fueran una.
@@ -198,6 +205,14 @@ if (!soloInicializar)
         .PersistKeysToStackExchangeRedis(
             redis,
             "UltimaMilla:DataProtection:Keys");
+
+    // Tablero en vivo (RNF 6.10): con dos réplicas, el backplane de Redis lleva cada mensaje a las
+    // conexiones de las dos. El cliente usa WebSockets directo, así no hace falta afinidad en Traefik.
+    builder.Services.AddSignalR().AddStackExchangeRedis(o =>
+    {
+        o.Configuration.ChannelPrefix = RedisChannel.Literal("UltimaMilla:SignalR");
+        o.ConnectionFactory = _ => Task.FromResult<IConnectionMultiplexer>(redis);
+    });
 }
 
 builder.Services.AddHttpContextAccessor();
@@ -223,6 +238,17 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
     return;
 }
 
+// Identificador de correlación (RNF 6.12): el que manda la app o uno nuevo; va en la respuesta, en los logs
+// y en los mensajes que publique el pedido. Antes del log de pedidos, para que también lo lleve.
+app.Use(async (contexto, siguiente) =>
+{
+    using var _ = Correlacion.Iniciar(contexto.Request.Headers[Correlacion.Encabezado]);
+    contexto.Response.Headers[Correlacion.Encabezado] = Correlacion.Actual;
+    await siguiente();
+});
+app.UseSerilogRequestLogging(o =>
+    o.GetLevel = (contexto, _, ex) => ex is null && EsSonda(contexto.Request.Path) ? LogEventLevel.Verbose : LogEventLevel.Information);
+
 app.UseSeguridadWeb();
 app.UseExceptionHandler();
 app.UseLimiteDeTasa();
@@ -238,6 +264,8 @@ app.MapOpenApi();  // contrato en /openapi/v1.json (Scalar se agrega con la API 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHub<TableroHub>("/api/hubs/tablero")
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 app.MapAutenticacionEndpoints();
 app.MapVinculacionesComercialesEndpoints();
 app.MapPersonalEndpoints();
@@ -1580,11 +1608,50 @@ api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/despachar", async (
 
 // POST /api/repartidor/posiciones → lote de posiciones que la app tomó durante la jornada (RF 23),
 // muchas veces con la pantalla apagada o sin señal. Idempotente: reenviar un lote no duplica nada.
+// Las nuevas se avisan al tablero en vivo (RF 29) para que mueva el marcador del repartidor.
 api.MapPost("/repartidor/posiciones", async (
     RegistrarPosicionesCommand command,
     RegistrarPosicionesHandler handler,
+    ITenantContext sesion,
+    IHubContext<TableroHub> tablero,
     CancellationToken ct) =>
-    Results.Ok(new { guardadas = await handler.Handle(command, ct) }))
+{
+    var guardadas = await handler.Handle(command, ct);
+    if (guardadas > 0 && sesion.OperadorId is { } operadorId)
+        await tablero.Clients.Group(TableroHub.Grupo(operadorId)).SendAsync("PosicionActualizada", ct);
+
+    return Results.Ok(new { guardadas });
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
+// GET /api/tablero → foto del tablero de operación en vivo (RF 29): envíos por estado, flota y envíos
+// en riesgo. El Backoffice la vuelve a pedir cuando el hub avisa un cambio.
+api.MapGet("/tablero", async (ObtenerTableroEnVivoHandler handler, CancellationToken ct) =>
+    Results.Ok(await handler.Handle(ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
+
+// PUT /api/repartidor/sincronizacion → al terminar cada sincronización la app avisa cuántos eventos le
+// quedan sin subir; el Worker publica la suma en la métrica sincronizaciones_pendientes (RNF 6.12).
+api.MapPut("/repartidor/sincronizacion", async (
+    EstadoSincronizacionRequest request,
+    ITenantContext sesion,
+    IConnectionMultiplexer redis) =>
+{
+    if (request.Pendientes < 0)
+        return Results.BadRequest();
+
+    try
+    {
+        await redis.GetDatabase().HashSetAsync(
+            SincronizacionMetrics.ClaveRedis, sesion.UsuarioId.ToString(), request.Pendientes);
+    }
+    catch (Exception e) when (e is RedisException or TimeoutException)
+    {
+        // Es solo una métrica: sin Redis se pierde este dato y la app no se entera.
+    }
+
+    return Results.NoContent();
+})
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
 
 // POST /api/dispositivos → la app registra el token de Firebase del teléfono al iniciar sesión.
@@ -1700,6 +1767,7 @@ public sealed record IniciarDevolucionRequest( string Responsable);
 public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);
 
 public sealed record AgregarRetiroARutaRequest(Guid RetiroId);
+public sealed record EstadoSincronizacionRequest(int Pendientes);
 public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId, DateOnly Fecha, TimeOnly HoraSalida, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta,  int MaximoParadas, IReadOnlyList<Guid>? EnviosIds, IReadOnlyList<Guid>? RetirosIds = null, IReadOnlyList<Guid>? DevolucionesIds = null, IReadOnlyList<Guid>? EntregasRetirosIds = null);
 
 /// <summary>RF 22: lo escaneado al volver al depósito y quién lo recibe.</summary>

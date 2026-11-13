@@ -186,6 +186,18 @@ public class EnviosApi : IEnviosApi
         }
     }
 
+    /// <summary>PUT /api/repartidor/sincronizacion. Es solo una métrica: si falla, no pasa nada.</summary>
+    public async Task InformarPendientesAsync(int pendientes, CancellationToken ct = default)
+    {
+        try
+        {
+            using var _ = await _http.PutAsJsonAsync("api/repartidor/sincronizacion", new { pendientes }, ct);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+        }
+    }
+
     /// <summary>
     /// La API explica el rechazo en un ProblemDetails: { "title": "El envío debe estar en tránsito..." }.
     /// Se guarda solo ese texto, que es el que ve el repartidor.
