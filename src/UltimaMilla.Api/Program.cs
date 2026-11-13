@@ -25,6 +25,7 @@ using UltimaMilla.Application.Configuracion.Queries.ListarZonas;
 using UltimaMilla.Application.Configuracion.Commands.CrearZona;
 using UltimaMilla.Application.Configuracion.Commands.EditarZona;
 using UltimaMilla.Application.Configuracion.Queries.ObtenerZona;
+using UltimaMilla.Application.Rutas.Commands.RendirHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.CrearHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ConsultarHojasDeRuta;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
@@ -1440,6 +1441,36 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
         Perfiles.AdministradorOperador,
         Perfiles.Operador));
 
+// RF 22: rendición al regresar al depósito. GET muestra lo que tiene que volver; POST lo recibe y cierra la hoja.
+api.MapGet("/hojas-de-ruta/{hojaId:guid}/rendicion",
+    async (Guid hojaId, RendirHojaDeRutaHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.ObtenerAsync(hojaId, ct)))
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
+
+api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
+    async (
+        Guid hojaId,
+        RendirHojaDeRutaRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        RendirHojaDeRutaHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        var resultado = await handler.Handle(
+            new RendirHojaDeRutaCommand(hojaId, request.BultosEscaneados ?? [], request.Responsable ?? string.Empty),
+            ct);
+
+        return Results.Ok(resultado);
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
+
 api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
     async (
         Guid hojaId,
@@ -1723,3 +1754,6 @@ public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOn
 
 public sealed record AgregarRetiroARutaRequest(Guid RetiroId);
 public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId, DateOnly Fecha, TimeOnly HoraSalida, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta,  int MaximoParadas, IReadOnlyList<Guid>? EnviosIds, IReadOnlyList<Guid>? RetirosIds = null, IReadOnlyList<Guid>? DevolucionesIds = null, IReadOnlyList<Guid>? EntregasRetirosIds = null);
+
+/// <summary>RF 22: lo escaneado al volver al depósito y quién lo recibe.</summary>
+public sealed record RendirHojaDeRutaRequest(IReadOnlyList<string>? BultosEscaneados, string? Responsable);

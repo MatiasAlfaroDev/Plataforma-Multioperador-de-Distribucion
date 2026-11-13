@@ -291,11 +291,20 @@
                             <td class="codigo">@hoja.Id</td>
 
                            <td>
-                                @if (hoja.Despachada)
+                                @if (hoja.Rendida)
+                                {
+                                    <span class="estado-despachada">
+                                        Rendida
+                                    </span>
+                                }
+                                else if (hoja.Despachada)
                                 {
                                     <span class="estado-despachada">
                                         Despachada
                                     </span>
+                                    <a asp-page="/Rendicion" asp-route-hojaId="@hoja.Id" class="btn-primario">
+                                        Rendir
+                                    </a>
                                 }
                                 else
                                 {
