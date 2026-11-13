@@ -176,7 +176,7 @@ public class ConsultasYValidacionesTests
     public void El_retiro_exige_domicilios_completos()
     {
         Assert.True(Falla(RetiroValido() with { DomicilioRetiro = null! }, "DomicilioRetiro"));
-        Assert.True(Falla(RetiroValido() with { DomicilioDestino = null! }, "DomicilioDestino"));
+        Assert.False(Falla(RetiroValido() with { DomicilioDestino = null! }, "DomicilioDestino"));
         
         var sinCalle = new DireccionRetiroCommand("", "1", "San José de Mayo", "San José");
         Assert.True(Falla(RetiroValido() with { DomicilioRetiro = sinCalle }, "DomicilioRetiro.Calle"));

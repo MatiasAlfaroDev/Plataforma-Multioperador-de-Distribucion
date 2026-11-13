@@ -93,6 +93,7 @@ public sealed class RetornoYDevolucionHandlersTests
         new(
             new EnviosEnMemoria(envio),
             new ReglasEnMemoria(_reglas),
+            new TarifasEnMemoria(),
             _unidad,
             new RelojFijo(Ahora),
             new TenantDePrueba(_usuarioId, operadorId ?? _operadorId, perfil));
@@ -437,6 +438,25 @@ public sealed class RetornoYDevolucionHandlersTests
         public override DateTimeOffset GetUtcNow() => ahora;
     }
 
+    /// <summary>Sin tarifas cargadas: el retorno de un envío no entregado no las consulta.</summary>
+    private sealed class TarifasEnMemoria : IVersionTarifariaRepository
+    {
+        public Task<VersionTarifaria?> ObtenerVigenteAsync(
+            Guid operadorId, string departamento, DateTimeOffset fecha,
+            CancellationToken ct,
+            TipoServicioTarifario tipoServicio = TipoServicioTarifario.Entrega) =>
+            Task.FromResult<VersionTarifaria?>(null);
+
+        public Task<VersionTarifaria?> ObtenerVigentePorZonaAsync(
+            Guid operadorId, Guid zonaCoberturaId, DateTimeOffset fecha,
+            CancellationToken ct,
+            TipoServicioTarifario tipoServicio = TipoServicioTarifario.Entrega) =>
+            Task.FromResult<VersionTarifaria?>(null);
+
+        public Task AgregarAsync(VersionTarifaria version, CancellationToken ct) =>
+            Task.CompletedTask;
+    }
+
     private sealed class CacheRegistradora : ICacheService
     {
         public List<string> Eliminadas { get; } = [];
@@ -456,5 +476,9 @@ public sealed class RetornoYDevolucionHandlersTests
             Eliminadas.Add(clave);
             return Task.CompletedTask;
         }
+
+        public Task EliminarPorPrefijoAsync(
+            string prefijo, CancellationToken ct = default) =>
+            Task.CompletedTask;
     }
 }
