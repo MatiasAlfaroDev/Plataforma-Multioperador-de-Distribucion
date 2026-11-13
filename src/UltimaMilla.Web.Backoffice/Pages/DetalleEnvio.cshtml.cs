@@ -7,6 +7,7 @@ namespace UltimaMilla.Web.Backoffice.Pages;
 public class DetalleEnvioModel(EnviosApiClient api) : PageModel
 {
     public DetalleEnvioItem? Envio { get; private set; }
+    public IReadOnlyList<DiscrepanciaRecepcionItem> Discrepancias { get; private set; } = [];
 
     public string? Error { get; private set; }
 
@@ -23,6 +24,7 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
 
             if (Envio is null)
                 return NotFound();
+            Discrepancias = await api.ListarDiscrepanciasAsync(id, ct);
         }
         catch (HttpRequestException ex)
         {

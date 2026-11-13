@@ -138,6 +138,33 @@ else if (Model.Envio is { } envio)
         </form>
     </section>
 }
+    @if (Model.Discrepancias.Count > 0)
+    {
+        <h2>Discrepancias de recepción</h2>
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Bulto</th>
+                        <th>Responsable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.Discrepancias)
+                    {
+                        <tr>
+                            <td>@Formato.Hora(d.RegistradaEn)</td>
+                            <td>@(d.Tipo == "BultoFaltante" ? "Bulto faltante" : "Bulto no declarado")</td>
+                            <td>@d.Identificacion</td>
+                            <td>@d.Responsable</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 
     <h2>Historial de eventos</h2>
 
