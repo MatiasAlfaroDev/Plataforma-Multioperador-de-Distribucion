@@ -81,6 +81,9 @@ using UltimaMilla.Application.Retiros.Commands.RegistrarEventoRetiro;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResumenRetiros;
 using System.Security.Cryptography;
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Infrastructure.Observabilidad;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -149,7 +152,7 @@ builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSe
 // Telemetría (RNF 6.12): logs, métricas y trazas salen por OTLP al Collector, y es él el que
 // decide el backend (docker/otel-collector-config.yaml). El destino y el nombre del servicio
 // los pone el compose: OTEL_EXPORTER_OTLP_ENDPOINT y OTEL_SERVICE_NAME.
-builder.Logging.AddOpenTelemetry(o => o.IncludeFormattedMessage = true);
+builder.Services.AddRegistroEstructurado();
 builder.Services.AddOpenTelemetry()
     // Las réplicas comparten OTEL_SERVICE_NAME; sin un id de instancia propio (el hostname del contenedor)
     // Prometheus suma sus series como si fueran una.
@@ -222,6 +225,17 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
     await app.Services.InicializarBaseDeDatosAsync();
     return;
 }
+
+// Identificador de correlación (RNF 6.12): el que manda la app o uno nuevo; va en la respuesta, en los logs
+// y en los mensajes que publique el pedido. Antes del log de pedidos, para que también lo lleve.
+app.Use(async (contexto, siguiente) =>
+{
+    using var _ = Correlacion.Iniciar(contexto.Request.Headers[Correlacion.Encabezado]);
+    contexto.Response.Headers[Correlacion.Encabezado] = Correlacion.Actual;
+    await siguiente();
+});
+app.UseSerilogRequestLogging(o =>
+    o.GetLevel = (contexto, _, ex) => ex is null && EsSonda(contexto.Request.Path) ? LogEventLevel.Verbose : LogEventLevel.Information);
 
 app.UseSeguridadWeb();
 app.UseExceptionHandler();
@@ -1587,6 +1601,30 @@ api.MapPost("/repartidor/posiciones", async (
     Results.Ok(new { guardadas = await handler.Handle(command, ct) }))
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
 
+// PUT /api/repartidor/sincronizacion → al terminar cada sincronización la app avisa cuántos eventos le
+// quedan sin subir; el Worker publica la suma en la métrica sincronizaciones_pendientes (RNF 6.12).
+api.MapPut("/repartidor/sincronizacion", async (
+    EstadoSincronizacionRequest request,
+    ITenantContext sesion,
+    IConnectionMultiplexer redis) =>
+{
+    if (request.Pendientes < 0)
+        return Results.BadRequest();
+
+    try
+    {
+        await redis.GetDatabase().HashSetAsync(
+            SincronizacionMetrics.ClaveRedis, sesion.UsuarioId.ToString(), request.Pendientes);
+    }
+    catch (Exception e) when (e is RedisException or TimeoutException)
+    {
+        // Es solo una métrica: sin Redis se pierde este dato y la app no se entera.
+    }
+
+    return Results.NoContent();
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
 // POST /api/dispositivos → la app registra el token de Firebase del teléfono al iniciar sesión.
 // El usuario y el operador salen de la cookie; si el token ya estaba, se renueva (no se duplica).
 api.MapPost("/dispositivos", async (
@@ -1700,6 +1738,7 @@ public sealed record IniciarDevolucionRequest( string Responsable);
 public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);
 
 public sealed record AgregarRetiroARutaRequest(Guid RetiroId);
+public sealed record EstadoSincronizacionRequest(int Pendientes);
 public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId, DateOnly Fecha, TimeOnly HoraSalida, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta,  int MaximoParadas, IReadOnlyList<Guid>? EnviosIds, IReadOnlyList<Guid>? RetirosIds = null, IReadOnlyList<Guid>? DevolucionesIds = null, IReadOnlyList<Guid>? EntregasRetirosIds = null);
 
 /// <summary>RF 22: lo escaneado al volver al depósito y quién lo recibe.</summary>

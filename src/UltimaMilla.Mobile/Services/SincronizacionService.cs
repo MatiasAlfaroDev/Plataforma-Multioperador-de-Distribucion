@@ -75,6 +75,8 @@ public sealed class SincronizacionService
         var enviados = 0;
         var rechazados = 0;
         var sinConexion = false;
+        // Un identificador para toda esta sincronización: lo llevan todos sus pedidos (RNF 6.12).
+        CorrelacionHandler.Actual = Guid.NewGuid().ToString("N");
         try
         {
             foreach (var evento in await _eventos.ListarAsync())
@@ -109,6 +111,8 @@ public sealed class SincronizacionService
         }
 
         var resumen = new ResultadoSincronizacion(enviados, rechazados, sinConexion, await _eventos.ContarAsync());
+        if (!sinConexion)
+            await _api.InformarPendientesAsync(resumen.Pendientes, ct);
         Sincronizado?.Invoke(this, resumen);
         return resumen;
     }

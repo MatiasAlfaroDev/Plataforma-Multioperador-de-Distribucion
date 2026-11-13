@@ -13,6 +13,8 @@
 		<PackageReference Include="MassTransit.RabbitMQ" />
 		<PackageReference Include="StackExchange.Redis" />
 		<PackageReference Include="FirebaseAdmin" />
+		<PackageReference Include="Serilog.AspNetCore" />
+		<PackageReference Include="Serilog.Sinks.OpenTelemetry" />
 	</ItemGroup>
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
