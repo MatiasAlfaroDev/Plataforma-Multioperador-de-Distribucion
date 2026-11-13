@@ -22,7 +22,8 @@ public static class LimiteDeTasa
     ];
 
     public static IApplicationBuilder UseLimiteDeTasa(this IApplicationBuilder app) =>
-        app.Use(async (context, next) =>
+        // La misma llave que el limitador por usuario: SeguridadWeb:LimitarTasa=false lo apaga para una prueba de carga.
+        !app.ApplicationServices.GetRequiredService<OpcionesSeguridadWeb>().LimitarTasa ? app : app.Use(async (context, next) =>
         {
             var ruta = context.Request.Path.Value ?? string.Empty;
             var regla = Reglas.FirstOrDefault(r => ruta.StartsWith(r.Prefijo, StringComparison.OrdinalIgnoreCase));
