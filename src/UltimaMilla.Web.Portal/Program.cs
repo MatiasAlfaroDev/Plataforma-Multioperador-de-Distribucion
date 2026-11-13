@@ -1,6 +1,7 @@
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using UltimaMilla.Web.Portal;
 using UltimaMilla.Web.Portal.Components;
 using UltimaMilla.Web.Portal.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -79,8 +80,12 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation())
     .UseOtlpExporter();
 
+// Seguridad web (RNF 6.3): cabeceras y límite de consultas de seguimiento por visitante.
+builder.Services.AddSeguridadWebPortal(builder.Configuration);
+
 var app = builder.Build();
 
+app.UseSeguridadWebPortal();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();

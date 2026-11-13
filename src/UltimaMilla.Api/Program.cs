@@ -116,6 +116,9 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// Seguridad web (RNF 6.3): IP real detrás de Traefik, limitación de tasa, CORS y cabeceras. Ver Seguridad/SeguridadWeb.cs.
+builder.Services.AddSeguridadWeb(builder.Configuration);
+
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -206,9 +209,11 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
     return;
 }
 
+app.UseSeguridadWeb();
 app.UseExceptionHandler();
 
 app.UseAuthentication();
+app.UseLimitacionDeTasa();
 app.UseAuthorization();
 app.UseAntiforgery();
 

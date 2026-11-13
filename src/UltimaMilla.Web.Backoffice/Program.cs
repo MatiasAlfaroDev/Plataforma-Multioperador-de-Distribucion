@@ -4,6 +4,7 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using StackExchange.Redis;
+using UltimaMilla.Web.Backoffice;
 using UltimaMilla.Web.Backoffice.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -142,6 +143,8 @@ builder.Services.AddOpenTelemetry()
 
 var app = builder.Build();
 
+// Seguridad web (RNF 6.3): cabeceras de seguridad en todas las respuestas.
+app.UseCabecerasDeSeguridad();
 app.UseAuthentication();
 app.UseAuthorization();
 
