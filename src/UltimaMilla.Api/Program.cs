@@ -701,9 +701,7 @@ api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
         ListarDiscrepanciasRecepcionHandler handler,
         CancellationToken ct) =>
         Results.Ok(await handler.Handle(envioId, ct)))
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.PersonalOperador));
 
 api.MapPost("/envios/{envioId:guid}/retorno-deposito",
     async (

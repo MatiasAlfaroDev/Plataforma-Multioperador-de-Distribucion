@@ -117,6 +117,15 @@ public sealed class EnviosApiClient(HttpClient http)
             ct);
     }
 
+    public async Task<IReadOnlyList<DiscrepanciaRecepcionItem>> ListarDiscrepanciasAsync(
+        Guid envioId,
+        CancellationToken ct = default)
+    {
+        return await http.GetFromJsonAsync<List<DiscrepanciaRecepcionItem>>(
+            $"api/envios/{envioId}/discrepancias-recepcion",
+            ct) ?? [];
+    }
+
     public async Task IniciarDevolucionAsync(
         Guid envioId,
         string responsable,

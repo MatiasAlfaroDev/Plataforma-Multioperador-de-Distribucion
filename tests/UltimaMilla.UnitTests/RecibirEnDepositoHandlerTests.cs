@@ -119,22 +119,22 @@ public sealed class RecibirEnDepositoHandlerTests
     }
 
     [Fact]
-    public async Task BultoNoDeclarado_RecibeElEnvioYRegistraLaDiscrepancia()
+    public async Task BultoNoDeclarado_NoRecibeElEnvioYRegistraLaDiscrepancia()
     {
         var resultado = await CrearHandler().Handle(
             Comando(_envio, [.. Declarados, "EXTRA-999"]),
             CancellationToken.None);
 
-        Assert.True(resultado.Recibido);
+        Assert.False(resultado.Recibido);
         var dto = Assert.Single(resultado.Discrepancias);
         Assert.Equal(TipoDiscrepanciaRecepcion.BultoNoDeclarado, dto.Tipo);
         Assert.Equal("EXTRA-999", dto.Identificacion);
 
-        Assert.Equal(EstadoEnvio.EnDeposito, _envio.Estado);
+        Assert.Equal(EstadoEnvio.Admitido, _envio.Estado);
         Assert.Single(_discrepancias.Guardadas);
         Assert.Equal(1, _unidad.Guardados);
     }
-
+    
     [Fact]
     public async Task FaltanteYNoDeclarado_RegistraAmbasYNoRecibe()
     {

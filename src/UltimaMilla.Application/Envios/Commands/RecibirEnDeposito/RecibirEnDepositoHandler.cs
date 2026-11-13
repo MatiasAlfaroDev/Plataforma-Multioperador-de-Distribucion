@@ -118,7 +118,7 @@ public sealed class RecibirEnDepositoHandler(
             .ToList();
 
         // Faltan bultos declarados: el envío sigue Admitido, pero la discrepancia no se pierde.
-        if (faltantes.Count > 0)
+        if (faltantes.Count > 0 || noDeclarados.Count > 0)
         {
             await unitOfWork.GuardarCambiosAsync(ct);
             return new ResultadoRecepcion(false, dtos);
