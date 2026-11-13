@@ -14,6 +14,8 @@ public sealed class CrearEnvioValidator : AbstractValidator<CrearEnvioCommand>
             .WithMessage("La modalidad debe ser Estandar o Urgente.");
         RuleFor(x => x.DestinatarioNombre).NotEmpty().MaximumLength(200);
         RuleFor(x => x.DestinatarioTelefono).MaximumLength(30);
+        RuleFor(x => x.DestinatarioEmail).EmailAddress().MaximumLength(200)
+            .When(x => !string.IsNullOrWhiteSpace(x.DestinatarioEmail));
         RuleFor(x => x.Calle).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Numero).MaximumLength(20);
         RuleFor(x => x.Localidad).NotEmpty().MaximumLength(100);

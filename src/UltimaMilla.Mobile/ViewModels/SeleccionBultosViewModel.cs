@@ -14,13 +14,25 @@ public partial class SeleccionBultosViewModel : ObservableObject
 {
     private readonly ILectorCodigos _lector;
 
-    public SeleccionBultosViewModel(string referencia, IReadOnlyList<BultoItem> bultos, ILectorCodigos lector)
+    public SeleccionBultosViewModel(string referencia, IReadOnlyList<BultoItem> bultos, ILectorCodigos lector, bool esRetiro = false)
     {
         Referencia = referencia;
         _lector = lector;
+        EsRetiro = esRetiro;
         foreach (var bulto in bultos)
-            Bultos.Add(new BultoParada(bulto));
+            Bultos.Add(new BultoParada(bulto, esRetiro));
     }
+
+    /// <summary>Retiro (RF 40): la misma pantalla sirve para escanear en el domicilio los bultos que se retiran.</summary>
+    public bool EsRetiro { get; }
+
+    public string Titulo => EsRetiro ? "Escaneá los bultos que retirás" : "¿Qué bultos se entregan?";
+    public string Instruccion => EsRetiro
+        ? "Escaneá o escribí el código de cada bulto que te entregan"
+        : "Escaneá o escribí el código de cada bulto que entregás";
+    public string TituloLista => EsRetiro
+        ? "Bultos del retiro (se marcan al escanearlos)"
+        : "Bultos del envío (tocá uno para marcarlo o desmarcarlo)";
 
     public string Referencia { get; }
 
@@ -44,7 +56,9 @@ public partial class SeleccionBultosViewModel : ObservableObject
     public int Entregados => Bultos.Count(b => b.Entregado);
 
     public string TextoResumen =>
-        Entregados == 0 ? "Marcá los bultos que entregás"
+        EsRetiro
+            ? (Entregados == Bultos.Count ? $"Tenés los {Bultos.Count} bultos" : $"Escaneaste {Entregados} de {Bultos.Count}")
+        : Entregados == 0 ? "Marcá los bultos que entregás"
         : Entregados == Bultos.Count ? $"Se entregan los {Bultos.Count} bultos"
         : $"Se entregan {Entregados} de {Bultos.Count}: los demás vuelven al depósito";
 
@@ -78,13 +92,13 @@ public partial class SeleccionBultosViewModel : ObservableObject
 
         var bulto = Bultos.FirstOrDefault(b => Normalizar(b.Codigo) == leido);
         if (bulto is null)
-            MostrarMensaje($"{leido} no es de este envío.", alerta: true);
+            MostrarMensaje(EsRetiro ? $"{leido} no es de este retiro." : $"{leido} no es de este envío.", alerta: true);
         else if (bulto.Entregado)
             MostrarMensaje($"{leido} ya estaba marcado.", alerta: false);
         else
         {
             bulto.Entregado = true;
-            MostrarMensaje($"✓ {leido} se entrega.", alerta: false);
+            MostrarMensaje(EsRetiro ? $"✓ {leido} retirado." : $"✓ {leido} se entrega.", alerta: false);
         }
 
         ActualizarResumen();
@@ -94,6 +108,13 @@ public partial class SeleccionBultosViewModel : ObservableObject
     [RelayCommand]
     private void Alternar(BultoParada bulto)
     {
+        // RF 40: en un retiro cada bulto se identifica con su código (escaneado o escrito), no tocándolo en la lista.
+        if (EsRetiro)
+        {
+            MostrarMensaje("En un retiro, cada bulto se marca escaneando su etiqueta (o escribiendo el código).", alerta: true);
+            return;
+        }
+
         bulto.Entregado = !bulto.Entregado;
         Mensaje = null;
         ActualizarResumen();
@@ -119,7 +140,7 @@ public partial class SeleccionBultosViewModel : ObservableObject
 }
 
 /// <summary>Un bulto en la pantalla de la parada: se entrega o no.</summary>
-public partial class BultoParada(BultoItem bulto) : ObservableObject
+public partial class BultoParada(BultoItem bulto, bool esRetiro = false) : ObservableObject
 {
     public BultoItem Bulto { get; } = bulto;
     public string Codigo => Bulto.Identificacion;
@@ -130,5 +151,7 @@ public partial class BultoParada(BultoItem bulto) : ObservableObject
 
     public string Icono => Entregado ? Iconos.TildeCirculo : Iconos.Caja;
     public Color ColorIcono => Paleta.De(Entregado ? "Exito" : "TextoSecundario");
-    public string TextoEstado => Entregado ? "Se entrega" : "No se entrega";
+    public string TextoEstado =>
+        esRetiro ? (Entregado ? "Retirado" : "Falta escanear")
+        : Entregado ? "Se entrega" : "No se entrega";
 }

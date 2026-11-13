@@ -242,9 +242,70 @@
             </div>
         }
 
+        @if (Model.RetiroHabilitado)
+        {
+        <h3>Retiros a domicilio</h3>
+        <p class="nota">
+            Hoja mixta (RF 39): los bultos retirados ocupan lugar desde la parada en que se suben; la API
+            valida la capacidad del vehículo parada por parada.
+        </p>
+
+        @if (Model.Retiros.Count == 0 && Model.EntregasRetiros.Count == 0)
+        {
+            <p class="nota">No hay retiros pendientes de asignar.</p>
+        }
+        else
+        {
+            <div class="tabla">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Parada</th>
+                            <th>Motivo</th>
+                            <th>Localidad</th>
+                            <th>Peso</th>
+                            <th>Franja</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var retiro in Model.Retiros)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="Formulario.RetirosIds" value="@retiro.Id"
+                                           checked="@(Model.Formulario.RetirosIds.Contains(retiro.Id))" />
+                                </td>
+                                <td><i class="ph ph-arrow-circle-up"></i> Retiro (sube carga)</td>
+                                <td>@retiro.Motivo</td>
+                                <td>@retiro.Localidad</td>
+                                <td class="num">@retiro.PesoKg kg</td>
+                                <td>@retiro.Fecha @retiro.HoraDesde a @retiro.HoraHasta</td>
+                            </tr>
+                        }
+                        @foreach (var entrega in Model.EntregasRetiros)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="Formulario.EntregasRetirosIds" value="@entrega.Id"
+                                           checked="@(Model.Formulario.EntregasRetirosIds.Contains(entrega.Id))" />
+                                </td>
+                                <td><i class="ph ph-arrow-circle-down"></i> Entrega al comercio (baja carga)</td>
+                                <td>@entrega.Motivo</td>
+                                <td>@entrega.Localidad</td>
+                                <td class="num">@entrega.PesoKg kg</td>
+                                <td>-</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        }
+
         <button type="submit"
                 class="btn-primario"
-                disabled="@(Model.Envios.Count == 0)">
+                disabled="@(Model.Envios.Count + Model.Retiros.Count + Model.EntregasRetiros.Count == 0)">
             Crear y asignar hoja de ruta
         </button>
     </form>

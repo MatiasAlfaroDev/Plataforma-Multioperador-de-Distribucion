@@ -22,6 +22,9 @@ public sealed class HojasDeRutaModel(
     public List<VehiculoRutaApiDto> Vehiculos { get; private set; } = [];
 
     public List<EnvioRutaApiDto> Envios { get; private set; } = [];
+    public List<RetiroRutaApiDto> Retiros { get; private set; } = [];
+    public bool RetiroHabilitado { get; private set; } = true;
+    public List<EntregaRetiroRutaApiDto> EntregasRetiros { get; private set; } = [];
 
     public List<HojaRutaApiDto> Hojas { get; private set; } = [];
 
@@ -62,12 +65,12 @@ public sealed class HojasDeRutaModel(
                 "Seleccioná un vehículo.");
         }
 
-        if (Formulario.EnviosIds is null ||
-            Formulario.EnviosIds.Count == 0)
+        // RF 39: la hoja puede ser mixta; alcanza con una parada de cualquier tipo.
+        if (Formulario.EnviosIds.Count + Formulario.RetirosIds.Count + Formulario.EntregasRetirosIds.Count == 0)
         {
             ModelState.AddModelError(
                 "",
-                "Seleccioná al menos un envío.");
+                "Seleccioná al menos un envío o retiro.");
         }
 
         var franjaValida = IntentarObtenerFranja(
@@ -99,7 +102,9 @@ public sealed class HojasDeRutaModel(
                 horaDesde,
                 horaHasta,
                 Formulario.MaximoParadas,
-                Formulario.EnviosIds);
+                Formulario.EnviosIds,
+                Formulario.RetirosIds,
+                Formulario.EntregasRetirosIds);
 
             var hojaId = await api.CrearAsync(
                 solicitud, ct);
@@ -180,6 +185,10 @@ public sealed class HojasDeRutaModel(
         Repartidores = opciones.Repartidores;
         Vehiculos = opciones.Vehiculos;
         Envios = opciones.Envios;
+        // Aclaración 3.2: sin la funcionalidad de retiro el Backoffice no ofrece esas paradas.
+        RetiroHabilitado = (await api.ObtenerBanderasAsync(ct)).GetValueOrDefault("retiro-domicilio", true);
+        Retiros = RetiroHabilitado ? opciones.Retiros ?? [] : [];
+        EntregasRetiros = RetiroHabilitado ? opciones.EntregasRetiros ?? [] : [];
         Franjas = opciones.Franjas;
 
         Hojas = await api.ListarAsync(operadorId, ct);
@@ -257,5 +266,7 @@ public sealed class HojasDeRutaModel(
         public int MaximoParadas { get; set; } = 20;
 
         public List<Guid> EnviosIds { get; set; } = [];
+        public List<Guid> RetirosIds { get; set; } = [];
+        public List<Guid> EntregasRetirosIds { get; set; } = [];
     }
 }

@@ -15,33 +15,41 @@
 
     var esPaginaPublica = paginaActual is "/Login" or "/Registro";
 
+    var esAdmin = User.IsInRole("AdministradorOperador");
+    var esDespacho = esAdmin || User.IsInRole("Despachador") || User.IsInRole("Operador");
+    var esDeposito = User.IsInRole("OperarioDeposito");
+
     var mostrarMenu =
         !esPaginaPublica &&
         User.Identity?.IsAuthenticated == true &&
-        (User.IsInRole("AdministradorOperador") ||
-        User.IsInRole("Operador"));
+        (esDespacho || esDeposito);
 
     var mostrarMenuPlataforma = !esPaginaPublica && User.IsInRole("AdministradorPlataforma");
 
-    // Entradas del menú lateral: página, ícono de Phosphor y texto.
+    // Entradas del menú lateral según el rol (letra 3.3): página, ícono de Phosphor y texto.
     var entradas = new List<(string Pagina, string Icono, string Texto)>();
     if (mostrarMenu)
     {
         entradas.Add(("/Index", "ph-package", "Envíos"));
-        entradas.Add(("/HojasDeRuta", "ph-path", "Hojas de ruta"));
-        entradas.Add(("/Zonas", "ph-map-trifold", "Zonas de cobertura"));
-        entradas.Add(("/Tarifas", "ph-currency-dollar", "Tarifas"));
-        entradas.Add(("/ReglasOperativas", "ph-sliders-horizontal", "Reglas operativas"));
-        entradas.Add(("/Avisos", "ph-bell", "Avisos a comercios"));
-        entradas.Add(("/Reportes", "ph-chart-bar", "Reportes"));
-        if (User.IsInRole("AdministradorOperador"))
+        if (esDespacho)
         {
+            entradas.Add(("/HojasDeRuta", "ph-path", "Hojas de ruta"));
+            entradas.Add(("/Avisos", "ph-bell", "Avisos a comercios"));
+            entradas.Add(("/Reportes", "ph-chart-bar", "Reportes"));
+        }
+        if (esAdmin)
+        {
+            entradas.Add(("/Zonas", "ph-map-trifold", "Zonas de cobertura"));
+            entradas.Add(("/Tarifas", "ph-currency-dollar", "Tarifas"));
+            entradas.Add(("/ReglasOperativas", "ph-sliders-horizontal", "Reglas operativas"));
+            entradas.Add(("/Personal", "ph-users-three", "Personal"));
             entradas.Add(("/SolicitudesComerciales", "ph-handshake", "Solicitudes de comercios"));
         }
     }
     if (mostrarMenuPlataforma)
     {
         entradas.Add(("/MensajesFallidos", "ph-warning-octagon", "Mensajes fallidos"));
+        entradas.Add(("/Banderas", "ph-toggle-right", "Banderas de funcionalidad"));
     }
     var hayMenu = entradas.Count > 0;
 }

@@ -16,6 +16,8 @@ public sealed class ReportesModel(
 
     public ResumenEnviosReporte? Resumen { get; private set; }
 
+    public ResumenRetirosReporte? Retiros { get; private set; }
+
     public MotivosNoEntregaReporte? Motivos { get; private set; }
 
     public string? Error { get; private set; }
@@ -65,6 +67,11 @@ public sealed class ReportesModel(
         try
         {
             Resumen = await reportesApi.ObtenerResumenAsync(
+                Desde.Value,
+                Hasta.Value,
+                ct);
+
+            Retiros = await reportesApi.ObtenerResumenRetirosAsync(
                 Desde.Value,
                 Hasta.Value,
                 ct);

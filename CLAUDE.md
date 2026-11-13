@@ -21,8 +21,10 @@ docker compose down -v                             # borra también el volumen d
 
 Entrypoints detrás de Traefik: `portal.localhost:8000`, `backoffice.localhost:8000`,
 `api.localhost:8000`, `grafana.localhost:8000` (Grafana: tablero técnico, trazas y logs),
-`rabbit.localhost:8000` (panel de RabbitMQ) y `receptor.localhost:8000` (receptor de prueba de
-los avisos; `POST /modo/{ok|falla|intermitente|lento}` cambia su modo de falla). El panel de Traefik va en `localhost:8081`.
+`rabbit.localhost:8000` (panel de RabbitMQ), `receptor.localhost:8000` (receptor de prueba de
+los avisos; `/avisos` recibe el contrato v1 y `/avisos/v2` el v2; `POST /modo/{ok|falla|intermitente|lento}`
+cambia su modo de falla) y `mail.localhost:8000` (Mailpit: los correos con el enlace de seguimiento que
+recibe el destinatario). El panel de Traefik va en `localhost:8081`.
 Los navegadores resuelven `*.localhost` solos.
 
 ### Estilos de Portal y Backoffice (Tailwind v4)
@@ -120,6 +122,24 @@ externa. No agregues esas dependencias a esos dos proyectos.
   `Directory.Packages.props` que anulan los de la raíz a propósito (MAUI necesita varios
   TargetFrameworks y versiones por `PackageReference`); no los borres.
 
+### Actores y perfiles (letra 3.3)
+
+Los perfiles son strings en `Application/Seguridad/Perfiles.cs`, junto con los grupos que usan los
+endpoints (`RequireRole(Perfiles.Despacho)`) y los handlers (`Perfiles.Deposito.Contains(...)`):
+
+- `Configuracion`: solo `AdministradorOperador` (zonas, tarifas, reglas, personal).
+- `Despacho`: AO + `Despachador` (y `Operador`, el perfil anterior, que equivale al despachador).
+- `Deposito`: lo de despacho más `OperarioDeposito`.
+
+Un perfil nuevo hay que sumarlo al grupo que corresponda y no compararlo suelto. El personal del
+operador se da de alta en `/api/personal` y los usuarios del comercio en `/api/comercio/usuarios`
+(`Api/Endpoints/PersonalEndpoints.cs`). Los usuarios del comercio entran al Portal por `UsuarioComercio`
+y no tienen operador en la sesión: los handlers del comercio fijan el operador de la cuenta con
+`IOperadorActivo.SeleccionarOperador` después de validarla. El sistema del comercio puede llamar a la API
+con la clave del encabezado `X-Api-Key` (`ClaveApiAuthenticationHandler`), que no lleva token
+antifalsificación. El destinatario no tiene cuenta: si el envío tiene correo, el Worker le manda el
+enlace de seguimiento (`EnlaceSeguimientoSolicitado`).
+
 ### Multitenancy
 
 El tenant es el **operador**. El eslabón es `CuentaComercial` (operador + comercio): un
@@ -127,9 +147,19 @@ comercio puede trabajar con varios operadores y tiene una cuenta por cada uno. `
 de la cuenta y **hereda su `OperadorId`**; las entidades con tenant implementan `ITenantEntity`.
 Ver ADR-002.
 
-Provisorio hasta el hito del 15/10: no hay login, y el operador y la cuenta se eligen en
-pantalla (`GET /api/cuentas-comerciales` existe solo para eso). Falta el `ITenantContext`,
-los filtros globales de consulta y el interceptor que asigne y valide `OperadorId`.
+El `ITenantContext` de la API sale de los claims de la cookie (`HttpTenantContext`). Los filtros
+globales por `OperadorId` están en `AppDbContext`, y `TenantSaveChangesInterceptor` rechaza guardar
+una entidad de otro operador.
+
+### Caché y banderas (aclaraciones 3.1 y 3.2)
+
+- **Caché.** Todo pasa por `ICacheService` (Redis). Las claves se arman en `ClavesCache`: el primer
+  segmento es el caso de uso, que es la etiqueta de las métricas, y las de configuración llevan el
+  operador. Sin Redis, cada operación cuenta como fallo y se sigue contra la base. El Worker invalida el
+  seguimiento público al procesar los eventos del envío. Ver ADR-005.
+- **Banderas.** `IBanderas` con las constantes de `Banderas` (`entrega-parcial`, `retiro-domicilio`). Las
+  cambia el `AdministradorPlataforma` desde el Backoffice y cada cambio queda auditado. Una funcionalidad
+  nueva bajo bandera tiene que consultarla en la API, el Worker, las webs y la app. Ver ADR-006.
 
 ### Datos de demostración
 
@@ -145,8 +175,8 @@ escuchan en 8080 (`ASPNETCORE_HTTP_PORTS`); solo Traefik publica puertos. El rou
 responde a `Host(api.localhost)` **y** a `PathPrefix(/api)`, esto último para que entre la app
 móvil (emulador Android: `10.0.2.2:8000`, ver `Mobile/Data/Constants.cs`).
 
-Trece contenedores: `traefik`, `postgres`, `redis`, `rabbitmq`, `otel-collector`,
-`lgtm`, `inicializador`, **dos réplicas de `api`**, `worker`, `receptor-avisos`, `portal` y `backoffice`.
+Catorce contenedores: `traefik`, `postgres`, `redis`, `rabbitmq`, `otel-collector`,
+`lgtm`, `inicializador`, **dos réplicas de `api`**, `worker`, `receptor-avisos`, `mailpit`, `portal` y `backoffice`.
 `rabbitmq` recibe los eventos del outbox y el `worker` los consume; `receptor-avisos` es el sistema
 de comercio de prueba al que apunta la suscripción sembrada para Tienda Norte en RapiEnvíos. `api` e `inicializador` comparten `image: ultimamilla-api:local`, así que la imagen se construye una sola vez; `api` no lleva `container_name` a propósito, porque con uno fijo Docker no puede crear la segunda réplica. El Portal y el Backoffice salen por
 `Api__BaseUrl: http://traefik/` y no por `api:8080`, para usar el balanceador con health
@@ -156,7 +186,7 @@ checks activos en lugar del round-robin del DNS de Docker.
 los tres `docker build` fallarían con `NETSDK1147`, porque la imagen `sdk:10.0` no trae el
 workload de MAUI. La dependencia va siempre de Mobile hacia afuera.
 
-El router de la API responde a `PathPrefix(/api)`, así que todo router de otro host cuyo panel use `/api` (Grafana, RabbitMQ) necesita `priority=100`.
+El router de la API responde a `PathPrefix(/api)`, así que todo router de otro host cuyo panel use `/api` (Grafana, RabbitMQ, Mailpit) necesita `priority=100`.
 
 ## Nube (RNF 6.14)
 
@@ -192,8 +222,10 @@ línea 289 en adelante son tres imágenes en base64 que pesan 350 KB; hay que le
 `diagrama-arquitectura.md`, más `img/` con los cuatro diagramas del informe exportados a PNG:
 `arquitectura-logica`, `modelo-dominio`, `despliegue` y `maquina-estados`.
 
-Los ADR de `Docs/Decisiones/` y el resto de `Docs/` son archivos vacíos reservados; mientras sigan
-así, el texto de ADR-001 y ADR-002 está en el informe (secciones 8 y 9).
+`Docs/Decisiones/` tiene ADR-001 a ADR-006: ADR-003 (conflictos de sincronización, también por bulto
+y retiro), ADR-004 (el cambio de requerimientos), ADR-005 (caché) y ADR-006 (banderas).
+`Docs/Cambio-Requerimientos.md` es el cambio del 30/10 (RF 31 a 41) con las aclaraciones de caché y
+banderas, y prevalece sobre la letra donde difieren.
 
 Los diagramas son Mermaid con `classDef` por categoría y leyenda en tabla; la información va
 en los nodos, no en las flechas.

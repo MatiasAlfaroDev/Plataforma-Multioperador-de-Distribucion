@@ -11,6 +11,7 @@ public class Envio : AuditableEntity, ITenantEntity
     private readonly List<Bulto> _bultos = [];
     private readonly List<EventoEnvio> _eventos = [];
     private readonly List<IntentoEntrega> _intentos = [];
+    private readonly List<EventoBulto> _eventosBulto = [];
 
     public Guid OperadorId { get; private set; }
     public Guid CuentaComercialId { get; private set; }
@@ -31,6 +32,9 @@ public class Envio : AuditableEntity, ITenantEntity
 
     public int IntentosRealizados { get; private set; }
 
+    /// <summary>RF 33: lo que se le sumó a la tarifa por nuevas visitas de bultos pendientes.</summary>
+    public decimal RecargoNuevasVisitas { get; private set; }
+
     public DateTimeOffset? FechaReprogramada { get; private set; }
     public string? FranjaReprogramada { get; private set; }
 
@@ -40,6 +44,7 @@ public class Envio : AuditableEntity, ITenantEntity
     public IReadOnlyCollection<Bulto> Bultos => _bultos;
     public IReadOnlyCollection<EventoEnvio> Eventos => _eventos;
     public IReadOnlyCollection<IntentoEntrega> Intentos => _intentos;
+    public IReadOnlyCollection<EventoBulto> EventosBulto => _eventosBulto;
 
     public decimal PesoTotalKg => _bultos.Sum(b => b.PesoKg);
     public decimal VolumenTotalMetrosCubicos =>
@@ -145,6 +150,23 @@ public class Envio : AuditableEntity, ITenantEntity
         VersionTarifariaId = versionTarifariaId;
         TarifaCalculada = tarifaCalculada;
     }
+
+    /// <summary>RF 33: la nueva visita de los bultos pendientes puede cobrarse, según las reglas del operador.</summary>
+    public void AgregarRecargoNuevaVisita(decimal monto)
+    {
+        if (monto < 0)
+            throw new ArgumentException("El recargo no puede ser negativo.", nameof(monto));
+
+        if (Estado != EstadoEnvio.Reprogramado)
+            throw new InvalidOperationException("El recargo corresponde a una nueva visita reprogramada.");
+
+        RecargoNuevasVisitas += monto;
+        TarifaCalculada = (TarifaCalculada ?? 0) + monto;
+    }
+
+    /// <summary>¿Las reglas permiten otra visita, o ya corresponde devolver?</summary>
+    public bool AdmiteNuevaVisita(VersionReglasOperativas reglas) =>
+        IntentosRealizados < reglas.MaximoIntentosEntrega && !UltimoMotivoRequiereDevolucion;
 
     public void AsignarReglasOperativas(Guid versionReglasOperativasId)
     {
@@ -252,9 +274,17 @@ public class Envio : AuditableEntity, ITenantEntity
             .Select(b => b.Id)
             .ToHashSet();
 
-        if (bultosEntregados.Any(id => !idsPendientes.Contains(id)))
+        var enConflicto = bultosEntregados.Where(id => !idsPendientes.Contains(id)).ToList();
+        if (enConflicto.Count > 0)
+        {
+            // RF 32: conflicto a nivel de bulto (otro dispositivo ya lo resolvió): se informa cuál y en qué estado.
+            var detalle = string.Join(", ", enConflicto.Select(id =>
+                _bultos.FirstOrDefault(b => b.Id == id) is { } b
+                    ? $"{b.Identificacion} ({b.Estado})"
+                    : $"{id} (no pertenece al envío)"));
             throw new InvalidOperationException(
-                "Todos los bultos indicados deben pertenecer al envío y estar pendientes.");
+                $"Conflicto: estos bultos ya no están pendientes: {detalle}.");
+        }
     }
 
     public void Aplicar(
@@ -546,41 +576,46 @@ public class Envio : AuditableEntity, ITenantEntity
             referenciaConstanciaDevolucion: referenciaConstanciaDevolucion);
 
         maquina.Fire(disparador);
-        if (disparador == DisparadorEnvio.RegistrarEntregaParcial)
-        {
-            foreach (var bulto in bultosParaEntregar)
-            {
-                bulto.Aplicar(
-                    MaquinaEstadosBulto.Disparador.Entregar);
-            }
-        }
-        else if (disparador == DisparadorEnvio.Entregar)
-        {
-            foreach (var bulto in _bultos.Where(
-                b => b.Estado == EstadoBulto.Pendiente))
-            {
-                bulto.Aplicar(
-                    MaquinaEstadosBulto.Disparador.Entregar);
-            }
-        }
 
-        else if (disparador == DisparadorEnvio.IniciarDevolucion)
+        // RF 31: cada transición del envío se traslada a sus bultos, que llevan su propio historial.
+        switch (disparador)
         {
-            foreach (var bulto in _bultos.Where(
-                b => b.Estado == EstadoBulto.Pendiente))
-            {
-                bulto.Aplicar(
-                    MaquinaEstadosBulto.Disparador.IniciarDevolucion);
-            }
-        }
-        else if (disparador == DisparadorEnvio.ConfirmarDevolucion)
-        {
-            foreach (var bulto in _bultos.Where(
-                b => b.Estado == EstadoBulto.EnDevolucion))
-            {
-                bulto.Aplicar(
-                    MaquinaEstadosBulto.Disparador.ConfirmarDevolucion);
-            }
+            case DisparadorEnvio.RegistrarEntregaParcial:
+                AplicarABultos(bultosParaEntregar, MaquinaEstadosBulto.Disparador.Entregar, ocurridoEn);
+                foreach (var (bultoId, motivo, _) in bultosNoEntregados!)
+                    RegistrarNoEntregado(_bultos.First(b => b.Id == bultoId), motivo.Descripcion, ocurridoEn);
+                break;
+
+            case DisparadorEnvio.Entregar:
+                AplicarABultos(_bultos.Where(b => b.Estado == EstadoBulto.Pendiente),
+                    MaquinaEstadosBulto.Disparador.Entregar, ocurridoEn);
+                break;
+
+            case DisparadorEnvio.RegistrarIntentoFallido:
+                foreach (var bulto in _bultos.Where(b => b.Estado == EstadoBulto.Pendiente))
+                    RegistrarNoEntregado(bulto, motivoNoEntrega!.Descripcion, ocurridoEn);
+                break;
+
+            case DisparadorEnvio.IniciarDevolucion:
+                AplicarABultos(_bultos.Where(b => b.Estado == EstadoBulto.Pendiente),
+                    MaquinaEstadosBulto.Disparador.IniciarDevolucion, ocurridoEn);
+                break;
+
+            case DisparadorEnvio.ConfirmarDevolucion:
+                AplicarABultos(_bultos.Where(b => b.Estado == EstadoBulto.EnDevolucion),
+                    MaquinaEstadosBulto.Disparador.ConfirmarDevolucion, ocurridoEn);
+                break;
+
+            case DisparadorEnvio.DeclararExtraviado:
+                // Se pierde lo que todavía estaba a cargo del operador; lo entregado o devuelto no.
+                AplicarABultos(_bultos.Where(b => b.Estado is EstadoBulto.Pendiente or EstadoBulto.EnDevolucion),
+                    MaquinaEstadosBulto.Disparador.DeclararExtraviado, ocurridoEn);
+                break;
+
+            case DisparadorEnvio.Reaparecer:
+                AplicarABultos(_bultos.Where(b => b.Estado == EstadoBulto.Extraviado),
+                    MaquinaEstadosBulto.Disparador.Reaparecer, ocurridoEn);
+                break;
         }
 
         if (nuevoIntento is not null)
@@ -623,6 +658,24 @@ public class Envio : AuditableEntity, ITenantEntity
         }
         _eventos.Add(evento);
     }
+
+    private void AplicarABultos(
+        IEnumerable<Bulto> bultos,
+        MaquinaEstadosBulto.Disparador disparador,
+        DateTimeOffset ocurridoEn)
+    {
+        foreach (var bulto in bultos.ToList())
+        {
+            var anterior = bulto.Estado;
+            bulto.Aplicar(disparador);
+            _eventosBulto.Add(EventoBulto.Crear(
+                this, bulto, anterior, MaquinaEstadosBulto.Resultado(disparador), null, ocurridoEn));
+        }
+    }
+
+    private void RegistrarNoEntregado(Bulto bulto, string motivo, DateTimeOffset ocurridoEn) =>
+        _eventosBulto.Add(EventoBulto.Crear(
+            this, bulto, bulto.Estado, ResultadoBulto.NoEntregado, motivo, ocurridoEn));
 
 public bool PuedeIniciarDevolucion(
     VersionReglasOperativas reglas)

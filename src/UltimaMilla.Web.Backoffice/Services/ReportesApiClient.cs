@@ -113,8 +113,26 @@ public sealed record PuntualidadReporte(
     DateOnly Hasta,
     ResultadoPuntualidadItem Resultados);
 
+// RF 41: los reportes incorporan los retiros a domicilio.
+public sealed record ConteoRetirosItem(string Estado, int Cantidad);
+
+public sealed record ResumenRetirosReporte(
+    DateOnly Desde,
+    DateOnly Hasta,
+    int TotalRetiros,
+    decimal TotalTarifado,
+    List<ConteoRetirosItem> PorEstado);
+
 public sealed class ReportesApiClient(HttpClient http)
 {
+    public async Task<ResumenRetirosReporte> ObtenerResumenRetirosAsync(
+        DateOnly desde,
+        DateOnly hasta,
+        CancellationToken ct = default) =>
+        await http.GetFromJsonAsync<ResumenRetirosReporte>(
+            $"api/reportes/retiros/resumen?desde={desde:yyyy-MM-dd}&hasta={hasta:yyyy-MM-dd}", ct)
+        ?? throw new InvalidOperationException("La API no devolvió el resumen de retiros.");
+
     public async Task<ResumenEnviosReporte> ObtenerResumenAsync(
         DateOnly desde,
         DateOnly hasta,

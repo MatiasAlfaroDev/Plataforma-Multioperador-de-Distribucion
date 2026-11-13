@@ -1,0 +1,87 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.BanderasModel
+
+@{
+    ViewData["Title"] = "Banderas de funcionalidad";
+}
+
+<div class="encabezado">
+    <div>
+        <h1>Banderas de funcionalidad</h1>
+        <p>Qué funcionalidades ofrece cada operador. El cambio llega a todas las instancias sin reiniciarlas.</p>
+    </div>
+</div>
+
+@if (TempData["Mensaje"] is string mensaje)
+{
+    <p class="aviso ok" role="status">@mensaje</p>
+}
+
+@if (Model.Error is not null)
+{
+    <p class="aviso error" role="alert">@Model.Error</p>
+}
+
+<div class="tabla">
+    <table>
+        <thead>
+            <tr>
+                <th>Operador</th>
+                @foreach (var (_, texto) in UltimaMilla.Web.Backoffice.Pages.BanderasModel.Nombres)
+                {
+                    <th>@texto</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var fila in Model.Datos.Estado)
+            {
+                <tr>
+                    <td>@fila.Operador</td>
+                    @foreach (var (clave, _) in UltimaMilla.Web.Backoffice.Pages.BanderasModel.Nombres)
+                    {
+                        var habilitada = fila.Banderas.GetValueOrDefault(clave, true);
+                        <td>
+                            <form method="post" class="inline">
+                                <input type="hidden" name="operadorId" value="@fila.OperadorId" />
+                                <input type="hidden" name="bandera" value="@clave" />
+                                <input type="hidden" name="habilitada" value="@((!habilitada).ToString().ToLowerInvariant())" />
+                                <span>@(habilitada ? "Habilitada" : "Deshabilitada")</span>
+                                <button type="submit">@(habilitada ? "Deshabilitar" : "Habilitar")</button>
+                            </form>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<h2>Historial</h2>
+
+@if (Model.Datos.Historial.Count == 0)
+{
+    <p class="nota">Todavía no se modificó ninguna bandera.</p>
+}
+else
+{
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr><th>Fecha</th><th>Operador</th><th>Bandera</th><th>Valor</th><th>Modificado por</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var cambio in Model.Datos.Historial)
+                {
+                    <tr>
+                        <td>@Formato.Hora(cambio.ModificadoEn)</td>
+                        <td>@Model.Operador(cambio.OperadorId)</td>
+                        <td>@Model.Texto(cambio.Nombre)</td>
+                        <td>@(cambio.Habilitada ? "Habilitada" : "Deshabilitada")</td>
+                        <td>@cambio.ModificadoPor</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

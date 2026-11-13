@@ -1,11 +1,13 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Domain.Configuracion;
 
 namespace UltimaMilla.Application.Configuracion.Queries.ObtenerTarifaVigente;
 
 public sealed class ObtenerTarifaVigenteHandler(
     IVersionTarifariaRepository tarifas,
-    TimeProvider reloj)
+    TimeProvider reloj,
+    ICacheService cache)
 {
     public async Task<TarifaVigenteDto?> Handle(
         ObtenerTarifaVigenteQuery query,
@@ -23,6 +25,10 @@ public sealed class ObtenerTarifaVigenteHandler(
                 "El tipo de servicio debe ser Entrega o RetiroDomicilio.");
         }
 
+        var clave = ClavesCache.TarifaVigente(query.OperadorId, query.ZonaCoberturaId, tipoServicio.ToString());
+        if (await cache.ObtenerAsync<TarifaVigenteDto>(clave, ct) is { } enCache)
+            return enCache;
+
         var version = await tarifas.ObtenerVigentePorZonaAsync(
             query.OperadorId,
             query.ZonaCoberturaId,
@@ -33,7 +39,7 @@ public sealed class ObtenerTarifaVigenteHandler(
         if (version is null)
             return null;
 
-        return new TarifaVigenteDto(
+        var dto = new TarifaVigenteDto(
             version.Id,
             version.CuadroTarifarioId,
             version.ZonaCoberturaId,
@@ -44,5 +50,8 @@ public sealed class ObtenerTarifaVigenteHandler(
             version.BonificacionPorcentaje,
             version.VigenciaDesde,
             version.TipoServicio.ToString());
+
+        await cache.GuardarAsync(clave, dto, ClavesCache.DuracionConfiguracion, ct);
+        return dto;
     }
 }

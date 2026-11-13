@@ -188,6 +188,10 @@ services:
       OTEL_SERVICE_NAME: "worker"
       # Lock de las tareas programadas (reintento de avisos fallidos).
       ConnectionStrings__Redis: "redis:6379"
+      # Correo al destinatario con el enlace de seguimiento (letra 3.3): lo captura Mailpit.
+      Correo__Host: "mailpit"
+      Correo__Puerto: "1025"
+      Seguimiento__UrlBase: "${URL_SEGUIMIENTO:-http://portal.localhost:8000/seguimiento}"
       # Push al repartidor cuando le asignan un envío (AvisarAsignacionConsumer). Misma cuenta de servicio que la API.
       Firebase__CredencialesRuta: "/run/secretos/firebase-cuenta-servicio.json"
     volumes:
@@ -201,6 +205,17 @@ services:
         condition: service_healthy
       inicializador:
         condition: service_completed_successfully
+
+  # Servidor SMTP de prueba: captura los correos al destinatario y los muestra en mail.localhost:8000.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailpit.rule=Host(`mail.${DOMINIO:-localhost}`)"
+      - "traefik.http.routers.mailpit.entrypoints=web"
+      # Su panel usa /api: prioridad sobre el PathPrefix(/api) de la API.
+      - "traefik.http.routers.mailpit.priority=100"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
 
   # Receptor de prueba de los avisos (RNF 6.9): hace de sistema del comercio y simula fallas.
   # El secreto es el de la suscripción de demostración (DbSeeder.SecretoAvisosDemo).

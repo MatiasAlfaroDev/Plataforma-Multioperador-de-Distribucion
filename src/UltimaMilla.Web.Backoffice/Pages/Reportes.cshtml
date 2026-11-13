@@ -87,6 +87,43 @@
         </section>
     }
 
+    @if (Model.Retiros is not null)
+    {
+        <section class="space-y-4">
+            <h2 class="font-display text-xl font-semibold">Retiros a domicilio</h2>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="rounded-xl border border-borde bg-superficie p-5">
+                    <p class="text-sm text-suave">Total de retiros</p>
+                    <p class="mt-1 text-3xl font-bold">@Model.Retiros.TotalRetiros</p>
+                </div>
+                <div class="rounded-xl border border-borde bg-superficie p-5">
+                    <p class="text-sm text-suave">Facturado por retiros</p>
+                    <p class="mt-1 text-3xl font-bold">@Formato.Moneda(Model.Retiros.TotalTarifado)</p>
+                </div>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-borde bg-superficie">
+                <table class="w-full text-left">
+                    <thead class="border-b border-borde">
+                        <tr><th class="p-3">Estado</th><th class="p-3 text-right">Cantidad</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Retiros.PorEstado.Count == 0)
+                        {
+                            <tr><td colspan="2" class="p-4 text-suave">No hay retiros en el período seleccionado.</td></tr>
+                        }
+                        @foreach (var estado in Model.Retiros.PorEstado)
+                        {
+                            <tr class="border-t border-borde">
+                                <td class="p-3">@estado.Estado</td>
+                                <td class="p-3 text-right">@estado.Cantidad</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+
     @if (Model.Motivos is not null)
     {
         <section class="space-y-4">

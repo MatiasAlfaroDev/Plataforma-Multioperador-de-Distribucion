@@ -40,11 +40,7 @@ public sealed class CrearEnvioHandler(
 
 await validator.ValidateAndThrowAsync(command, ct);
 
-if (tenantContext.Perfil is not (
-    Perfiles.AdministradorOperador or
-    Perfiles.Operador or
-    Perfiles.AdministradorComercio or
-    Perfiles.Comercio))
+if (!Perfiles.DespachoYComercio.Contains(tenantContext.Perfil))
 {
     throw new UnauthorizedAccessException(
         "Su perfil no tiene permisos para crear envíos.");
@@ -122,7 +118,7 @@ if (!cuenta.Activa ||
             cuenta,
             referencia,
             Enum.Parse<Modalidad>(command.Modalidad, ignoreCase: true),
-            new Destinatario(command.DestinatarioNombre, command.DestinatarioTelefono),
+            new Destinatario(command.DestinatarioNombre, command.DestinatarioTelefono, command.DestinatarioEmail),
             new Direccion(command.Calle, command.Numero, command.Localidad, command.Departamento),
             command.Bultos.Select(b => new NuevoBulto(b.PesoKg, b.AltoCm, b.AnchoCm, b.ProfundidadCm)).ToList(),
             ahora);
@@ -156,6 +152,14 @@ if (!cuenta.Activa ||
         
         // va antes de guardar porque se confirma en la misma transacción que el envío (outbox, RNF 6.8)
         await eventos.PublicarAsync(new EnvioCreado(envio.Id, envio.OperadorId, envio.CuentaComercialId, envio.ReferenciaExterna, envio.FechaAlta), ct);
+
+        // Letra 3.3: el destinatario no tiene cuenta; recibe el enlace de seguimiento por correo.
+        if (envio.Destinatario.Email is { } email)
+        {
+            await eventos.PublicarAsync(new EnlaceSeguimientoSolicitado(
+                envio.Id, envio.OperadorId, email, envio.Destinatario.Nombre,
+                envio.ReferenciaExterna, envio.TokenSeguimientoOriginal!), ct);
+        }
 
         await unitOfWork.GuardarCambiosAsync(ct);
 

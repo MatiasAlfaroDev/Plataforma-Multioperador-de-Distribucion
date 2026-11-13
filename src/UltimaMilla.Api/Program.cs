@@ -38,6 +38,7 @@ using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using UltimaMilla.Infrastructure.Identidad;
@@ -93,8 +94,17 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, rabbitMq);
 
+// Con X-Api-Key autentica la clave del comercio (RF 37); si no, la cookie de siempre.
+const string CookieOClave = "CookieOClaveApi";
+
 builder.Services
-    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddAuthentication(CookieOClave)
+    .AddPolicyScheme(CookieOClave, CookieOClave, options =>
+        options.ForwardDefaultSelector = context =>
+            context.Request.Headers.ContainsKey(ClaveApiAuthenticationHandler.Encabezado)
+                ? ClaveApiAuthenticationHandler.Esquema
+                : IdentityConstants.ApplicationScheme)
+    .AddScheme<AuthenticationSchemeOptions, ClaveApiAuthenticationHandler>(ClaveApiAuthenticationHandler.Esquema, null)
     .AddCookie(IdentityConstants.ApplicationScheme, options =>
     {
         options.Cookie.Name = "UltimaMilla.Auth";
@@ -174,8 +184,11 @@ if (!soloInicializar)
         ?? throw new InvalidOperationException(
             "No se configuró ConnectionStrings:Redis.");
 
-    var redis = await ConnectionMultiplexer.ConnectAsync(
-        redisConnectionString);
+    // Aclaración 3.1: sin Redis la API arranca igual y la caché se comporta como fallos (va a la base);
+    // se reconecta sola cuando Redis vuelve.
+    var opcionesRedis = ConfigurationOptions.Parse(redisConnectionString);
+    opcionesRedis.AbortOnConnectFail = false;
+    var redis = await ConnectionMultiplexer.ConnectAsync(opcionesRedis);
 
     builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 
@@ -212,6 +225,7 @@ if (builder.Configuration.GetValue<bool>("Inicializacion:SoloInicializar"))
 
 app.UseSeguridadWeb();
 app.UseExceptionHandler();
+app.UseLimiteDeTasa();
 
 app.UseAuthentication();
 app.UseLimitacionDeTasa();
@@ -226,6 +240,8 @@ app.MapHealthChecks("/ready", new HealthCheckOptions { Predicate = c => c.Tags.C
 app.MapHealthChecks("/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapAutenticacionEndpoints();
 app.MapVinculacionesComercialesEndpoints();
+app.MapPersonalEndpoints();
+app.MapBanderasEndpoints();
 
 
 app.MapGet("/api/antiforgery/token", (
@@ -247,21 +263,39 @@ var api = app.MapGroup("/api");
 
 // GET /api/seguimiento/{token}
 // Consulta pública de seguimiento para destinatarios.
+// RF 41: el mismo enlace sirve para envíos y retiros; si el token no es de un envío, se prueba como retiro.
 api.MapGet("/seguimiento/{token}", async (
     string token,
     ConsultarSeguimientoPublicoHandler handler,
+    IDataProtectionProvider dataProtection,
+    IConsultaPublicaRetiroRepository retiros,
     CancellationToken ct) =>
 {
     var seguimiento = await handler.Handle(token, ct);
+    if (seguimiento is not null)
+        return Results.Ok(seguimiento);
 
-    return seguimiento is null
+    if (TokenRetiro.Leer(dataProtection, token) is not var (operadorId, retiroId))
+        return Results.NotFound();
+
+    var retiro = await retiros.ObtenerAsync(operadorId, retiroId, ct);
+
+    return retiro is null
         ? Results.NotFound()
-        : Results.Ok(seguimiento);
+        : Results.Ok(new SeguimientoPublicoDto(
+            "Retiro a domicilio",
+            retiro.Estado,
+            retiro.SolicitadoEn,
+            retiro.FechaSolicitada,
+            null, null, null, null,
+            [],
+            Tipo: "Retiro"));
 })
 .AllowAnonymous();
 
 api.MapGet("/operadores", async (ListarOperadoresHandler handler, CancellationToken ct) =>
-    Results.Ok(await handler.Handle(new ListarOperadoresQuery(), ct)));
+    Results.Ok(await handler.Handle(new ListarOperadoresQuery(), ct)))
+    .RequireAuthorization();
 
 // Provisorio hasta el login del 15/10: el Portal elige con qué cuenta comercial operar.
 api.MapGet("/cuentas-comerciales", async (
@@ -274,8 +308,7 @@ api.MapGet("/cuentas-comerciales", async (
           .RequireAssertion(context =>
               context.User.HasClaim("perfil_comercio", "AdministradorComercio") ||
               context.User.HasClaim("perfil_comercio", "Comercio") ||
-              context.User.IsInRole("AdministradorOperador") ||
-              context.User.IsInRole("Operador")));
+              Perfiles.PersonalOperador.Any(context.User.IsInRole)));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
 api.MapPost("/envios", async (
@@ -285,7 +318,8 @@ api.MapPost("/envios", async (
     CrearEnvioHandler handler,
     CancellationToken ct) =>
 {
-    if (!await antiforgery.IsRequestValidAsync(context))
+    if (!ClaveApiAuthenticationHandler.EsLlamadaConClave(context) &&
+        !await antiforgery.IsRequestValidAsync(context))
     {
         return Results.Problem(
             statusCode: StatusCodes.Status400BadRequest,
@@ -303,11 +337,7 @@ api.MapPost("/envios", async (
             tokenSeguimiento = resultado.TokenSeguimiento
         });
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador,
-    Perfiles.AdministradorComercio,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.OperadorYComercio));
 
 
  // GET /api/reportes/envios/resumen?desde=2026-11-01&hasta=2026-11-30
@@ -343,9 +373,7 @@ api.MapPost("/envios", async (
 
      return Results.Ok(resultado);
  })
- .RequireAuthorization(policy => policy.RequireRole(
-     Perfiles.AdministradorOperador,
-     Perfiles.Operador));
+ .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapGet("/envios/{envioId:guid}",
     async (
@@ -393,9 +421,7 @@ api.MapGet("/reportes/motivos-no-entrega", async (
 
     return Results.Ok(resultado);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapGet("/reportes/actividad-comercial", async (
@@ -429,9 +455,7 @@ api.MapGet("/reportes/actividad-comercial", async (
 
     return Results.Ok(resultado);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapGet("/reportes/repartidores", async (
@@ -455,9 +479,7 @@ api.MapGet("/reportes/repartidores", async (
     return Results.Ok(await handler.Handle(
         operadorId, desde, hasta, ct));
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapGet("/reportes/cumplimiento", async (
@@ -483,9 +505,7 @@ api.MapGet("/reportes/cumplimiento", async (
 
     return Results.Ok(resultado);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapGet("/reportes/liquidacion", async (
@@ -509,9 +529,7 @@ api.MapGet("/reportes/liquidacion", async (
     return Results.Ok(await handler.Handle(
         operadorId, desde, hasta, ct));
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapGet("/reportes/puntualidad", async (
@@ -535,9 +553,7 @@ api.MapGet("/reportes/puntualidad", async (
     return Results.Ok(await handler.Handle(
         operadorId, desde, hasta, ct));
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 
@@ -583,10 +599,7 @@ api.MapPost("/envios/importar-csv", async (
     return Results.Ok(resultado);
 })
 .DisableAntiforgery()
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.DespachoYComercio));
 
 // GET /api/envios?operadorId=... → listado para el Backoffice.
 // GET /api/envios → listado según el operador y perfil autenticado.
@@ -600,11 +613,7 @@ api.MapGet("/envios", async (
 
     return Results.Ok(resultado);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador,
-    Perfiles.AdministradorComercio,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.OperadorYComercio));
 
 // POST /api/envios/{id}/eventos-movil → sincronización de la app del repartidor (entregado / no entregado).
 // 201 = guardado; 409 = ya estaba (reintento, la app lo toma como éxito); 400 = conflicto o datos inválidos.
@@ -634,7 +643,7 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                     .ToArray()), ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     })
-    .RequireAuthorization();
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
 
 api.MapPost("/envios/{envioId:guid}/recepcion",
     async (
@@ -653,9 +662,7 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
         // RF 10: 200 con el detalle; "recibido: false" indica que faltan bultos declarados.
         return Results.Ok(resultado);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
 api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
     async (
@@ -683,9 +690,7 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
 
         return Results.NoContent();
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
 
 api.MapPost("/envios/{envioId:guid}/iniciar-devolucion",
@@ -720,9 +725,7 @@ api.MapPost("/envios/{envioId:guid}/iniciar-devolucion",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapPost("/envios/{envioId:guid}/confirmar-devolucion",
@@ -754,9 +757,7 @@ api.MapPost("/envios/{envioId:guid}/confirmar-devolucion",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorComercio,
-        Perfiles.Comercio));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.PersonalComercio));
 
 // RF37: solicitud de retiro en domicilio desde el Portal del comercio.
 api.MapPost("/retiros", async (
@@ -766,7 +767,8 @@ api.MapPost("/retiros", async (
     CrearRetiroHandler handler,
     CancellationToken ct) =>
 {
-    if (!await antiforgery.IsRequestValidAsync(context))
+    if (!ClaveApiAuthenticationHandler.EsLlamadaConClave(context) &&
+        !await antiforgery.IsRequestValidAsync(context))
     {
         return Results.Problem(
             statusCode: StatusCodes.Status400BadRequest,
@@ -780,9 +782,7 @@ api.MapPost("/retiros", async (
         $"/api/retiros/{id}",
         new { id });
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorComercio,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.PersonalComercio));
 
 // RF37: listar retiros del comercio o del operador autenticado.
 api.MapGet("/retiros", async (
@@ -793,11 +793,7 @@ api.MapGet("/retiros", async (
 
     return Results.Ok(resultado);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorComercio,
-    Perfiles.Comercio,
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.OperadorYComercio));
 
 
 // RF37: consultar el detalle de un retiro.
@@ -814,11 +810,7 @@ api.MapGet("/retiros/{retiroId:guid}", async (
         ? Results.NotFound()
         : Results.Ok(retiro);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorComercio,
-    Perfiles.Comercio,
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.OperadorYComercio));
 
 // Declarar un envío como extraviado.
 api.MapPost("/envios/{envioId:guid}/extravio",
@@ -855,9 +847,7 @@ api.MapPost("/envios/{envioId:guid}/extravio",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapPost("/retiros/{retiroId:guid}/recibir-deposito",
     async (
@@ -878,10 +868,30 @@ api.MapPost("/retiros/{retiroId:guid}/recibir-deposito",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
+
+// POST /api/retiros/{id}/reprogramar → un retiro no retirado vuelve a Solicitado (RF 38).
+api.MapPost("/retiros/{retiroId:guid}/reprogramar",
+    async (
+        Guid retiroId,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        GestionarRetiroHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        await handler.ReprogramarAsync(retiroId, ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapPost("/retiros/{retiroId:guid}/entregar-comercio",
     async (
@@ -902,9 +912,7 @@ api.MapPost("/retiros/{retiroId:guid}/entregar-comercio",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
 api.MapPost("/retiros/{retiroId:guid}/eventos-movil",
     async (
@@ -939,9 +947,7 @@ api.MapGet("/reportes/retiros/resumen",
         return Results.Ok(resultado);
     })
     .RequireAuthorization(policy =>
-        policy.RequireRole(
-            Perfiles.AdministradorOperador,
-            Perfiles.Operador));
+        policy.RequireRole(Perfiles.Despacho));
 
 // Generar enlace para un retiro que el usuario puede consultar.
 api.MapGet("/retiros/{retiroId:guid}/enlace-publico",
@@ -956,75 +962,18 @@ api.MapGet("/retiros/{retiroId:guid}/enlace-publico",
         if (retiro is null)
             return Results.NotFound();
 
-        var protector = dataProtection
-            .CreateProtector("UltimaMilla.RetiroSeguimiento.v1")
-            .ToTimeLimitedDataProtector();
+        var token = TokenRetiro.Proteger(dataProtection, retiro.OperadorId, retiro.Id);
 
-        var contenido = $"{retiro.OperadorId:N}:{retiro.Id:N}";
-
-        var token = protector.Protect(
-            contenido,
-            TimeSpan.FromDays(30));
-
+        // RF 41: el mismo enlace público que los envíos (página /seguimiento del Portal).
         return Results.Ok(new
         {
-            Url = $"/api/publico/retiros/{token}",
-            VigenciaDias = 30
+            Url = $"/seguimiento/{token}",
+            VigenciaDias = TokenRetiro.VigenciaDias
         });
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador,
-        Perfiles.AdministradorComercio,
-        Perfiles.Comercio));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.OperadorYComercio));
 
 
-// Consultar el estado sin iniciar sesión.
-api.MapGet("/publico/retiros/{token}",
-    async (
-        string token,
-        IDataProtectionProvider dataProtection,
-        IConsultaPublicaRetiroRepository consultas,
-        CancellationToken ct) =>
-    {
-        string contenido;
-
-        try
-        {
-            var protector = dataProtection
-                .CreateProtector("UltimaMilla.RetiroSeguimiento.v1")
-                .ToTimeLimitedDataProtector();
-
-            contenido = protector.Unprotect(token);
-        }
-        catch (CryptographicException)
-        {
-            return Results.NotFound();
-        }
-        catch (FormatException)
-        {
-            return Results.NotFound();
-        }
-
-        var partes = contenido.Split(':');
-
-        if (partes.Length != 2 ||
-            !Guid.TryParseExact(partes[0], "N", out var operadorId) ||
-            !Guid.TryParseExact(partes[1], "N", out var retiroId))
-        {
-            return Results.NotFound();
-        }
-
-        var seguimiento = await consultas.ObtenerAsync(
-            operadorId,
-            retiroId,
-            ct);
-
-        return seguimiento is null
-            ? Results.NotFound()
-            : Results.Ok(seguimiento);
-    })
-    .AllowAnonymous();
 
 // Registrar la reaparición de un envío extraviado.
 api.MapPost("/envios/{envioId:guid}/reaparicion",
@@ -1061,9 +1010,7 @@ api.MapPost("/envios/{envioId:guid}/reaparicion",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
 // Solicitudes de reprogramación pendientes para Backoffice.
 
@@ -1092,9 +1039,7 @@ api.MapPost("/solicitudes-reprogramacion",
             Mensaje = "Solicitud de reprogramación creada correctamente."
         });
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapGet("/solicitudes-reprogramacion/pendientes",
     async (
@@ -1104,9 +1049,7 @@ api.MapGet("/solicitudes-reprogramacion/pendientes",
         var solicitudes = await handler.Handle(ct);
         return Results.Ok(solicitudes);
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapPost("/solicitudes-reprogramacion/{solicitudId:guid}/confirmar",
     async (
@@ -1133,9 +1076,7 @@ api.MapPost("/solicitudes-reprogramacion/{solicitudId:guid}/confirmar",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 // Actualizar una tarifa existente: crea una nueva versión.
 api.MapPost("/tarifas", async (
@@ -1164,9 +1105,7 @@ api.MapPost("/tarifas", async (
 
     return Results.Ok(new { id });
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
 
 
 // Crear un cuadro tarifario y su primera versión.
@@ -1198,9 +1137,7 @@ api.MapPost("/tarifas/nueva", async (
         $"/api/tarifas/vigente",
         new { id });
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
 
 
 // Consultar la tarifa vigente de un servicio.
@@ -1231,9 +1168,7 @@ api.MapGet("/tarifas/vigente", async (
         ? Results.NotFound()
         : Results.Ok(tarifa);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapGet("/reglas-operativas/vigente", async (
     Guid operadorId,
@@ -1257,9 +1192,7 @@ api.MapGet("/reglas-operativas/vigente", async (
         ? Results.NotFound()
         : Results.Ok(reglas);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapPost("/reglas-operativas", async (
@@ -1280,9 +1213,28 @@ api.MapPost("/reglas-operativas", async (
 
     return Results.Ok(new { id });
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
+
+// GET /api/motivos-no-entrega → catálogo vigente del operador para la app del repartidor (RF 32).
+// La app lo guarda en el teléfono para elegir el motivo sin conexión.
+api.MapGet("/motivos-no-entrega", async (
+    ITenantContext tenant,
+    ObtenerReglasOperativasVigentesHandler handler,
+    IBanderas banderas,
+    CancellationToken ct) =>
+{
+    var operadorId = tenant.OperadorId ?? throw new UnauthorizedAccessException("Primero hay que elegir un operador.");
+    var reglas = await handler.Handle(new ObtenerReglasOperativasVigentesQuery(operadorId), ct);
+
+    return Results.Ok(new
+    {
+        // Regla del operador y bandera de la plataforma (aclaración 3.2): las dos tienen que permitirla.
+        admiteEntregaParcial = (reglas?.AdmiteEntregaParcial ?? false) &&
+            await banderas.EstaHabilitadaAsync(Banderas.EntregaParcial, operadorId, ct),
+        motivos = reglas?.Motivos.Select(m => m.Descripcion).ToArray() ?? []
+    });
+})
+.RequireAuthorization(policy => policy.RequireRole([Perfiles.Repartidor, .. Perfiles.PersonalOperador]));
 
 api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, CancellationToken ct) =>
 {
@@ -1291,7 +1243,8 @@ api.MapGet("/zonas", async (Guid operadorId, ListarZonasHandler handler, Cancell
         ct);
 
     return Results.Ok(zonas);
-});
+})
+.RequireAuthorization();
 
 
 api.MapPost("/zonas", async (
@@ -1302,7 +1255,8 @@ api.MapPost("/zonas", async (
     var id = await handler.Handle(command, ct);
 
     return Results.Ok(new { id });
-});
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
 
 // GET /api/zonas/{id}?operadorId=... → detalle de una zona, para el formulario de edición del Backoffice.
 api.MapGet("/zonas/{zonaId:guid}", async (
@@ -1311,7 +1265,7 @@ api.MapGet("/zonas/{zonaId:guid}", async (
     ObtenerZonaHandler handler,
     CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ObtenerZonaQuery(operadorId, zonaId), ct)))
-.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
 
 // PUT /api/zonas/{id} → edición de una zona (RF 2). Configurar zonas es tarea del administrador del operador.
 api.MapPut("/zonas/{zonaId:guid}", async (
@@ -1333,7 +1287,7 @@ api.MapPut("/zonas/{zonaId:guid}", async (
 
     return Results.NoContent();
 })
-.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
 
 api.MapPost("/hojas-de-ruta", async (
     CrearHojaDeRutaRequest request,
@@ -1377,9 +1331,7 @@ api.MapPost("/hojas-de-ruta", async (
         $"/api/hojas-de-ruta/{id}",
         new { id });
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapGet("/hojas-de-ruta/opciones", async (
     DateOnly? fecha,
@@ -1401,9 +1353,7 @@ api.MapGet("/hojas-de-ruta/opciones", async (
 
     return Results.Ok(opciones);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapGet("/hojas-de-ruta", async (
@@ -1418,9 +1368,7 @@ api.MapGet("/hojas-de-ruta", async (
 
     return Results.Ok(hojas);
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
@@ -1454,9 +1402,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
             enviosActualizados = cantidad
         });
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 // RF 22: rendición al regresar al depósito. GET muestra lo que tiene que volver; POST lo recibe y cierra la hoja.
 api.MapGet("/hojas-de-ruta/{hojaId:guid}/rendicion",
@@ -1525,9 +1471,7 @@ api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
 
         return Results.NoContent();
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios",
     async (
@@ -1568,9 +1512,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios",
             horarios
         });
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 api.MapPost("/hojas-de-ruta/{hojaId:guid}/retiros",
     async (
@@ -1609,9 +1551,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/retiros",
             horarios
         });
     })
-    .RequireAuthorization(policy => policy.RequireRole(
-        Perfiles.AdministradorOperador,
-        Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 // GET /api/repartidor/hojas-de-ruta?fecha=2026-10-28 → las hojas de ruta del repartidor logueado en la app,
 // con sus paradas y los bultos a cargar. La fecha la manda el teléfono (es "hoy" en Uruguay, no en UTC).
@@ -1674,10 +1614,7 @@ api.MapGet("/avisos", async (
     ListarAvisosHandler handler,
     CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ListarAvisosQuery(estado), ct)))
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.DespachoYComercio));
 
 // POST /api/avisos/{id}/reenviar → vuelve a encolar un aviso fallido; lo entrega el Worker.
 api.MapPost("/avisos/{entregaId:guid}/reenviar", async (
@@ -1688,19 +1625,14 @@ api.MapPost("/avisos/{entregaId:guid}/reenviar", async (
     await handler.Handle(new ReenviarAvisoCommand(entregaId), ct);
     return Results.NoContent();
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.DespachoYComercio));
 
 // GET /api/suscripciones-aviso → a qué URL y tipos de evento avisa la plataforma, con el secreto de la firma.
 api.MapGet("/suscripciones-aviso", async (
     ListarSuscripcionesHandler handler,
     CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ListarSuscripcionesQuery(), ct)))
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.AdministradorComercio, Perfiles.Comercio));
 
 // POST /api/suscripciones-aviso → alta de una suscripción; el secreto lo genera la plataforma.
 api.MapPost("/suscripciones-aviso", async (
@@ -1711,9 +1643,7 @@ api.MapPost("/suscripciones-aviso", async (
     var id = await handler.Handle(command, ct);
     return Results.Created($"/api/suscripciones-aviso/{id}", new { id });
 })
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Comercio));
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.AdministradorComercio, Perfiles.Comercio));
 
 // GET /api/mensajes-fallidos → colas *_error del broker con una muestra de sus mensajes (RNF 6.8).
 // Solo el administrador de plataforma: las colas mezclan mensajes de todos los operadores.

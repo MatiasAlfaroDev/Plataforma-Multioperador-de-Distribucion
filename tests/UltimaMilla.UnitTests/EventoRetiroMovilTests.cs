@@ -127,4 +127,22 @@ public sealed class EventoRetiroMovilTests
         Assert.Equal(Ahora, evento.OcurridoEn);
         Assert.Equal(Ahora.AddHours(3), evento.RecibidoEn);
     }
+
+    [Fact]
+    public void Retiro_no_retirado_se_reprograma_y_vuelve_a_una_ruta()
+    {
+        // RF 38: NoRetirado → Solicitado → AsignadoARuta, con su propia máquina de estados.
+        var retiro = CrearRetiro();
+        retiro.AsignarARuta(Guid.NewGuid());
+        retiro.RegistrarRetiroFallido();
+
+        retiro.Reprogramar();
+
+        Assert.Equal(EstadoRetiro.Solicitado, retiro.Estado);
+        Assert.Null(retiro.HojaDeRutaId);
+
+        retiro.AsignarARuta(Guid.NewGuid());
+        Assert.Equal(EstadoRetiro.AsignadoARuta, retiro.Estado);
+        Assert.Throws<InvalidOperationException>(() => retiro.Reprogramar());
+    }
 }

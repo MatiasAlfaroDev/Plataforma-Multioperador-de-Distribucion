@@ -11,19 +11,23 @@ namespace UltimaMilla.Application.Avisos.Commands.ReenviarAviso;
 /// </summary>
 public sealed class ReenviarAvisoHandler(
     IEntregaAvisoRepository entregas,
+    ICuentaComercialRepository cuentas,
     IPublicadorDeEventos eventos,
     IUnitOfWork unitOfWork,
-    ITenantContext sesion)
+    ITenantContext sesion,
+    IOperadorActivo operadorActivo)
 {
     public async Task Handle(ReenviarAvisoCommand command, CancellationToken ct)
     {
-        var (_, cuentaComercialId) = AlcanceAvisos.Resolver(sesion);
-
-        var entrega = await entregas.ObtenerAsync(command.EntregaAvisoId, ct);
+        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct);
 
         // Un comercio no ve los avisos de otra cuenta: para él no existen.
-        if (entrega is null || (cuentaComercialId.HasValue && entrega.CuentaComercialId != cuentaComercialId))
-            throw new NoEncontradoException("El aviso no existe.");
+        var entrega = await entregas.ObtenerAsync(command.EntregaAvisoId, alcance.Cuentas?.Keys.ToList(), ct)
+            ?? throw new NoEncontradoException("El aviso no existe.");
+
+        // La sesión del comercio no tiene operador: se fija el de la cuenta para poder guardar.
+        if (alcance.Cuentas is not null)
+            operadorActivo.SeleccionarOperador(entrega.OperadorId);
 
         entrega.Reencolar();
         await eventos.PublicarAsync(new AvisoPendiente(entrega.Id, entrega.OperadorId), ct);

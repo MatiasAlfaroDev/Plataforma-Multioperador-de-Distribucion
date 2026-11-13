@@ -54,6 +54,7 @@ public static class DependencyInjection
         .AddEntityFrameworkStores<AppDbContext>()
         .AddDefaultTokenProviders();
         services.AddScoped<IEnvioRepository, EnvioRepository>();
+        services.AddScoped<IBanderas, UltimaMilla.Infrastructure.Plataforma.BanderasService>();
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<IDiscrepanciaRecepcionRepository, DiscrepanciaRecepcionRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();

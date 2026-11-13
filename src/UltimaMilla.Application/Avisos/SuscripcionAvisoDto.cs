@@ -11,7 +11,8 @@ public sealed record SuscripcionAvisoDto(
     string Url,
     string Secreto,
     IReadOnlyList<string> TiposEvento,
-    bool Activa)
+    bool Activa,
+    int VersionContrato)
 {
     /// <summary>
     /// Mapea una entidad de suscripción a su DTO correspondiente.
@@ -22,5 +23,6 @@ public sealed record SuscripcionAvisoDto(
         s.Url,
         s.Secreto,
         s.TiposEvento,
-        s.Activa);
+        s.Activa,
+        s.VersionContrato);
 }

@@ -42,6 +42,7 @@ else
                     <th>URL</th>
                     <th>Eventos</th>
                     <th>Secreto</th>
+                    <th>Contrato</th>
                     <th>Activa</th>
                 </tr>
             </thead>
@@ -52,6 +53,7 @@ else
                         <td>@suscripcion.Url</td>
                         <td>@string.Join(", ", suscripcion.TiposEvento)</td>
                         <td><code>@suscripcion.Secreto</code></td>
+                        <td>v@(suscripcion.VersionContrato)</td>
                         <td>@(suscripcion.Activa ? "Sí" : "No")</td>
                     </tr>
                 }
@@ -68,11 +70,27 @@ else
             <label for="url">URL de tu sistema</label>
             <input type="url" id="url" @bind="nuevaUrl" placeholder="https://mi-tienda.uy/avisos" required />
         </div>
+        <div>
+            <label for="cuenta">Operador</label>
+            <select id="cuenta" @bind="cuentaElegida" required>
+                @foreach (var cuenta in cuentas)
+                {
+                    <option value="@cuenta.Id">@cuenta.OperadorNombre</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="version">Versión del contrato</label>
+            <select id="version" @bind="versionContrato">
+                <option value="1">v1: estado del envío (formato original)</option>
+                <option value="2">v2: agrega el detalle y los avisos por bulto</option>
+            </select>
+        </div>
     </div>
 
     <fieldset>
         <legend>Eventos</legend>
-        @foreach (var (tipo, nombre) in Tipos)
+        @foreach (var (tipo, nombre) in Tipos.Where(t => versionContrato >= 2 || !t.Tipo.StartsWith("bulto.")))
         {
             <label>
                 <input type="checkbox" checked="@tiposElegidos.Contains(tipo)" @onchange="() => AlternarTipo(tipo)" />
@@ -146,8 +164,19 @@ else
         ("envio.reprogramado", "Reprogramado"),
         ("envio.en_devolucion", "En devolución"),
         ("envio.devuelto", "Devuelto"),
-        ("envio.extraviado", "Extraviado")
+        ("envio.extraviado", "Extraviado"),
+        ("envio.entregado_parcialmente", "Entregado parcialmente"),
+        ("bulto.entregado", "Bulto entregado"),
+        ("bulto.no_entregado", "Bulto no entregado"),
+        ("bulto.en_devolucion", "Bulto en devolución"),
+        ("bulto.devuelto", "Bulto devuelto"),
+        ("bulto.extraviado", "Bulto extraviado"),
+        ("bulto.reaparecido", "Bulto reaparecido")
     ];
+
+    private List<CuentaItem> cuentas = [];
+    private Guid cuentaElegida;
+    private int versionContrato = 2;
 
     private List<AvisoItem> avisos = [];
     private List<SuscripcionItem> suscripciones = [];
@@ -175,6 +204,13 @@ else
         {
             avisos = await JS.InvokeAsync<List<AvisoItem>>("avisosPortal.listarAvisos");
             suscripciones = await JS.InvokeAsync<List<SuscripcionItem>>("avisosPortal.listarSuscripciones");
+
+            // Un comercio puede trabajar con varios operadores: la suscripción es por cuenta.
+            cuentas = (await JS.InvokeAsync<List<CuentaItem>>("autenticacionPortal.obtenerCuentasComerciales"))
+                .Where(c => c.Activa && c.Estado == CuentaConfirmada)
+                .ToList();
+            if (cuentaElegida == Guid.Empty && cuentas.Count > 0)
+                cuentaElegida = cuentas[0].Id;
         }
         catch (JSException)
         {
@@ -204,7 +240,14 @@ else
         {
             if (await EjecutarAsync(() => JS.InvokeAsync<ResultadoOperacion>(
                     "avisosPortal.crearSuscripcion",
-                    new { url = nuevaUrl, tiposEvento = tiposElegidos.ToArray() }).AsTask(),
+                    new
+                    {
+                        cuentaComercialId = cuentaElegida,
+                        url = nuevaUrl,
+                        versionContrato,
+                        // Una suscripción v1 no recibe avisos de bulto: no se mandan.
+                        tiposEvento = tiposElegidos.Where(t => versionContrato >= 2 || !t.StartsWith("bulto.")).ToArray()
+                    }).AsTask(),
                 "No se pudo crear la suscripción."))
             {
                 nuevaUrl = "";
@@ -254,7 +297,13 @@ else
         string Url,
         string Secreto,
         List<string> TiposEvento,
-        bool Activa);
+        bool Activa,
+        int VersionContrato);
+
+    // La API serializa EstadoCuentaComercial como número: 1 = Confirmada.
+    private const int CuentaConfirmada = 1;
+
+    private sealed record CuentaItem(Guid Id, string OperadorNombre, bool Activa, int Estado);
 
     private sealed record ResultadoOperacion(bool Exito, string Mensaje);
 }

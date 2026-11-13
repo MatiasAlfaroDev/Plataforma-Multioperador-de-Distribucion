@@ -36,12 +36,16 @@ public class EnviosApi : IEnviosApi
         return hojas
             .SelectMany(h => h.Paradas.OrderBy(p => p.Orden))
             .Select(p => new EnvioItem(
-                p.EnvioId,
-                p.ReferenciaExterna,
+                p.IdParada,
+                // El retiro no tiene referencia del comercio: el servidor manda su Id; se muestra corto.
+                p.RetiroId is Guid retiroId && p.TipoOperacion == "Retiro"
+                    ? $"Retiro {retiroId.ToString()[..8].ToUpperInvariant()}"
+                    : p.ReferenciaExterna,
                 operadorId,
                 OperadorNombre: string.Empty,
                 ComercioNombre: string.Empty,
-                Modalidad: string.Empty,
+                // ponytail: el tipo de parada viaja en Modalidad para no cambiar la base local; las de entrega quedan vacías como antes.
+                Modalidad: p.TipoOperacion == "Entrega" ? string.Empty : p.TipoOperacion,
                 p.Estado,
                 p.Destinatario,
                 $"{p.Direccion}, {p.Localidad}",
@@ -51,6 +55,9 @@ public class EnviosApi : IEnviosApi
                 Bultos: p.DetalleBultos))
             .ToList();
     }
+
+    public async Task<CatalogoMotivos> ObtenerCatalogoAsync(CancellationToken ct = default) =>
+        await _http.GetFromJsonAsync<CatalogoMotivos>("api/motivos-no-entrega", JsonOptions, ct) ?? new(false, []);
 
     public async Task<IReadOnlyList<HojaDeRutaItem>> ListarMisHojasAsync(CancellationToken ct = default) =>
         await PedirMisHojasAsync(ct)
@@ -100,6 +107,22 @@ public class EnviosApi : IEnviosApi
     /// </summary>
     public async Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarEventoAsync(EventoPendiente evento, CancellationToken ct = default)
     {
+        // RF 40: los retiros van a su propio endpoint; EnvioId es el Id del retiro.
+        if (evento.Tipo is "Retirado" or "NoRetirado")
+        {
+            return await EnviarAsync($"api/retiros/{evento.EnvioId}/eventos-movil", new
+            {
+                retiroId = evento.EnvioId,
+                idEvento = evento.Id,
+                tipo = evento.Tipo,
+                fechaHora = evento.FechaHora,
+                idsBultos = evento.BultosEntregados,
+                referenciaFotografia = evento.ReferenciaFoto,
+                referenciaFirma = evento.ReferenciaFirma,
+                motivoFallo = evento.Motivo
+            }, ct);
+        }
+
         // La prueba de entrega va tanto en la entrega completa como en la parcial.
         var esEntrega = evento.Tipo is "Entregado" or "EntregadoParcialmente";
         var cuerpo = new
@@ -121,9 +144,14 @@ public class EnviosApi : IEnviosApi
             bultosNoEntregados = evento.BultosNoEntregados?.Select(b => new { bultoId = b.BultoId, motivo = b.Motivo, evidencia = b.Evidencia })
         };
 
+        return await EnviarAsync($"api/envios/{evento.EnvioId}/eventos-movil", cuerpo, ct);
+    }
+
+    private async Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarAsync(string ruta, object cuerpo, CancellationToken ct)
+    {
         try
         {
-            using var respuesta = await _http.PostAsJsonAsync($"api/envios/{evento.EnvioId}/eventos-movil", cuerpo, ct);
+            using var respuesta = await _http.PostAsJsonAsync(ruta, cuerpo, ct);
 
             // 2xx = guardado. 409 = el servidor ya tenía ese idEvento: también es éxito (idempotencia).
             if (respuesta.IsSuccessStatusCode || respuesta.StatusCode == HttpStatusCode.Conflict)

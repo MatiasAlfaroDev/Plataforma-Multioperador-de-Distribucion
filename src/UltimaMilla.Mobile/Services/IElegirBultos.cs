@@ -8,14 +8,14 @@ namespace UltimaMilla.Mobile.Services;
 public interface IElegirBultos
 {
     /// <summary>Null si el repartidor canceló.</summary>
-    Task<SeleccionBultos?> ElegirAsync(string referencia, IReadOnlyList<BultoItem> bultos);
+    Task<SeleccionBultos?> ElegirAsync(string referencia, IReadOnlyList<BultoItem> bultos, bool esRetiro = false);
 }
 
 public sealed class ElegirBultos(ILectorCodigos lector) : IElegirBultos
 {
-    public async Task<SeleccionBultos?> ElegirAsync(string referencia, IReadOnlyList<BultoItem> bultos)
+    public async Task<SeleccionBultos?> ElegirAsync(string referencia, IReadOnlyList<BultoItem> bultos, bool esRetiro = false)
     {
-        var pagina = new SeleccionBultosPage(new SeleccionBultosViewModel(referencia, bultos, lector));
+        var pagina = new SeleccionBultosPage(new SeleccionBultosViewModel(referencia, bultos, lector, esRetiro));
         await Shell.Current.Navigation.PushModalAsync(pagina);
         return await pagina.Resultado;
     }
