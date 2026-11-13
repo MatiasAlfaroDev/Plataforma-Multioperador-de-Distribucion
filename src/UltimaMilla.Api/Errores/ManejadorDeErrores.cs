@@ -78,6 +78,12 @@ public sealed class ManejadorDeErrores(
                 Title = exception.Message
             },
 
+            DbUpdateConcurrencyException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "El recurso fue modificado por otra operación. Recargá y reintentá."
+            },
+
             ArgumentException or InvalidOperationException => new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
