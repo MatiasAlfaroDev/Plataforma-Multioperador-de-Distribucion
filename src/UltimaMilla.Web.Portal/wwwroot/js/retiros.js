@@ -88,5 +88,18 @@ window.retirosPortal = {
         }
 
         return (await respuesta.json()).clave;
+    },
+        async obtenerClavePruebas() {
+        const respuesta = await fetch("/api/comercio/usuarios/clave-pruebas", {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        if (!respuesta.ok) {
+            throw new Error(await mensajeDeProblema(respuesta));
+        }
+
+        return (await respuesta.json()).clave;
     }
 };

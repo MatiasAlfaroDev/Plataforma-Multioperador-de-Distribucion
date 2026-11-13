@@ -50,7 +50,7 @@ public static class SeguridadWeb
         app.UseForwardedHeaders();
         app.Use((contexto, siguiente) =>
         {
-            AgregarCabeceras(contexto, esApi: true);
+            AgregarCabeceras(contexto, esApi: !contexto.Request.Path.StartsWithSegments("/docs"));
             return siguiente();
         });
         app.UseCors();
@@ -121,6 +121,9 @@ public static class SeguridadWeb
             return new CuotaDeTasa($"seguimiento:{ip}", opciones.SeguimientoPorMinuto);
 
         var usuario = contexto.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (usuario is not null && ClaveApiAuthenticationHandler.EsEntornoDePruebas(contexto))
+            return new CuotaDeTasa($"clave-pruebas:{usuario}", opciones.ClavePruebasPorMinuto);
 
         // Limitación diferenciada para la API pública: cada clave de comercio tiene su propio cupo.
         if (usuario is not null && contexto.User.Identity?.AuthenticationType == ClaveApiAuthenticationHandler.Esquema)
@@ -217,7 +220,10 @@ public sealed class OpcionesSeguridadWeb
 
     /// <summary>API pública: cada clave de comercio, por minuto. Es menor que el de un usuario porque son integraciones automáticas.</summary>
     public int ClaveApiPorMinuto { get; set; } = 120;
-
+    
+    /// <summary>API pública, clave del ambiente de pruebas: menor que la real, porque no guarda nada.</summary>
+    public int ClavePruebasPorMinuto { get; set; } = 30;
+    
     /// <summary>Orígenes de navegador que pueden llamar a la API desde otro dominio. Vacío: ninguno.</summary>
     public string[] OrigenesPermitidos { get; set; } = [];
 }

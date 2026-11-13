@@ -162,6 +162,30 @@ public static class PersonalEndpoints
             return Results.Ok(new { clave, encabezado = ClaveApiAuthenticationHandler.Encabezado });
         });
 
+        // Ambiente de pruebas de la API pública: la clave de pruebas se deriva de la clave real (no se guarda).
+        comercio.MapGet("/clave-pruebas", async (
+            ITenantContext tenant,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var comercioId = tenant.ComercioId ?? throw new UnauthorizedAccessException();
+            var usuarioId = tenant.UsuarioId ?? throw new UnauthorizedAccessException();
+
+            var vinculo = await db.UsuariosComercios
+                .AsNoTracking()
+                .FirstOrDefaultAsync(uc => uc.UsuarioId == usuarioId && uc.ComercioId == comercioId && uc.Activa, ct)
+                ?? throw new UnauthorizedAccessException();
+
+            if (string.IsNullOrEmpty(vinculo.ClaveApiHash))
+                throw new ConflictoException("Primero generá la clave de API real: la de pruebas depende de ella.");
+
+            return Results.Ok(new
+            {
+                clave = ClavesDePruebas.Generar(vinculo.Id, vinculo.ClaveApiHash),
+                encabezado = ClaveApiAuthenticationHandler.Encabezado
+            });
+        });
+
         return app;
     }
 

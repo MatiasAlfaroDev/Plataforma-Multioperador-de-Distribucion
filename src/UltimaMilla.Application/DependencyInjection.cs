@@ -81,6 +81,8 @@ public static class DependencyInjection
         services.AddScoped<ObtenerDetalleEnvioHandler>();
         services.AddScoped<RegistrarEventoMovilHandler>();
         services.AddScoped<RecibirEnDepositoHandler>();
+        services.AddScoped<ListarDiscrepanciasRecepcionHandler>();
+        services.AddScoped<ObtenerTableroEnVivoHandler>();
         services.AddScoped<RetornarADepositoHandler>();
         services.AddScoped<SolicitarReprogramacionHandler>();
         services.AddScoped<ConfirmarReprogramacionHandler>();

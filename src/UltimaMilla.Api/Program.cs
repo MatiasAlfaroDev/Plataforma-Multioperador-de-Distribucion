@@ -145,6 +145,7 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ManejadorDeErrores>();
 builder.Services.AddOpenApi();
+builder.Services.AddApiPublica();
 builder.Services.AddHealthChecks()
     .AddCheck<BaseDeDatosHealthCheck>("base-de-datos", tags: ["ready"])
     .AddCheck<DrenajeAlApagar>("apagado", tags: ["ready"]);
@@ -254,11 +255,13 @@ app.UseExceptionHandler();
 app.UseLimiteDeTasa();
 
 app.UseAuthentication();
+app.UseAislamientoDePruebas();
 app.UseLimitacionDeTasa();
 app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapOpenApi();  // contrato en /openapi/v1.json (Scalar se agrega con la API pública)
+app.MapApiPublicaV1();
 
 // Salud (RNF 6.13): /live = el proceso responde; /ready = además llega a la base; /health = todo.
 app.MapHealthChecks("/health");
@@ -691,16 +694,6 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
         return Results.Ok(resultado);
 })
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
-
-api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
-    async (
-        Guid envioId,
-        ListarDiscrepanciasRecepcionHandler handler,
-        CancellationToken ct) =>
-        Results.Ok(await handler.Handle(envioId, ct)))
-.RequireAuthorization(policy => policy.RequireRole(
-    Perfiles.AdministradorOperador,
-    Perfiles.Operador));
 
 api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
     async (
