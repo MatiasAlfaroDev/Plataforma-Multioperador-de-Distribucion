@@ -62,6 +62,7 @@ using UltimaMilla.Application.Retiros.Queries;
 using UltimaMilla.Application.Rutas.Commands.AgregarRetiroARuta;
 using UltimaMilla.Application.Retiros.Commands.GestionarRetiro;
 using UltimaMilla.Application.Retiros.Commands.CancelarRetiro;
+using UltimaMilla.Application.Notificaciones.Commands.AvisarAsignacion;
 using UltimaMilla.Application.Rutas.Commands.QuitarRetiroDeRuta;
 using UltimaMilla.Application.Retiros.Commands.RegistrarEventoRetiro;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResumenRetiros;
@@ -125,6 +126,7 @@ public static class DependencyInjection
         services.AddScoped<AgregarRetiroARutaHandler>();
         services.AddScoped<GestionarRetiroHandler>();
         services.AddScoped<CancelarRetiroHandler>();
+        services.AddScoped<AvisarAsignacionHandler>();
         services.AddScoped<QuitarRetiroDeRutaHandler>();
         services.AddScoped<RegistrarEventoRetiroHandler>();
         services.AddScoped<ObtenerResumenRetirosHandler>();
