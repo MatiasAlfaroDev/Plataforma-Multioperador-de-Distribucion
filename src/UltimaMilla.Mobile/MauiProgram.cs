@@ -106,6 +106,8 @@ public static class MauiProgram
         builder.Services.AddTransient<EnviosPage>();
         builder.Services.AddTransient<CargaVehiculoViewModel>();
         builder.Services.AddTransient<CargaVehiculoPage>();
+        builder.Services.AddTransient<RendicionViewModel>();
+        builder.Services.AddTransient<RendicionPage>();
 
 #if ANDROID
         // Rediseño: cada Entry va dentro de una caja redondeada (estilo "Campo"), así que se saca

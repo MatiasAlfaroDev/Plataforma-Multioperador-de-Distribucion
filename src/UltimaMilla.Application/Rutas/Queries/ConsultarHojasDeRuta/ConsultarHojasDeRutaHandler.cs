@@ -79,7 +79,8 @@ public sealed record HojaDeRutaDto(
     int CantidadParadas,
     decimal PesoAsignadoKg,
     bool Despachada,
-    bool Rendida = false);
+    bool Rendida = false,
+    bool PendienteDeControl = false);
 
 public sealed class ConsultarHojasDeRutaHandler(
     IRepartidorRepository repartidores,
@@ -425,7 +426,8 @@ public sealed class ConsultarHojasDeRutaHandler(
                 x.Paradas.Count(p => p.Activa),
                 x.PesoAsignadoKg,
                 x.Estado != EstadoHojaDeRuta.EnPreparacion,
-                x.Estado == EstadoHojaDeRuta.Rendida))
+                x.Estado == EstadoHojaDeRuta.Rendida,
+                x.Estado == EstadoHojaDeRuta.PendienteDeControl))
             .ToList();
     }
 }

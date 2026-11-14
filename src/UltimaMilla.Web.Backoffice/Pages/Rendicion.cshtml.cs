@@ -45,7 +45,7 @@ public sealed class RendicionModel(HojasDeRutaApiClient api) : PageModel
             var resultado = await api.RendirAsync(HojaId, codigos, Responsable ?? string.Empty, ct);
 
             TempData["Exito"] =
-                $"Hoja rendida. {resultado.EnviosRetornados} envío(s) volvieron al depósito y " +
+                $"Rendición controlada y hoja cerrada. {resultado.EnviosRetornados} envío(s) volvieron al depósito y " +
                 $"{resultado.RetirosRecibidos} retiro(s) quedaron en depósito.";
 
             return RedirectToPage("/HojasDeRuta");

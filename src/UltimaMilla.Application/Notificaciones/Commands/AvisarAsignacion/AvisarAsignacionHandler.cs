@@ -1,10 +1,13 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Seguridad;
 
+using UltimaMilla.Domain.Rutas;
+
 namespace UltimaMilla.Application.Notificaciones.Commands.AvisarAsignacion;
 
 /// <param name="EnvioId">El envío que se acaba de asignar a una hoja de ruta.</param>
-public sealed record AvisarAsignacionCommand(Guid EnvioId);
+/// <param name="AsignadoEn">Cuándo se asignó (viene en el evento): si fue antes del despacho, no es urgente.</param>
+public sealed record AvisarAsignacionCommand(Guid EnvioId, DateTimeOffset? AsignadoEn = null);
 
 /// <summary>Cuántos teléfonos del repartidor recibieron el aviso.</summary>
 public sealed record ResultadoAvisoAsignacion(int Dispositivos, int Enviadas, int TokensEliminados);
@@ -38,6 +41,15 @@ public sealed class AvisarAsignacionHandler(
         if (hoja is null)
             return sinAviso;
 
+        // El push es para la reasignación urgente (letra 6.11): un envío que se suma a una hoja que ya salió.
+        // Una hoja en preparación todavía no le llega al repartidor (RF 17): la ve completa cuando se despacha.
+        if (hoja.Estado != EstadoHojaDeRuta.Despachada)
+            return sinAviso;
+
+        // El mensaje de una asignación hecha antes del despacho puede procesarse después: tampoco es urgente.
+        if (command.AsignadoEn is { } asignadoEn && hoja.DespachadaEn is { } despachadaEn && asignadoEn < despachadaEn)
+            return sinAviso;
+
         var repartidor = await repartidores.ObtenerAsync(operadorId, hoja.RepartidorId, ct);
         if (repartidor?.UsuarioId is not Guid usuarioId)
             return sinAviso; // repartidor sin usuario de la app: no tiene teléfono donde avisarle
@@ -48,11 +60,11 @@ public sealed class AvisarAsignacionHandler(
 
         var envio = await envios.ObtenerAsync(command.EnvioId, ct);
         var detalle = envio is null
-            ? "Actualizá tu ruta en la app."
-            : $"{envio.ReferenciaExterna} · {envio.Direccion.Calle} {envio.Direccion.Numero}, {envio.Direccion.Localidad}. Actualizá tu ruta.";
+            ? "Pasá por el depósito a buscarlo y actualizá tu ruta en la app."
+            : $"{envio.ReferenciaExterna} · {envio.Direccion.Calle} {envio.Direccion.Numero}, {envio.Direccion.Localidad}. Pasá por el depósito a buscarlo y actualizá tu ruta.";
 
         var notificacion = new NotificacionPush(
-            "Nuevo envío en tu ruta",
+            "Envío urgente en tu ruta",
             detalle,
             new Dictionary<string, string>
             {

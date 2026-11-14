@@ -168,7 +168,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             Operador = elegido;
             CargarCommand.Execute(null);
         }
-        // Vuelta desde "Cargar vehículo" después de despachar: los envíos pasaron a En tránsito.
+        // Vuelta desde "Cargar vehículo" o "Rendir": se vuelve a bajar la ruta.
         else if (query.ContainsKey("recargar"))
         {
             CargarCommand.Execute(null);
@@ -260,9 +260,13 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         }
     }
 
-    /// <summary>Abre la pantalla de carga del vehículo (escaneo de bultos y despacho, RF 19).</summary>
+    /// <summary>Abre la pantalla de carga del vehículo (escaneo y verificación de bultos, RF 19).</summary>
     [RelayCommand]
     private Task IrACargaAsync() => Shell.Current.GoToAsync("carga");
+
+    /// <summary>Abre la rendición al volver al depósito (RF 22).</summary>
+    [RelayCommand]
+    private Task IrARendicionAsync() => Shell.Current.GoToAsync("rendicion");
 
     /// <summary>Resultado de la pantalla de bultos para la entrega: completa, parcial o cancelada.</summary>
     private sealed record ResultadoBultos(
@@ -276,22 +280,31 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     {
         var bultos = await _ruta.ListarBultosAsync(envio.Id);
 
-        // Aclaración 3.2: si la entrega parcial no está habilitada, la entrega es completa o no es.
-        if (bultos.Count <= 1 || !AdmiteEntregaParcial)
+        // Sin el detalle de bultos (ruta bajada con un perfil que no es repartidor) se registra el envío completo.
+        if (bultos.Count == 0)
             return ResultadoBultos.Completa;
 
+        // RF 32: en cada parada se escanean los bultos que se entregan, sean uno o varios.
         var seleccion = await _elegirBultos.ElegirAsync(envio.ReferenciaExterna, bultos);
         if (seleccion is null)
             return ResultadoBultos.Cancelada;
 
         if (seleccion.Entregados.Count == 0)
         {
-            await _dialogos.AvisarAsync("Entrega", "No marcaste ningún bulto. Si no se entrega nada, usá «No entregado».");
+            await _dialogos.AvisarAsync("Entrega", "No escaneaste ningún bulto. Si no se entrega nada, usá «No entregado».");
             return ResultadoBultos.Cancelada;
         }
 
         if (seleccion.NoEntregados.Count == 0)
             return ResultadoBultos.Completa;
+
+        // RF 33 y aclaración 3.2: si el operador no admite la entrega parcial, se entrega todo o nada.
+        if (!AdmiteEntregaParcial)
+        {
+            await _dialogos.AvisarAsync("Entrega",
+                "Este operador no admite entregas parciales: escaneá todos los bultos o registrá «No entregado».");
+            return ResultadoBultos.Cancelada;
+        }
 
         // Una foto de evidencia para los bultos que quedan (por ejemplo, el bulto rechazado o dañado).
         var evidencia = await _captura.SacarFotoAsync(Guid.NewGuid());
@@ -331,8 +344,8 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             return;
         }
 
-        // Entrega parcial (RF 32): si el envío tiene más de un bulto pendiente, se escanean los que se entregan.
-        // Para los que no, se elige un motivo del catálogo y se saca una foto de evidencia.
+        // RF 32: se escanean los bultos que se entregan. Si quedan bultos sin entregar (entrega parcial),
+        // para cada uno se elige un motivo del catálogo y se saca una foto de evidencia.
         var seleccion = await ElegirBultosAsync(envio);
         if (seleccion is { Cancelado: true })
             return;

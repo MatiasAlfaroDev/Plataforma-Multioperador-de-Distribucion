@@ -3,6 +3,7 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Envios;
+using UltimaMilla.Domain.Retiros;
 using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
@@ -40,12 +41,16 @@ public sealed class ObtenerMisHojasDeRutaHandler(
 
         var resultado = new List<MiHojaDeRutaDto>();
 
-        foreach (var hoja in delDia)
+        // RF 17: la hoja llega a la app recién cuando el despachador la despacha desde el Backoffice.
+        // Una hoja en preparación todavía puede cambiar: el repartidor no la ve.
+        foreach (var hoja in delDia.Where(h => h.Estado != EstadoHojaDeRuta.EnPreparacion))
         {
             var paradas = new List<MiParadaDto>();
 
+            // Las paradas activas y las que se resolvieron después del despacho (RF 22: lo que se entregó en
+            // parte o no se entregó sigue a cargo del repartidor hasta rendir). Las quitadas antes del despacho no.
             foreach (var parada in hoja.Paradas
-                .Where(p => p.Activa)
+                .Where(p => p.Activa || (hoja.DespachadaEn is { } despachadaEn && p.LiberadaEn >= despachadaEn))
                 .OrderBy(p => p.Orden))
             {
                 switch (parada.TipoOperacion)
@@ -69,13 +74,24 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                             parada.TipoOperacion ==
                             TipoOperacionRuta.DevolucionComercio;
 
-                        var bultos = envio.Bultos
-                            .Where(b => b.Estado ==
-                                (esDevolucion
-                                    ? EstadoBulto.EnDevolucion
-                                    : EstadoBulto.Pendiente))
-                            .OrderBy(b => b.Identificacion)
-                            .ToList();
+                        // Una parada resuelta se muestra solo con el resultado de la visita.
+                        if (!parada.Activa &&
+                            (esDevolucion || envio.Estado is not (EstadoEnvio.Entregado
+                                or EstadoEnvio.EntregadoParcialmente or EstadoEnvio.NoEntregado)))
+                        {
+                            break;
+                        }
+
+                        // Resuelta: no queda nada que cargar ni escanear en la parada.
+                        List<Bulto> bultos = parada.Activa
+                            ? envio.Bultos
+                                .Where(b => b.Estado ==
+                                    (esDevolucion
+                                        ? EstadoBulto.EnDevolucion
+                                        : EstadoBulto.Pendiente))
+                                .OrderBy(b => b.Identificacion)
+                                .ToList()
+                            : [];
 
                         var direccion = envio.Direccion;
                         var nombre = envio.Destinatario.Nombre;
@@ -113,7 +129,8 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                             bultos.Select(b => new MiBultoDto(
                                 b.Id,
                                 b.Identificacion)).ToList(),
-                            TipoOperacion: parada.TipoOperacion.ToString()));
+                            TipoOperacion: parada.TipoOperacion.ToString(),
+                            Activa: parada.Activa));
 
                         break;
                     }
@@ -135,6 +152,12 @@ public sealed class ObtenerMisHojasDeRutaHandler(
 
                         var esRecogida =
                             parada.TipoOperacion == TipoOperacionRuta.Retiro;
+
+                        if (!parada.Activa &&
+                            (!esRecogida || retiro.Estado is not (EstadoRetiro.Retirado or EstadoRetiro.NoRetirado)))
+                        {
+                            break;
+                        }
 
                         if (esRecogida && retiro.HojaDeRutaId != hoja.Id)
                             throw new InvalidOperationException(
@@ -164,7 +187,8 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                                 .Select(b => new MiBultoDto(b.Id, b.Identificacion))
                                 .ToList(),
                             RetiroId: retiro.Id,
-                            TipoOperacion: parada.TipoOperacion.ToString()));
+                            TipoOperacion: parada.TipoOperacion.ToString(),
+                            Activa: parada.Activa));
 
                         break;
                     }
@@ -180,7 +204,8 @@ public sealed class ObtenerMisHojasDeRutaHandler(
                 hoja.Fecha,
                 hoja.HoraSalida,
                 repartidor.Nombre,
-                paradas));
+                paradas,
+                hoja.Estado.ToString()));
         }
 
         return resultado;

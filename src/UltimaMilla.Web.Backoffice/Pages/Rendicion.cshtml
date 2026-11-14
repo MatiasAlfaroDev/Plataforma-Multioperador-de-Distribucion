@@ -2,13 +2,13 @@
 @model UltimaMilla.Web.Backoffice.Pages.RendicionModel
 
 @{
-    ViewData["Title"] = "Rendición de hoja de ruta";
+    ViewData["Title"] = "Control de rendición";
 }
 
 <div class="encabezado">
     <div>
-        <h1>Rendición al regresar al depósito</h1>
-        <p>Escaneá lo que trae el repartidor: los bultos que no se entregaron y los que retiró en domicilios. Si coincide con la hoja, la hoja se cierra.</p>
+        <h1>Control de rendición</h1>
+        <p>El repartidor ya rindió desde la app. Escaneá lo que recibís: los bultos que no se entregaron y los que retiró en domicilios. Si coincide con la hoja, quedan en el depósito y la hoja se cierra.</p>
     </div>
 </div>
 
@@ -25,7 +25,11 @@
 {
     @if (rendicion.Estado == "Rendida")
     {
-        <div class="aviso ok">Esta hoja ya fue rendida.</div>
+        <div class="aviso ok">La rendición de esta hoja ya fue controlada: la hoja está cerrada.</div>
+    }
+    else if (rendicion.Estado != "PendienteDeControl")
+    {
+        <div class="aviso">El repartidor todavía no rindió esta hoja desde la app. El control se hace después de su rendición.</div>
     }
     else
     {
@@ -41,7 +45,7 @@
 
         @if (rendicion.Retornos.Count == 0)
         {
-            <p>No vuelve nada: todo se entregó. Igual hay que rendir para cerrar la hoja.</p>
+            <p>No vuelve nada: todo se entregó. Igual hay que confirmar el control para cerrar la hoja.</p>
         }
         else
         {
@@ -75,7 +79,7 @@
             <div>
                 <label asp-for="Escaneados">Bultos escaneados</label>
                 <textarea asp-for="Escaneados" rows="6" placeholder="Un código por línea"></textarea>
-                <p class="nota">Si falta algún bulto y se perdió, declarar el extravío del envío desde su detalle y volver a rendir.</p>
+                <p class="nota">Si falta algún bulto y se perdió, declarar el extravío del envío desde su detalle y volver a controlar.</p>
             </div>
 
             <div>
@@ -86,7 +90,7 @@
             <div class="acciones">
                 <a asp-page="/HojasDeRuta">Cancelar</a>
                 <button type="submit" class="btn-primario" disabled="@(rendicion.ParadasSinResultado.Count > 0)">
-                    Rendir y cerrar la hoja
+                    Confirmar control y cerrar la hoja
                 </button>
             </div>
         </form>

@@ -14,8 +14,23 @@ public sealed class RetornarADepositoHandler(
     TimeProvider reloj,
     ITenantContext tenantContext)
 {
-    public async Task Handle(
+    public Task Handle(
         RetornarADepositoCommand command,
+        CancellationToken ct) =>
+        HandleAsync(command, exigirPerfilDeposito: true, ct);
+
+    /// <summary>
+    /// El retorno como parte de la rendición de una hoja (RF 22). Quien llama ya verificó quién rinde: el depósito
+    /// desde el Backoffice o el repartidor dueño de la hoja desde la app. Solo se usa dentro de Application.
+    /// </summary>
+    internal Task HandleDesdeRendicionAsync(
+        RetornarADepositoCommand command,
+        CancellationToken ct) =>
+        HandleAsync(command, exigirPerfilDeposito: false, ct);
+
+    private async Task HandleAsync(
+        RetornarADepositoCommand command,
+        bool exigirPerfilDeposito,
         CancellationToken ct)
     {
         if (command.EnvioId == Guid.Empty)
@@ -70,7 +85,7 @@ public sealed class RetornarADepositoHandler(
                 "Debe iniciar sesión y seleccionar un operador.");
         }
 
-        if (!Perfiles.Deposito.Contains(tenantContext.Perfil))
+        if (exigirPerfilDeposito && !Perfiles.Deposito.Contains(tenantContext.Perfil))
         {
             throw new UnauthorizedAccessException(
                 "No tiene permisos para registrar retornos al depósito.");

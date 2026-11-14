@@ -8,7 +8,7 @@
              x:DataType="vm:CargaVehiculoViewModel"
              Title="Cargar vehículo">
 
-    <!-- Fila 0: la lista (con su cabecera). Fila 1: el botón Despachar, siempre visible abajo. -->
+    <!-- Fila 0: la lista (con su cabecera). Fila 1: el botón Confirmar carga, siempre visible abajo. -->
     <Grid RowDefinitions="*,Auto">
 
         <!-- En el celular ocupa todo el ancho; en tablet o Windows queda centrada -->
@@ -32,7 +32,7 @@
                     </Border>
 
                     <!-- 1. Elegir la hoja de ruta de hoy -->
-                    <Label Text="Tus hojas de ruta de hoy" Style="{StaticResource Seccion}" />
+                    <Label Text="Tus hojas de ruta despachadas de hoy" Style="{StaticResource Seccion}" />
                     <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding Hojas}">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="models:HojaDeRutaItem">
@@ -84,7 +84,7 @@
 
                             <!-- Con la cámara del celular (o una imagen guardada, para probar en el emulador) -->
                             <Grid ColumnDefinitions="2*,*" ColumnSpacing="10" IsVisible="{Binding HayLectorCamara}">
-                                <Button Text="Escanear con la cámara" Style="{StaticResource BotonPrimario}"
+                                <Button Text="Escanear" Style="{StaticResource BotonPrimario}"
                                         Command="{Binding EscanearCommand}" ContentLayout="Left,8">
                                     <Button.ImageSource>
                                         <FontImageSource FontFamily="Iconos" Glyph="{x:Static app:Iconos.Camara}" Size="18"
@@ -221,7 +221,7 @@
             </CollectionView.Footer>
         </CollectionView>
 
-        <!-- ===== Despachar: barra fija abajo; se habilita solo con la carga completa ===== -->
+        <!-- ===== Confirmar carga: barra fija abajo; se habilita solo con la carga completa (RF 19) ===== -->
         <Border Grid.Row="1" StrokeThickness="0" IsVisible="{Binding HayHojaElegida}">
             <VerticalStackLayout Spacing="0">
                 <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Borde}, Dark={StaticResource BordeOscuro}}" />
@@ -231,9 +231,9 @@
                                          WidthRequest="{OnIdiom Phone=-1, Default=680}"
                                          HorizontalOptions="{OnIdiom Phone=Fill, Default=Center}">
                         <Label HorizontalTextAlignment="Center" Style="{StaticResource Secundario}"
-                               Text="{Binding TextoDespacho}" />
-                        <Button Text="Despachar ruta" Style="{StaticResource BotonPrimario}"
-                                Command="{Binding DespacharCommand}" ContentLayout="Left,8">
+                               Text="{Binding TextoCarga}" />
+                        <Button Text="Confirmar carga y salir" Style="{StaticResource BotonPrimario}"
+                                Command="{Binding ConfirmarCargaCommand}" ContentLayout="Left,8">
                             <Button.ImageSource>
                                 <FontImageSource FontFamily="Iconos" Glyph="{x:Static app:Iconos.Camion}" Size="18"
                                                 Color="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource PrimaryDarkText}}" />

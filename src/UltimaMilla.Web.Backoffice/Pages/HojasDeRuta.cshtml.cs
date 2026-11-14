@@ -167,6 +167,49 @@ public sealed class HojasDeRutaModel(
     }
 }
 
+    /// <summary>
+    /// Reasignación urgente (letra 6.11): suma un envío del depósito a una hoja ya despachada.
+    /// Si el envío no tiene franja comprometida, se usa la elegida.
+    /// </summary>
+    public async Task<IActionResult> OnPostAgregarUrgenteAsync(
+        Guid hojaId,
+        Guid envioUrgenteId,
+        string? franjaUrgente,
+        CancellationToken ct)
+    {
+        if (hojaId == Guid.Empty || envioUrgenteId == Guid.Empty)
+        {
+            Error = "Elegí el envío que querés sumar a la hoja.";
+            await CargarAsync(ct);
+            return Page();
+        }
+
+        if (!IntentarObtenerFranja(franjaUrgente, out var desde, out var hasta))
+        {
+            Error = "Elegí una franja horaria para el envío urgente.";
+            await CargarAsync(ct);
+            return Page();
+        }
+
+        try
+        {
+            await api.AgregarEnvioUrgenteAsync(hojaId, envioUrgenteId, desde, hasta, ct);
+
+            TempData["Exito"] =
+                "Envío agregado a la hoja despachada. El repartidor recibe un aviso en el teléfono y lo levanta del depósito.";
+
+            return RedirectToPage("/HojasDeRuta");
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException ||
+            ex is InvalidOperationException)
+        {
+            Error = ex.Message;
+            await CargarAsync(ct);
+            return Page();
+        }
+    }
+
    private async Task CargarAsync(CancellationToken ct)
 {
     try

@@ -64,8 +64,8 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
             var upsert = conexion.CreateCommand();
             upsert.Transaction = tx;
             upsert.CommandText = """
-                INSERT INTO envios_ruta (id, operador_id, referencia, destinatario, direccion, comercio, modalidad, bultos, estado_servidor)
-                VALUES ($id, $op, $ref, $dest, $dir, $com, $mod, $bultos, $estado)
+                INSERT INTO envios_ruta (id, operador_id, referencia, destinatario, direccion, comercio, modalidad, bultos, estado_servidor, resultado_local)
+                VALUES ($id, $op, $ref, $dest, $dir, $com, $mod, $bultos, $estado, $resultado)
                 ON CONFLICT(id) DO UPDATE SET
                     referencia = excluded.referencia,
                     destinatario = excluded.destinatario,
@@ -73,7 +73,9 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
                     comercio = excluded.comercio,
                     modalidad = excluded.modalidad,
                     bultos = excluded.bultos,
-                    estado_servidor = excluded.estado_servidor
+                    estado_servidor = excluded.estado_servidor,
+                    -- Lo registrado en el teléfono manda; si no hay nada, se toma el resultado que ya tiene el servidor.
+                    resultado_local = COALESCE(envios_ruta.resultado_local, excluded.resultado_local)
                 """;
             upsert.Parameters.AddWithValue("$id", e.Id.ToString());
             upsert.Parameters.AddWithValue("$op", operadorId.ToString());
@@ -84,6 +86,7 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
             upsert.Parameters.AddWithValue("$mod", e.Modalidad);
             upsert.Parameters.AddWithValue("$bultos", e.CantidadBultos);
             upsert.Parameters.AddWithValue("$estado", e.Estado);
+            upsert.Parameters.AddWithValue("$resultado", (object?)e.ResultadoServidor ?? DBNull.Value);
             await upsert.ExecuteNonQueryAsync();
 
             // Bultos pendientes del envío (RF 32). Si la API no los mandó, se dejan los que había.

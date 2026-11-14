@@ -358,14 +358,54 @@
                                         Rendida
                                     </span>
                                 }
+                                else if (hoja.PendienteDeControl)
+                                {
+                                    @* RF 22: el repartidor ya rindió desde la app; el depósito controla y cierra. *@
+                                    <span class="estado-despachada">
+                                        Rendida por el repartidor
+                                    </span>
+                                    <a asp-page="/Rendicion" asp-route-hojaId="@hoja.Id" class="btn-primario">
+                                        Controlar rendición
+                                    </a>
+                                }
                                 else if (hoja.Despachada)
                                 {
                                     <span class="estado-despachada">
                                         Despachada
                                     </span>
-                                    <a asp-page="/Rendicion" asp-route-hojaId="@hoja.Id" class="btn-primario">
-                                        Rendir
-                                    </a>
+                                    <span class="nota">En ruta: el repartidor rinde desde la app al volver.</span>
+
+                                    @* Reasignación urgente (letra 6.11): un envío del depósito se suma a la hoja que ya salió. *@
+                                    @if (Model.Envios.Count > 0)
+                                    {
+                                        <form method="post"
+                                              asp-page-handler="AgregarUrgente"
+                                              asp-route-hojaId="@hoja.Id"
+                                              class="mt-1.5 flex flex-wrap items-center gap-2">
+
+                                            @Html.AntiForgeryToken()
+
+                                            <select name="envioUrgenteId" aria-label="Envío urgente">
+                                                <option value="">Envío urgente…</option>
+                                                @foreach (var envio in Model.Envios)
+                                                {
+                                                    <option value="@envio.Id">@envio.ReferenciaExterna (@envio.Localidad)</option>
+                                                }
+                                            </select>
+
+                                            <select name="franjaUrgente" aria-label="Franja">
+                                                @foreach (var franja in Model.Franjas)
+                                                {
+                                                    var valor = $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
+                                                    <option value="@valor">@franja.HoraDesde.ToString("HH:mm") - @franja.HoraHasta.ToString("HH:mm")</option>
+                                                }
+                                            </select>
+
+                                            <button type="submit" class="btn-secundario">
+                                                Agregar urgente
+                                            </button>
+                                        </form>
+                                    }
                                 }
                                 else
                                 {

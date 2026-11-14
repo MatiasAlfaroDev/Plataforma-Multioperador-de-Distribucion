@@ -2,9 +2,10 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Notificaciones.Commands.AvisarAsignacion;
 using UltimaMilla.Application.Rutas;
+using UltimaMilla.Application.Rutas.Commands.AgregarEnvioUrgente;
 using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
-using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
+using UltimaMilla.Application.Rutas.Queries.VerificarMiCarga;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
@@ -15,7 +16,7 @@ using UltimaMilla.Domain.Retiros;
 
 namespace UltimaMilla.UnitTests;
 
-/// <summary>Repartidor vinculado a un usuario, descarga de su hoja de ruta y despacho con verificación de carga (RF 17–19).</summary>
+/// <summary>Repartidor vinculado a un usuario, descarga de su hoja despachada y verificación de la carga del vehículo (RF 17–19).</summary>
 public class MisHojasDeRutaTests
 {
     private static readonly DateTimeOffset Alta = new(2026, 10, 28, 12, 0, 0, TimeSpan.Zero);
@@ -33,7 +34,9 @@ public class MisHojasDeRutaTests
     private readonly SesionFalsa _sesion;
     private readonly UnidadDeTrabajoEnMemoria _unidad = new();
     private readonly ObtenerMisHojasDeRutaHandler _handler;
-    private readonly DespacharMiHojaDeRutaHandler _despachar;
+    private readonly DespacharHojaDeRutaHandler _despacho;
+    private readonly VerificarMiCargaHandler _verificar;
+    private readonly AgregarEnvioUrgenteHandler _urgente;
 
     public MisHojasDeRutaTests()
     {
@@ -61,19 +64,30 @@ public class MisHojasDeRutaTests
             new CuentasEnMemoria(),
             _sesion);
 
-        _despachar = new DespacharMiHojaDeRutaHandler(
+        // RF 17: despacha el despachador desde el Backoffice.
+        _despacho = new DespacharHojaDeRutaHandler(
+            new HojasEnMemoria(_hojas),
+            new EnviosEnMemoria(_envios),
+            new RetirosEnMemoria(new List<Retiro>()),
+            new ReglasEnMemoria(_reglas),
+            _unidad,
+            new RelojFijo(Alta.AddHours(1)));
+
+        // RF 19: el repartidor verifica la carga en la app.
+        _verificar = new VerificarMiCargaHandler(
             new RepartidoresEnMemoria(_repartidores),
             new HojasEnMemoria(_hojas),
             new EnviosEnMemoria(_envios),
             new RetirosEnMemoria(new List<Retiro>()),
-            _sesion,
-            new DespacharHojaDeRutaHandler(
-                new HojasEnMemoria(_hojas),
-                new EnviosEnMemoria(_envios),
-                new RetirosEnMemoria(new List<Retiro>()),
-                new ReglasEnMemoria(_reglas),
-                _unidad,
-                new RelojFijo(Alta.AddHours(1))));
+            _sesion);
+
+        // Letra 6.11: reasignación urgente a una hoja que ya salió.
+        _urgente = new AgregarEnvioUrgenteHandler(
+            new HojasEnMemoria(_hojas),
+            new EnviosEnMemoria(_envios),
+            new ReglasEnMemoria(_reglas),
+            _unidad,
+            new RelojFijo(Alta.AddHours(2)));
     }
 
     // ----- Dominio: vínculo repartidor ↔ usuario -----
@@ -112,10 +126,12 @@ public class MisHojasDeRutaTests
         var hoja = CrearHoja(Hoy);
         var primero = AgregarEnvio(hoja, "PED-001", bultos: 2);
         AgregarEnvio(hoja, "PED-002", bultos: 1);
+        await DespacharAsync(hoja);
 
         var resultado = await _handler.Handle(new ObtenerMisHojasDeRutaQuery(Hoy), CancellationToken.None);
 
         var mia = Assert.Single(resultado);
+        Assert.Equal("Despachada", mia.Estado);
         Assert.Equal("Ana Repartidora", mia.Repartidor);
         Assert.Equal(new[] { "PED-001", "PED-002" }, mia.Paradas.Select(p => p.ReferenciaExterna));
         Assert.Equal(primero.Bultos.Select(b => b.Identificacion).OrderBy(i => i), mia.Paradas[0].Bultos);
@@ -124,6 +140,37 @@ public class MisHojasDeRutaTests
         Assert.Equal(
             primero.Bultos.OrderBy(b => b.Identificacion).Select(b => b.Id),
             mia.Paradas[0].DetalleBultos.Select(b => b.Id));
+    }
+
+    [Fact]
+    public async Task Una_parada_resuelta_en_la_jornada_sigue_llegando_hasta_rendir_sin_bultos_para_cargar()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-001", bultos: 2);
+        await DespacharAsync(hoja);
+
+        var motivo = MotivoNoEntrega.Crear(_operadorId, _reglas.Id, "AUSENTE", "Destinatario ausente", false);
+        envio.Aplicar(DisparadorEnvio.RegistrarIntentoFallido, _reglas, Alta.AddHours(3), "Mobile", "Repartidor",
+            motivoNoEntrega: motivo, evidenciaFallo: "foto-intento");
+        hoja.FinalizarParada(envio, Alta.AddHours(3));
+
+        var resultado = await _handler.Handle(new ObtenerMisHojasDeRutaQuery(Hoy), CancellationToken.None);
+
+        var parada = Assert.Single(Assert.Single(resultado).Paradas);
+        Assert.False(parada.Activa);
+        Assert.Equal("NoEntregado", parada.Estado);
+        Assert.Empty(parada.Bultos);
+    }
+
+    [Fact]
+    public async Task No_devuelve_una_hoja_que_el_despachador_todavia_no_despacho()
+    {
+        var hoja = CrearHoja(Hoy);
+        AgregarEnvio(hoja, "PED-001", bultos: 1);
+
+        var resultado = await _handler.Handle(new ObtenerMisHojasDeRutaQuery(Hoy), CancellationToken.None);
+
+        Assert.Empty(resultado);
     }
 
     [Fact]
@@ -175,61 +222,110 @@ public class MisHojasDeRutaTests
         Assert.False(resultado.Completa);
     }
 
-    // ----- Despacho desde la app -----
+    // ----- Verificación de la carga en la app (RF 19), con la hoja ya despachada (RF 17) -----
 
     [Fact]
-    public async Task Con_todos_los_bultos_escaneados_despacha_y_quedan_en_transito()
+    public async Task Con_todos_los_bultos_escaneados_la_carga_esta_completa_y_no_cambia_estados()
     {
         var hoja = CrearHoja(Hoy);
         var envio = AgregarEnvio(hoja, "PED-001", bultos: 2);
+        await DespacharAsync(hoja);
+        var guardadosAntes = _unidad.Guardados;
 
-        var cantidad = await _despachar.Handle(
-            new DespacharMiHojaDeRutaCommand(hoja.Id, ["PED-001-1", "PED-001-2"]),
+        var resultado = await _verificar.Handle(
+            new VerificarMiCargaQuery(hoja.Id, ["PED-001-1", "PED-001-2"]),
             CancellationToken.None);
 
-        Assert.Equal(1, cantidad);
+        Assert.True(resultado.Completa);
         Assert.Equal(EstadoEnvio.EnTransito, envio.Estado);
-        Assert.Equal(1, _unidad.Guardados);
+        Assert.Equal(guardadosAntes, _unidad.Guardados);
     }
 
     [Fact]
-    public async Task Si_falta_un_bulto_no_despacha_y_dice_cual()
+    public async Task Si_falta_un_bulto_avisa_cual()
     {
         var hoja = CrearHoja(Hoy);
-        var envio = AgregarEnvio(hoja, "PED-001", bultos: 2);
+        AgregarEnvio(hoja, "PED-001", bultos: 2);
+        await DespacharAsync(hoja);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _despachar.Handle(new DespacharMiHojaDeRutaCommand(hoja.Id, ["PED-001-1"]), CancellationToken.None));
+        var resultado = await _verificar.Handle(new VerificarMiCargaQuery(hoja.Id, ["PED-001-1"]), CancellationToken.None);
 
-        Assert.Contains("faltan PED-001-2", ex.Message);
-        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
-        Assert.Equal(0, _unidad.Guardados);
+        Assert.False(resultado.Completa);
+        Assert.Equal(new[] { "PED-001-2" }, resultado.Faltantes);
     }
 
     [Fact]
-    public async Task Si_sobra_un_bulto_no_despacha_y_dice_cual()
+    public async Task Si_sobra_un_bulto_avisa_cual()
     {
         var hoja = CrearHoja(Hoy);
-        var envio = AgregarEnvio(hoja, "PED-001", bultos: 1);
+        AgregarEnvio(hoja, "PED-001", bultos: 1);
+        await DespacharAsync(hoja);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _despachar.Handle(new DespacharMiHojaDeRutaCommand(hoja.Id, ["PED-001-1", "PED-999-1"]), CancellationToken.None));
+        var resultado = await _verificar.Handle(
+            new VerificarMiCargaQuery(hoja.Id, ["PED-001-1", "PED-999-1"]),
+            CancellationToken.None);
 
-        Assert.Contains("sobran PED-999-1", ex.Message);
-        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
+        Assert.False(resultado.Completa);
+        Assert.Equal(new[] { "PED-999-1" }, resultado.Sobrantes);
     }
 
     [Fact]
-    public async Task No_se_puede_despachar_la_hoja_de_otro_repartidor()
+    public async Task No_se_verifica_la_carga_de_una_hoja_sin_despachar()
+    {
+        var hoja = CrearHoja(Hoy);
+        AgregarEnvio(hoja, "PED-001", bultos: 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _verificar.Handle(new VerificarMiCargaQuery(hoja.Id, ["PED-001-1"]), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task No_se_puede_verificar_la_hoja_de_otro_repartidor()
     {
         var otro = Repartidor.Crear(_operadorId, "Otro", "098");
         _repartidores.Add(otro);
         var hojaAjena = HojaDeRuta.Crear(_operadorId, otro, _vehiculo, Hoy, 5);
         _hojas.Add(hojaAjena);
         AgregarEnvio(hojaAjena, "PED-AJENO", bultos: 1);
+        await DespacharAsync(hojaAjena);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            _despachar.Handle(new DespacharMiHojaDeRutaCommand(hojaAjena.Id, ["PED-AJENO-1"]), CancellationToken.None));
+            _verificar.Handle(new VerificarMiCargaQuery(hojaAjena.Id, ["PED-AJENO-1"]), CancellationToken.None));
+    }
+
+    // ----- Reasignación urgente a una hoja despachada (letra 6.11) -----
+
+    [Fact]
+    public async Task Un_envio_urgente_se_suma_a_la_hoja_despachada_y_queda_en_transito()
+    {
+        var hoja = CrearHoja(Hoy);
+        AgregarEnvio(hoja, "PED-001", bultos: 1);
+        await DespacharAsync(hoja);
+        var urgente = CrearEnvioEnDeposito("PED-URG", bultos: 1);
+
+        var paradas = await _urgente.Handle(
+            new AgregarEnvioUrgenteCommand(_operadorId, hoja.Id, urgente.Id, new TimeOnly(14, 0), new TimeOnly(18, 0)),
+            CancellationToken.None);
+
+        Assert.Equal(2, paradas);
+        Assert.Equal(EstadoEnvio.EnTransito, urgente.Estado);
+
+        // En la app, el bulto nuevo aparece como faltante hasta que el repartidor lo levanta del depósito.
+        var carga = await _verificar.Handle(new VerificarMiCargaQuery(hoja.Id, ["PED-001-1"]), CancellationToken.None);
+        Assert.Equal(new[] { "PED-URG-1" }, carga.Faltantes);
+    }
+
+    [Fact]
+    public async Task No_se_suma_urgente_a_una_hoja_que_todavia_no_salio()
+    {
+        var hoja = CrearHoja(Hoy);
+        AgregarEnvio(hoja, "PED-001", bultos: 1);
+        var urgente = CrearEnvioEnDeposito("PED-URG", bultos: 1);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _urgente.Handle(
+            new AgregarEnvioUrgenteCommand(_operadorId, hoja.Id, urgente.Id, new TimeOnly(14, 0), new TimeOnly(18, 0)),
+            CancellationToken.None));
+        Assert.Equal(EstadoEnvio.EnDeposito, urgente.Estado);
     }
 
     // ----- Push al repartidor cuando le asignan un envío (reasignación urgente) -----
@@ -239,15 +335,21 @@ public class MisHojasDeRutaTests
             dispositivos, notificador, _sesion, _unidad);
 
     [Fact]
-    public async Task Al_asignar_un_envio_le_llega_un_push_al_telefono_del_repartidor_de_esa_hoja()
+    public async Task Al_sumar_un_envio_urgente_le_llega_un_push_al_telefono_del_repartidor_de_esa_hoja()
     {
         var hoja = CrearHoja(Hoy);
-        var envio = AgregarEnvio(hoja, "PED-URG", bultos: 1);
+        AgregarEnvio(hoja, "PED-001", bultos: 1);
+        await DespacharAsync(hoja);
+        var envio = CrearEnvioEnDeposito("PED-URG", bultos: 1);
+        await _urgente.Handle(
+            new AgregarEnvioUrgenteCommand(_operadorId, hoja.Id, envio.Id, new TimeOnly(14, 0), new TimeOnly(18, 0)),
+            CancellationToken.None);
         var dispositivos = new DispositivosEnMemoria();
         dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-ana", "Android", Alta));
         var notificador = new NotificadorFalso();
 
-        var resultado = await Avisar(dispositivos, notificador).Handle(new AvisarAsignacionCommand(envio.Id), CancellationToken.None);
+        var resultado = await Avisar(dispositivos, notificador).Handle(
+            new AvisarAsignacionCommand(envio.Id, Alta.AddHours(2)), CancellationToken.None);
 
         Assert.Equal(1, resultado.Enviadas);
         var (token, aviso) = Assert.Single(notificador.Enviados);
@@ -266,6 +368,7 @@ public class MisHojasDeRutaTests
         var hojaAjena = HojaDeRuta.Crear(_operadorId, otro, _vehiculo, Hoy, 5);
         _hojas.Add(hojaAjena);
         var envio = AgregarEnvio(hojaAjena, "PED-AJENO", bultos: 1);
+        await DespacharAsync(hojaAjena);
 
         var dispositivos = new DispositivosEnMemoria();
         dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-ana", "Android", Alta));
@@ -282,6 +385,8 @@ public class MisHojasDeRutaTests
     {
         var hoja = CrearHoja(Hoy);
         var envio = AgregarEnvio(hoja, "PED-URG", bultos: 1);
+        await DespacharAsync(hoja);
+        var guardadosAntes = _unidad.Guardados;
         var dispositivos = new DispositivosEnMemoria();
         dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-viejo", "Android", Alta));
         var notificador = new NotificadorFalso();
@@ -291,7 +396,39 @@ public class MisHojasDeRutaTests
 
         Assert.Equal(1, resultado.TokensEliminados);
         Assert.Empty(dispositivos.Lista);
-        Assert.Equal(1, _unidad.Guardados);
+        Assert.Equal(guardadosAntes + 1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Una_hoja_en_preparacion_no_avisa_porque_el_repartidor_todavia_no_la_ve()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-001", bultos: 1);
+        var dispositivos = new DispositivosEnMemoria();
+        dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-ana", "Android", Alta));
+        var notificador = new NotificadorFalso();
+
+        var resultado = await Avisar(dispositivos, notificador).Handle(new AvisarAsignacionCommand(envio.Id), CancellationToken.None);
+
+        Assert.Equal(0, resultado.Enviadas);
+        Assert.Empty(notificador.Enviados);
+    }
+
+    [Fact]
+    public async Task Una_asignacion_anterior_al_despacho_no_avisa_aunque_el_mensaje_llegue_despues()
+    {
+        var hoja = CrearHoja(Hoy);
+        var envio = AgregarEnvio(hoja, "PED-001", bultos: 1);
+        await DespacharAsync(hoja); // a las Alta + 1 h
+        var dispositivos = new DispositivosEnMemoria();
+        dispositivos.Lista.Add(DispositivoMovil.Registrar(_operadorId, _usuarioId, "token-ana", "Android", Alta));
+        var notificador = new NotificadorFalso();
+
+        var resultado = await Avisar(dispositivos, notificador).Handle(
+            new AvisarAsignacionCommand(envio.Id, Alta), CancellationToken.None);
+
+        Assert.Empty(notificador.Enviados);
+        Assert.Equal(0, resultado.Enviadas);
     }
 
     [Fact]
@@ -309,11 +446,34 @@ public class MisHojasDeRutaTests
 
     // ----- Ayudas -----
 
+    private Task<int> DespacharAsync(HojaDeRuta hoja) =>
+        _despacho.Handle(new DespacharHojaDeRutaCommand(_operadorId, hoja.Id), CancellationToken.None);
+
     private HojaDeRuta CrearHoja(DateOnly fecha)
     {
         var hoja = HojaDeRuta.Crear(_operadorId, _repartidor, _vehiculo, fecha, 5);
         _hojas.Add(hoja);
         return hoja;
+    }
+
+    private Envio CrearEnvioEnDeposito(string referencia, int bultos)
+    {
+        var cuenta = CuentaComercial.Crear(Guid.NewGuid(), _operadorId, Guid.NewGuid());
+
+        var envio = Envio.Crear(
+            cuenta,
+            referencia,
+            Modalidad.Estandar,
+            new Destinatario("Destinatario Test", "099123456"),
+            new Direccion("Calle Test", "123", "Montevideo", "Montevideo"),
+            Enumerable.Range(0, bultos).Select(_ => new NuevoBulto(1m, 10, 10, 10)).ToList(),
+            Alta);
+
+        envio.AsignarReglasOperativas(_reglas.Id);
+        envio.Aplicar(DisparadorEnvio.RecibirEnDeposito, _reglas, Alta, "Prueba", "OperarioTest");
+
+        _envios.Add(envio);
+        return envio;
     }
 
     private Envio AgregarEnvio(HojaDeRuta hoja, string referencia, int bultos)
