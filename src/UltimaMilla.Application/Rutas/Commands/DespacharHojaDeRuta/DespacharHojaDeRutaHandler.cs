@@ -154,14 +154,15 @@ public sealed class DespacharHojaDeRutaHandler(
 
         var ahora = reloj.GetUtcNow();
 
-        // Mantener las transiciones existentes de entregas.
+        // RF 17: el despachador despacha desde el Backoffice; los envíos salen a nombre del repartidor de la hoja.
+        // Después el repartidor verifica la carga del vehículo en la app (RF 19).
         foreach (var item in enviosPreparados)
         {
             item.Envio.Aplicar(
                 DisparadorEnvio.Despachar,
                 item.Reglas,
                 ahora,
-                "Mobile",
+                "Backoffice",
                 hoja.RepartidorId.ToString());
         }
 

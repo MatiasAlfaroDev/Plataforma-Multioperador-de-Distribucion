@@ -52,7 +52,8 @@ public class EnviosApi : IEnviosApi
                 p.Bultos.Count,
                 PesoTotalKg: 0m,
                 FechaAlta: DateTimeOffset.Now,
-                Bultos: p.DetalleBultos))
+                Bultos: p.DetalleBultos,
+                ResultadoServidor: p.Activa ? null : p.Estado))
             .ToList();
     }
 
@@ -80,26 +81,61 @@ public class EnviosApi : IEnviosApi
         return await respuesta.Content.ReadFromJsonAsync<List<HojaDeRutaItem>>(JsonOptions, ct) ?? [];
     }
 
-    /// <summary>POST /api/repartidor/hojas-de-ruta/{id}/despachar con los códigos escaneados (RF 17 y 19).</summary>
-    public async Task<(bool Ok, string Mensaje)> DespacharAsync(
+    /// <summary>
+    /// POST /api/repartidor/hojas-de-ruta/{id}/carga con los códigos escaneados (RF 19). La hoja ya la despachó
+    /// el despachador (RF 17): el servidor solo compara y dice qué falta o sobra.
+    /// </summary>
+    public async Task<VerificacionCarga> VerificarCargaAsync(
         Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default)
     {
         using var respuesta = await _http.PostAsJsonAsync(
-            $"api/repartidor/hojas-de-ruta/{hojaId}/despachar",
+            $"api/repartidor/hojas-de-ruta/{hojaId}/carga",
+            new { bultosEscaneados },
+            ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+            return new VerificacionCarga(false, [], [], [], await LeerMotivoAsync(respuesta, ct));
+
+        return await respuesta.Content.ReadFromJsonAsync<VerificacionCarga>(JsonOptions, ct)
+            ?? new VerificacionCarga(false, [], [], [], "El servidor no respondió la verificación.");
+    }
+
+    /// <summary>GET /api/repartidor/hojas-de-ruta/{id}/rendicion (RF 22).</summary>
+    public async Task<RendicionItem> ObtenerRendicionAsync(Guid hojaId, CancellationToken ct = default)
+    {
+        using var respuesta = await _http.GetAsync($"api/repartidor/hojas-de-ruta/{hojaId}/rendicion", ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+            throw new RutaNoDisponibleException(await LeerMotivoAsync(respuesta, ct));
+
+        return await respuesta.Content.ReadFromJsonAsync<RendicionItem>(JsonOptions, ct)
+            ?? throw new RutaNoDisponibleException("El servidor no devolvió la rendición.");
+    }
+
+    /// <summary>
+    /// POST /api/repartidor/hojas-de-ruta/{id}/rendicion con lo escaneado al volver (RF 22). La hoja queda
+    /// pendiente de control: el depósito la controla y la cierra desde el Backoffice.
+    /// </summary>
+    public async Task<(bool Ok, string Mensaje)> RendirAsync(
+        Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default)
+    {
+        using var respuesta = await _http.PostAsJsonAsync(
+            $"api/repartidor/hojas-de-ruta/{hojaId}/rendicion",
             new { bultosEscaneados },
             ct);
 
         if (respuesta.IsSuccessStatusCode)
         {
-            var cuerpo = await respuesta.Content.ReadFromJsonAsync<RespuestaDespacho>(JsonOptions, ct);
-            return (true, $"Ruta despachada: {cuerpo?.EnviosEnTransito ?? 0} envíos en tránsito.");
+            var cuerpo = await respuesta.Content.ReadFromJsonAsync<RespuestaRendicion>(JsonOptions, ct);
+            return (true,
+                $"Rendiste la hoja ({cuerpo?.BultosDevueltos ?? 0} bultos devueltos). El depósito la controla y la cierra.");
         }
 
-        // 400 = la carga no coincide (el servidor dice qué falta o sobra) o la hoja no se puede despachar.
+        // 400 = lo escaneado no coincide (el servidor dice qué falta o sobra) o quedan paradas sin resultado.
         return (false, await LeerMotivoAsync(respuesta, ct));
     }
 
-    private sealed record RespuestaDespacho(Guid HojaDeRutaId, int EnviosEnTransito);
+    private sealed record RespuestaRendicion(int BultosDevueltos);
 
     /// <summary>
     /// POST /api/envios/{envioId}/eventos-movil. El contrato está en LEEME-OFFLINE.md

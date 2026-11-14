@@ -45,7 +45,18 @@ else
 
             <p><strong>Operador:</strong> @envio.OperadorNombre</p>
             <p><strong>Estado:</strong> @envio.Estado</p>
-            <p><strong>Bultos:</strong> @envio.CantidadBultos</p>
+            @* Una devolución puede venir de una entrega parcial: vuelven solo los bultos que no se entregaron. *@
+            @if (bultosQueVuelven.TryGetValue(envio.Id, out var queVuelven))
+            {
+                <p>
+                    <strong>Bultos que vuelven:</strong> @queVuelven.Count de @envio.CantidadBultos
+                    (@string.Join(", ", queVuelven))
+                </p>
+            }
+            else
+            {
+                <p><strong>Bultos:</strong> @envio.CantidadBultos</p>
+            }
 
             <button type="button"
                     class="primario"
@@ -118,6 +129,9 @@ else
 
 @code {
     private List<EnvioDto> devoluciones = new();
+
+    // Por envío, los bultos que el operador devuelve (los que no se entregaron).
+    private readonly Dictionary<Guid, List<string>> bultosQueVuelven = new();
     private DetalleEnvioDto? detalle;
 
     private Guid? envioSeleccionado;
@@ -153,6 +167,26 @@ else
             devoluciones = (envios ?? new())
                 .Where(e => e.Estado == "EnDevolucion")
                 .ToList();
+
+            bultosQueVuelven.Clear();
+            foreach (var envio in devoluciones)
+            {
+                try
+                {
+                    var detalleEnvio = await JS.InvokeAsync<DetalleEnvioDto>(
+                        "autenticacionPortal.obtenerDetalleEnvio",
+                        envio.Id);
+
+                    bultosQueVuelven[envio.Id] = detalleEnvio.Bultos
+                        .Where(b => b.Estado == "EnDevolucion")
+                        .Select(b => b.Identificacion)
+                        .ToList();
+                }
+                catch (JSException)
+                {
+                    // Sin el detalle se muestra el total del envío; la confirmación igual lista los que vuelven.
+                }
+            }
         }
         catch (JSException ex)
         {

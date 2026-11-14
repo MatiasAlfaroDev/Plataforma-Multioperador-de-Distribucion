@@ -66,7 +66,8 @@ public sealed record HojaRutaApiDto(
     int CantidadParadas,
     decimal PesoAsignadoKg,
     bool Despachada,
-    bool Rendida = false);
+    bool Rendida = false,
+    bool PendienteDeControl = false);
 
 /// <summary>RF 22: lo que tiene que volver al depósito al cerrar la hoja.</summary>
 public sealed record RetornoEsperadoApiDto(string Tipo, Guid Id, string Referencia, List<string> Bultos);
@@ -196,6 +197,30 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
 
         return await respuesta.Content.ReadFromJsonAsync<ResultadoRendicionApiDto>(cancellationToken: ct)
             ?? throw new InvalidOperationException("La API no devolvió el resultado de la rendición.");
+    }
+
+    /// <summary>Reasignación urgente: suma un envío del depósito a una hoja que ya salió (el repartidor recibe un push).</summary>
+    public async Task AgregarEnvioUrgenteAsync(
+        Guid hojaId,
+        Guid envioId,
+        TimeOnly horaDesde,
+        TimeOnly horaHasta,
+        CancellationToken ct)
+    {
+        using var solicitud = await CrearSolicitudProtegidaAsync(
+            HttpMethod.Post,
+            $"api/hojas-de-ruta/{hojaId}/envios-urgentes",
+            JsonContent.Create(new { envioId, horaEntregaDesde = horaDesde, horaEntregaHasta = horaHasta }),
+            ct);
+
+        using var respuesta = await http.SendAsync(solicitud, ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException(
+                $"No se pudo agregar el envío urgente. HTTP {(int)respuesta.StatusCode}: {contenido}");
+        }
     }
 
     public async Task<Guid> CrearAsync(

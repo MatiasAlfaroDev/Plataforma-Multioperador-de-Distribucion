@@ -31,14 +31,24 @@ public interface IEnviosApi
     /// </summary>
     Task<CatalogoMotivos> ObtenerCatalogoAsync(CancellationToken ct = default);
 
-    /// <summary>Despacha la hoja con los bultos escaneados. Devuelve si salió bien y el mensaje para mostrar.</summary>
     /// <summary>Manda un lote de posiciones de la jornada (RF 23).</summary>
     Task<ResultadoEnvio> EnviarPosicionesAsync(IReadOnlyList<PosicionPendiente> posiciones, CancellationToken ct = default);
 
     /// <summary>Cuántos eventos quedan sin subir (métrica de sincronizaciones pendientes, RNF 6.12).</summary>
     Task InformarPendientesAsync(int pendientes, CancellationToken ct = default);
 
-    Task<(bool Ok, string Mensaje)> DespacharAsync(Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default);
+    /// <summary>RF 19: verifica contra el servidor los bultos escaneados al cargar el vehículo. No cambia estados.</summary>
+    Task<VerificacionCarga> VerificarCargaAsync(Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default);
+
+    /// <summary>RF 22: lo que tiene que volver al depósito con esta hoja (no entregados, pendientes de una entrega parcial y retiros).</summary>
+    Task<RendicionItem> ObtenerRendicionAsync(Guid hojaId, CancellationToken ct = default);
+
+    /// <summary>
+    /// RF 22: rinde la hoja con lo escaneado al volver; después el depósito la controla en el Backoffice.
+    /// Devuelve si salió bien y el mensaje para mostrar.
+    /// </summary>
+    Task<(bool Ok, string Mensaje)> RendirAsync(
+        Guid hojaId, IReadOnlyList<string> bultosEscaneados, CancellationToken ct = default);
 
     /// <summary>Manda al servidor un evento registrado en el teléfono (entrega o intento fallido).</summary>
     Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarEventoAsync(EventoPendiente evento, CancellationToken ct = default);

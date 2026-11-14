@@ -144,8 +144,10 @@ escaneados, la foto de su estado y la firma de quien los entrega; `NoRetirado`, 
   encontrado; y se rechazan la entrega sin coordenadas, la entrega sin firma ni foto cuando las
   reglas lo exigen, el intento fallido sin evidencia, el motivo ajeno al catálogo y el envío que no
   está en tránsito.
-- **Demostración del escenario 3:** registrar *Entregado* en un envío **sin despachar**, con la app
-  sin conexión; recuperar la conexión y sincronizar; la tarjeta muestra **"Rechazado: El envío debe
-  estar en tránsito…"** y el botón **Descartar**; al descartar, el envío vuelve a *Por entregar*.
+- **Demostración del escenario 3:** con la hoja despachada desde el Backoffice y la carga confirmada
+  en la app, poner el teléfono sin conexión y registrar *Entregado*; mientras tanto, el despachador
+  declara ese envío **extraviado** desde el Backoffice. Al recuperar la conexión y sincronizar, la
+  tarjeta muestra **"Rechazado: El envío debe estar en tránsito…"** y el botón **Descartar**; al
+  descartar, el teléfono adopta lo que dice el servidor.
   Variante con dos dispositivos: entregar el mismo envío desde los dos; el segundo queda
   "Rechazado: el envío ya figura como entregado a …".

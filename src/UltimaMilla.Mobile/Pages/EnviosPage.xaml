@@ -89,13 +89,23 @@
                                         Command="{Binding TerminarJornadaCommand}" Padding="12,6" />
                             </Grid>
 
-                            <!-- Acción principal antes de salir: cargar el vehículo y despachar -->
-                            <Button Text="Cargar vehículo y despachar" Style="{StaticResource BotonPrimario}" ContentLayout="Left,8"
+                            <!-- Antes de salir: cargar el vehículo y verificar los bultos (RF 19). La hoja ya la despachó el despachador (RF 17). -->
+                            <Button Text="Cargar vehículo" Style="{StaticResource BotonPrimario}" ContentLayout="Left,8"
                                     Command="{Binding IrACargaCommand}">
                                 <Button.ImageSource>
                                     <FontImageSource FontFamily="Iconos" Glyph="{x:Static app:Iconos.Camion}" 
                                                      Size="18" 
                                                      Color="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource PrimaryDarkText}}" />
+                                </Button.ImageSource>
+                            </Button>
+
+                            <!-- Al volver: rendir en el depósito lo que no se entregó y lo retirado (RF 22) -->
+                            <Button Text="Rendir en el depósito" Style="{StaticResource BotonSecundario}" ContentLayout="Left,8"
+                                    Command="{Binding IrARendicionCommand}">
+                                <Button.ImageSource>
+                                    <FontImageSource FontFamily="Iconos" Glyph="{x:Static app:Iconos.Caja}" 
+                                                     Size="18" 
+                                                     Color="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
                                 </Button.ImageSource>
                             </Button>
                         </VerticalStackLayout>

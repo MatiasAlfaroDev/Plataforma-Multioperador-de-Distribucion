@@ -7,8 +7,9 @@ using UltimaMilla.Mobile.Services;
 namespace UltimaMilla.Mobile.ViewModels;
 
 /// <summary>
-/// Entrega parcial (RF 32): en la parada, el repartidor escanea (o toca) los bultos que entrega.
-/// Los que quedan sin marcar son los no entregados.
+/// RF 32: en cada parada, el repartidor indica mediante escaneo qué bultos entrega (o retira, RF 40).
+/// Cada bulto se marca escaneando su etiqueta o, si no se puede leer, escribiendo su código: tocarlo en
+/// la lista no alcanza. Los que quedan sin escanear son los no entregados.
 /// </summary>
 public partial class SeleccionBultosViewModel : ObservableObject
 {
@@ -32,7 +33,7 @@ public partial class SeleccionBultosViewModel : ObservableObject
         : "Escaneá o escribí el código de cada bulto que entregás";
     public string TituloLista => EsRetiro
         ? "Bultos del retiro (se marcan al escanearlos)"
-        : "Bultos del envío (tocá uno para marcarlo o desmarcarlo)";
+        : "Bultos del envío (se marcan al escanearlos)";
 
     public string Referencia { get; }
 
@@ -58,7 +59,7 @@ public partial class SeleccionBultosViewModel : ObservableObject
     public string TextoResumen =>
         EsRetiro
             ? (Entregados == Bultos.Count ? $"Tenés los {Bultos.Count} bultos" : $"Escaneaste {Entregados} de {Bultos.Count}")
-        : Entregados == 0 ? "Marcá los bultos que entregás"
+        : Entregados == 0 ? "Escaneá los bultos que entregás"
         : Entregados == Bultos.Count ? $"Se entregan los {Bultos.Count} bultos"
         : $"Se entregan {Entregados} de {Bultos.Count}: los demás vuelven al depósito";
 
@@ -104,20 +105,22 @@ public partial class SeleccionBultosViewModel : ObservableObject
         ActualizarResumen();
     }
 
-    /// <summary>Tocar un bulto lo marca o desmarca (por si la etiqueta no se puede leer).</summary>
+    /// <summary>
+    /// Tocar un bulto en la lista no lo marca (RF 32 y 40): cada bulto se identifica con su código, escaneado o
+    /// escrito. Si se escaneó uno por error, tocarlo lo desmarca.
+    /// </summary>
     [RelayCommand]
     private void Alternar(BultoParada bulto)
     {
-        // RF 40: en un retiro cada bulto se identifica con su código (escaneado o escrito), no tocándolo en la lista.
-        if (EsRetiro)
+        if (bulto.Entregado)
         {
-            MostrarMensaje("En un retiro, cada bulto se marca escaneando su etiqueta (o escribiendo el código).", alerta: true);
+            bulto.Entregado = false;
+            MostrarMensaje($"{bulto.Codigo} desmarcado.", alerta: false);
+            ActualizarResumen();
             return;
         }
 
-        bulto.Entregado = !bulto.Entregado;
-        Mensaje = null;
-        ActualizarResumen();
+        MostrarMensaje("Cada bulto se marca escaneando su etiqueta (o escribiendo el código si no se puede leer).", alerta: true);
     }
 
     public SeleccionBultos Resultado() => new(

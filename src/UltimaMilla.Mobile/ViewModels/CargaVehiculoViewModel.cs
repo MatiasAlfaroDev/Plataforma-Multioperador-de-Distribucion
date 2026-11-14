@@ -7,9 +7,10 @@ using UltimaMilla.Mobile.Services;
 namespace UltimaMilla.Mobile.ViewModels;
 
 /// <summary>
-/// Carga del vehículo en el depósito (RF 19) y despacho de la ruta (RF 17).
-/// El repartidor elige su hoja de hoy, escanea cada bulto y la pantalla avisa en el momento
-/// si falta o sobra alguno. "Despachar" se habilita solo con la carga completa.
+/// Carga del vehículo en el depósito (RF 19). El despachador ya despachó la hoja desde el Backoffice
+/// (RF 17) y por eso le aparece al repartidor. Acá el repartidor escanea cada bulto que sube y la pantalla
+/// avisa en el momento si falta o sobra alguno. "Confirmar carga" se habilita solo con la carga completa:
+/// el servidor la vuelve a verificar y empieza la jornada (se comparte la ubicación, RF 23).
 /// </summary>
 public partial class CargaVehiculoViewModel : ObservableObject
 {
@@ -89,7 +90,7 @@ public partial class CargaVehiculoViewModel : ObservableObject
     private string? error;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(DespacharCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmarCargaCommand))]
     private bool estaCargando;
 
     public bool HayHojaElegida => HojaElegida is not null;
@@ -102,20 +103,51 @@ public partial class CargaVehiculoViewModel : ObservableObject
     public double Progreso => Bultos.Count == 0 ? 0 : (double)Cargados / Bultos.Count;
     public string TextoProgreso => $"{Cargados} de {Bultos.Count} bultos cargados";
 
-    /// <summary>La línea arriba del botón: qué falta para poder salir.</summary>
-    public string TextoDespacho =>
-        HojaElegida is { YaDespachada: true } ? "Esta hoja ya fue despachada"
-        : Sobrantes.Count > 0 ? "Bajá del vehículo los bultos que sobran"
-        : HayHojaElegida && Bultos.Count == 0 ? "Solo hay retiros: no hay bultos para cargar, podés salir"
-        : Faltantes > 0 ? $"Faltan {Faltantes} bultos por cargar"
-        : "Carga completa: podés salir";
+    /// <summary>
+    /// Ya se confirmó la carga de todos los bultos de la hoja. Lo cargado se guarda en el teléfono por hoja:
+    /// si el despachador suma un envío urgente después (letra 6.11), sus bultos aparecen como faltantes
+    /// hasta que el repartidor los levanta del depósito y vuelve a confirmar.
+    /// </summary>
+    public bool CargaConfirmada =>
+        HojaElegida is { } hoja &&
+        Bultos.Count > 0 &&
+        Bultos.All(b => b.Cargado) &&
+        Sobrantes.Count == 0 &&
+        LeerCargados(hoja.Id).SetEquals(Bultos.Select(b => b.Codigo));
 
-    /// <summary>Se puede salir solo con todo cargado, nada de más y una hoja que todavía no salió.</summary>
-    public bool PuedeDespachar =>
+    internal static string ClaveCargaConfirmada(Guid hojaId) => $"carga-confirmada-{hojaId}";
+
+    private static HashSet<string> LeerCargados(Guid hojaId)
+    {
+        var guardado = Preferences.Get(ClaveCargaConfirmada(hojaId), null);
+        if (string.IsNullOrEmpty(guardado))
+            return [];
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(guardado) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>La línea arriba del botón: qué falta para poder salir.</summary>
+    public string TextoCarga =>
+        HojaElegida is { EsRendida: true } ? "Esta hoja ya se rindió en el depósito"
+        : CargaConfirmada ? "Carga confirmada: ya podés salir a la ruta"
+        : Sobrantes.Count > 0 ? "Bajá del vehículo los bultos que sobran"
+        : HayHojaElegida && Bultos.Count == 0 ? "Solo hay retiros: no hay bultos para cargar"
+        : Faltantes > 0 ? $"Faltan {Faltantes} bultos por cargar"
+        : "Carga completa: confirmala para salir";
+
+    /// <summary>Se confirma solo con todo cargado, nada de más y una hoja que sigue en curso.</summary>
+    public bool PuedeConfirmarCarga =>
         !EstaCargando &&
-        HojaElegida is { YaDespachada: false } &&
-        // Una hoja con solo retiros no tiene bultos para cargar en el depósito, pero igual hay que despacharla (RF 39).
-        (Bultos.Count > 0 || HojaElegida.Paradas.Count > 0) &&
+        HojaElegida is { EsRendida: false } &&
+        // Una hoja con solo retiros no tiene bultos para cargar en el depósito, pero igual se confirma para salir (RF 39).
+        (Bultos.Count > 0 || HojaElegida.ParadasActivas.Count > 0) &&
         Faltantes == 0 &&
         Sobrantes.Count == 0;
 
@@ -127,17 +159,18 @@ public partial class CargaVehiculoViewModel : ObservableObject
         EstaCargando = true;
         try
         {
+            // Una hoja ya rendida terminó su jornada: no hay nada que cargar.
             var hojas = await _api.ListarMisHojasAsync();
             Hojas.Clear();
-            foreach (var hoja in hojas)
+            foreach (var hoja in hojas.Where(h => !h.EsRendida))
                 Hojas.Add(hoja);
 
+            // RF 17: la hoja aparece recién cuando el despachador la despacha desde el Backoffice.
             if (Hojas.Count == 0)
-                Error = "No tenés hojas de ruta para hoy.";
+                Error = "Todavía no tenés hojas de ruta despachadas para hoy. Avisale al despachador.";
 
-            // Si hay una sola pendiente de salir, se elige sola.
-            var pendientes = Hojas.Where(h => !h.YaDespachada).ToList();
-            HojaElegida = pendientes.Count == 1 ? pendientes[0] : null;
+            // Si hay una sola, se elige sola.
+            HojaElegida = Hojas.Count == 1 ? Hojas[0] : null;
         }
         catch (RutaNoDisponibleException ex)
         {
@@ -169,15 +202,24 @@ public partial class CargaVehiculoViewModel : ObservableObject
         if (value is not null)
         {
             // RF 39: los bultos de un retiro se suben en el domicilio, no en el depósito.
-            foreach (var parada in value.Paradas.Where(p => p.TipoOperacion != "Retiro").OrderBy(p => p.Orden))
+            foreach (var parada in value.ParadasActivas.Where(p => p.TipoOperacion != "Retiro").OrderBy(p => p.Orden))
                 foreach (var bulto in parada.Bultos)
                     Bultos.Add(new BultoCarga(Normalizar(bulto), parada.ReferenciaExterna, parada.Destinatario));
 
-            foreach (var retiro in value.Paradas.Where(p => p.TipoOperacion == "Retiro").OrderBy(p => p.Orden))
+            foreach (var retiro in value.ParadasActivas.Where(p => p.TipoOperacion == "Retiro").OrderBy(p => p.Orden))
                 Retiros.Add(retiro);
 
-            if (value.YaDespachada)
-                Mensaje = "Esta hoja ya salió del depósito.";
+            // Lo que ya se cargó y confirmó antes sigue cargado; lo nuevo (un envío urgente) queda faltante.
+            var cargados = LeerCargados(value.Id);
+            foreach (var bulto in Bultos.Where(b => cargados.Contains(b.Codigo)))
+                bulto.Cargado = true;
+
+            if (value.EsRendida)
+                Mensaje = "Esta hoja ya se rindió en el depósito.";
+            else if (cargados.Count > 0 && Bultos.Any(b => !b.Cargado))
+                MostrarMensaje("Se agregó un envío urgente a tu hoja: levantá del depósito los bultos que faltan.", alerta: true);
+            else if (cargados.Count > 0)
+                Mensaje = "Ya confirmaste la carga de esta hoja.";
         }
 
         ActualizarResumen();
@@ -228,18 +270,18 @@ public partial class CargaVehiculoViewModel : ObservableObject
         ActualizarResumen();
     }
 
-    [RelayCommand(CanExecute = nameof(PuedeDespachar))]
-    private async Task DespacharAsync()
+    [RelayCommand(CanExecute = nameof(PuedeConfirmarCarga))]
+    private async Task ConfirmarCargaAsync()
     {
         if (HojaElegida is not { } hoja)
             return;
 
-        // Operación sensible (6.11): una vez despachada, los envíos quedan En tránsito a nombre del repartidor.
-        var confirmacion = await _biometria.ConfirmarAsync("Vas a despachar la ruta y salir del depósito.");
+        // Operación sensible (6.11): con la confirmación, el repartidor se hace cargo de los bultos que subió.
+        var confirmacion = await _biometria.ConfirmarAsync("Confirmás que cargaste los bultos de la hoja y salís del depósito.");
         if (confirmacion == ResultadoBiometria.NoConfigurada)
         {
-            await _dialogos.AvisarAsync("Despachar",
-                "Para despachar, el teléfono necesita bloqueo de pantalla o huella configurados.");
+            await _dialogos.AvisarAsync("Confirmar carga",
+                "Para confirmar la carga, el teléfono necesita bloqueo de pantalla o huella configurados.");
             return;
         }
         if (confirmacion != ResultadoBiometria.Confirmado)
@@ -249,27 +291,35 @@ public partial class CargaVehiculoViewModel : ObservableObject
         try
         {
             var escaneados = Bultos.Where(b => b.Cargado).Select(b => b.Codigo).ToList();
-            var (ok, texto) = await _api.DespacharAsync(hoja.Id, escaneados);
+            var verificacion = await _api.VerificarCargaAsync(hoja.Id, escaneados);
 
-            if (!ok)
+            if (verificacion.Motivo is { } motivo)
             {
-                // El servidor vuelve a verificar: si algo no coincide, dice qué falta o sobra.
-                await _dialogos.AvisarAsync("No se pudo despachar", texto);
+                await _dialogos.AvisarAsync("No se pudo verificar la carga", motivo);
                 return;
             }
 
-            // Empieza la jornada: se comparte la ubicación hasta "Terminar jornada" (RF 23).
+            if (!verificacion.Completa)
+            {
+                // El servidor vuelve a comparar con la hoja actual: si el despachador la cambió, se nota acá.
+                await _dialogos.AvisarAsync("La carga no coincide con la hoja", DescribirDiferencias(verificacion));
+                return;
+            }
+
+            Preferences.Set(ClaveCargaConfirmada(hoja.Id),
+                System.Text.Json.JsonSerializer.Serialize(escaneados));
+
+            // Empieza la jornada: se comparte la ubicación hasta rendir o "Terminar jornada" (RF 23).
             var siguiendo = await _seguimiento.IniciarAsync();
             await _dialogos.AvisarAsync("¡En camino!", siguiendo
-                ? texto
-                : $"{texto}\n\nNo se pudo compartir tu ubicación: revisá el permiso de ubicación de la app.");
+                ? "Carga verificada. Ya podés salir a la ruta."
+                : "Carga verificada. No se pudo compartir tu ubicación: revisá el permiso de ubicación de la app.");
 
-            // Vuelve a la ruta y la recarga: los envíos ahora están En tránsito y se pueden entregar.
             await Shell.Current.GoToAsync("..", new Dictionary<string, object> { ["recargar"] = true });
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            await _dialogos.AvisarAsync("Sin conexión", "No se pudo despachar. Probá de nuevo cuando haya señal.");
+            await _dialogos.AvisarAsync("Sin conexión", "No se pudo verificar la carga. Probá de nuevo con el Wi-Fi del depósito.");
         }
         finally
         {
@@ -278,13 +328,24 @@ public partial class CargaVehiculoViewModel : ObservableObject
         }
     }
 
+    private static string DescribirDiferencias(VerificacionCarga v)
+    {
+        var partes = new List<string>();
+        if (v.Faltantes.Count > 0)
+            partes.Add($"Faltan: {string.Join(", ", v.Faltantes)}.");
+        if (v.Sobrantes.Count > 0)
+            partes.Add($"Sobran: {string.Join(", ", v.Sobrantes)}.");
+        partes.Add("Volvé a descargar la hoja si el despachador la cambió.");
+        return string.Join("\n", partes);
+    }
+
     private void MostrarMensaje(string texto, bool alerta)
     {
         Mensaje = texto;
         MensajeEsAlerta = alerta;
     }
 
-    /// <summary>Recalcula contadores y el botón Despachar después de cada cambio.</summary>
+    /// <summary>Recalcula contadores y el botón Confirmar carga después de cada cambio.</summary>
     private void ActualizarResumen()
     {
         OnPropertyChanged(nameof(Cargados));
@@ -293,18 +354,21 @@ public partial class CargaVehiculoViewModel : ObservableObject
         OnPropertyChanged(nameof(TextoProgreso));
         OnPropertyChanged(nameof(HaySobrantes));
         OnPropertyChanged(nameof(HayRetiros));
-        OnPropertyChanged(nameof(PuedeDespachar));
-        OnPropertyChanged(nameof(TextoDespacho));
-        DespacharCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CargaConfirmada));
+        OnPropertyChanged(nameof(PuedeConfirmarCarga));
+        OnPropertyChanged(nameof(TextoCarga));
+        ConfirmarCargaCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Igual que el servidor: sin espacios y en mayúsculas ("ped-300-1 " es "PED-300-1").</summary>
     private static string Normalizar(string? texto) => (texto ?? string.Empty).Trim().ToUpperInvariant();
 }
 
-/// <summary>Un bulto de la hoja elegida, con su estado en la carga.</summary>
-public partial class BultoCarga(string codigo, string referencia, string destinatario) : ObservableObject
+/// <summary>Un bulto de la hoja elegida, con su estado en la carga (o en la rendición, al volver).</summary>
+public partial class BultoCarga(string codigo, string referencia, string destinatario, bool esRendicion = false) : ObservableObject
 {
+    public bool EsRendicion { get; } = esRendicion;
+
     public string Codigo { get; } = codigo;
     public string Referencia { get; } = referencia;
     public string Destinatario { get; } = destinatario;
@@ -315,5 +379,7 @@ public partial class BultoCarga(string codigo, string referencia, string destina
 
     public string Icono => Cargado ? Iconos.TildeCirculo : Iconos.Reloj;
     public Color ColorIcono => Paleta.De(Cargado ? "Exito" : "TextoSecundario");
-    public string TextoEstado => Cargado ? "Cargado" : "Falta cargar";
+    public string TextoEstado => EsRendicion
+        ? (Cargado ? "Bajado en el depósito" : "Falta escanear")
+        : (Cargado ? "Cargado" : "Falta cargar");
 }

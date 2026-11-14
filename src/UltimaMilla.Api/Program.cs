@@ -34,7 +34,8 @@ using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
 using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 using UltimaMilla.Application.Envios.Commands.RetornarADeposito;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
-using UltimaMilla.Application.Rutas.Commands.DespacharMiHojaDeRuta;
+using UltimaMilla.Application.Rutas.Queries.VerificarMiCarga;
+using UltimaMilla.Application.Rutas.Commands.AgregarEnvioUrgente;
 using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
@@ -1454,11 +1455,12 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
-// RF 22: rendición al regresar al depósito. GET muestra lo que tiene que volver; POST lo recibe y cierra la hoja.
+// RF 22, segundo paso: el depósito controla la rendición del repartidor. GET muestra lo que tiene que volver;
+// POST lo recibe (escaneado) y cierra la hoja.
 api.MapGet("/hojas-de-ruta/{hojaId:guid}/rendicion",
     async (Guid hojaId, RendirHojaDeRutaHandler handler, CancellationToken ct) =>
         Results.Ok(await handler.ObtenerAsync(hojaId, ct)))
-    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
 api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
     async (
@@ -1482,37 +1484,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
 
         return Results.Ok(resultado);
     })
-    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
-
-// RF 22: rendición al regresar al depósito. GET muestra lo que tiene que volver; POST lo recibe y cierra la hoja.
-api.MapGet("/hojas-de-ruta/{hojaId:guid}/rendicion",
-    async (Guid hojaId, RendirHojaDeRutaHandler handler, CancellationToken ct) =>
-        Results.Ok(await handler.ObtenerAsync(hojaId, ct)))
-    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
-
-api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
-    async (
-        Guid hojaId,
-        RendirHojaDeRutaRequest request,
-        HttpContext context,
-        IAntiforgery antiforgery,
-        RendirHojaDeRutaHandler handler,
-        CancellationToken ct) =>
-    {
-        if (!await antiforgery.IsRequestValidAsync(context))
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token de seguridad inválido");
-        }
-
-        var resultado = await handler.Handle(
-            new RendirHojaDeRutaCommand(hojaId, request.BultosEscaneados ?? [], request.Responsable ?? string.Empty),
-            ct);
-
-        return Results.Ok(resultado);
-    })
-    .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorOperador, Perfiles.Operador));
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
 api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
     async (
@@ -1594,6 +1566,41 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios",
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
+// Reasignación urgente (letra 6.11): sumar un envío del depósito a una hoja que ya salió.
+// Queda en tránsito a nombre del repartidor, que recibe un push y lo levanta del depósito.
+api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios-urgentes",
+    async (
+        Guid hojaId,
+        AgregarEnvioARutaRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        AgregarEnvioUrgenteHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+            return Results.Forbid();
+
+        var paradas = await handler.Handle(
+            new AgregarEnvioUrgenteCommand(
+                operadorId,
+                hojaId,
+                request.EnvioId,
+                request.HoraEntregaDesde,
+                request.HoraEntregaHasta),
+            ct);
+
+        return Results.Ok(new { hojaDeRutaId = hojaId, paradasActivas = paradas });
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
+
 api.MapPost("/hojas-de-ruta/{hojaId:guid}/retiros",
     async (
         Guid hojaId,
@@ -1642,21 +1649,42 @@ api.MapGet("/repartidor/hojas-de-ruta", async (
     Results.Ok(await handler.Handle(new ObtenerMisHojasDeRutaQuery(fecha), ct)))
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
 
-// POST /api/repartidor/hojas-de-ruta/{id}/despachar → el repartidor terminó de cargar el vehículo (RF 17 y 19).
-// Manda los bultos que escaneó; si falta o sobra alguno responde 400 con la lista y no despacha nada.
-api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/despachar", async (
+// POST /api/repartidor/hojas-de-ruta/{id}/carga → el repartidor escaneó los bultos al cargar el vehículo (RF 19).
+// La hoja ya la despachó el despachador desde el Backoffice (RF 17): esto solo verifica, no cambia estados.
+// Responde qué bultos están cargados, cuáles faltan y cuáles sobran.
+api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/carga", async (
     Guid hojaId,
-    DespacharMiHojaDeRutaRequest request,
-    DespacharMiHojaDeRutaHandler handler,
+    VerificarMiCargaRequest request,
+    VerificarMiCargaHandler handler,
     CancellationToken ct) =>
 {
-    var cantidad = await handler.Handle(
-        new DespacharMiHojaDeRutaCommand(hojaId, request.BultosEscaneados),
+    var resultado = await handler.Handle(
+        new VerificarMiCargaQuery(hojaId, request.BultosEscaneados ?? []),
         ct);
 
-    return Results.Ok(new { hojaDeRutaId = hojaId, enviosEnTransito = cantidad });
+    return Results.Ok(new
+    {
+        completa = resultado.Completa,
+        cargados = resultado.Cargados,
+        faltantes = resultado.Faltantes,
+        sobrantes = resultado.Sobrantes
+    });
 })
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
+// RF 22, primer paso: el repartidor rinde desde la app al volver (solo su hoja). La hoja queda pendiente
+// de control; el depósito la controla y la cierra desde el Backoffice (POST /api/hojas-de-ruta/{id}/rendicion).
+api.MapGet("/repartidor/hojas-de-ruta/{hojaId:guid}/rendicion",
+    async (Guid hojaId, RendirHojaDeRutaHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.ObtenerParaRepartidorAsync(hojaId, ct)))
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
+
+api.MapPost("/repartidor/hojas-de-ruta/{hojaId:guid}/rendicion",
+    async (Guid hojaId, DeclararRendicionRequest request, RendirHojaDeRutaHandler handler, CancellationToken ct) =>
+        Results.Ok(await handler.DeclararParaRepartidorAsync(
+            new DeclararRendicionCommand(hojaId, request.BultosEscaneados ?? []),
+            ct)))
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
 
 // POST /api/repartidor/posiciones → lote de posiciones que la app tomó durante la jornada (RF 23),
 // muchas veces con la pantalla apagada o sin señal. Idempotente: reenviar un lote no duplica nada.
@@ -1809,8 +1837,8 @@ public sealed record EditarZonaRequest(
     IReadOnlyList<CoberturaCommand> Coberturas,
     IReadOnlyList<FranjaEntregaCommand> Franjas);
 
-/// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/despachar; la hoja viaja en la URL.</summary>
-public sealed record DespacharMiHojaDeRutaRequest(IReadOnlyList<string> BultosEscaneados);
+/// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/carga; la hoja viaja en la URL.</summary>
+public sealed record VerificarMiCargaRequest(IReadOnlyList<string>? BultosEscaneados);
 
 public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
 public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
@@ -1824,3 +1852,6 @@ public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId,
 
 /// <summary>RF 22: lo escaneado al volver al depósito y quién lo recibe.</summary>
 public sealed record RendirHojaDeRutaRequest(IReadOnlyList<string>? BultosEscaneados, string? Responsable);
+
+/// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/rendicion: lo que el repartidor trae de vuelta.</summary>
+public sealed record DeclararRendicionRequest(IReadOnlyList<string>? BultosEscaneados);

@@ -1,30 +1,36 @@
 namespace UltimaMilla.Mobile.Models;
 
-/// <summary>Lo que devuelve GET /api/repartidor/hojas-de-ruta (mismos nombres que MiHojaDeRutaDto de Application).</summary>
+/// <summary>
+/// Lo que devuelve GET /api/repartidor/hojas-de-ruta (mismos nombres que MiHojaDeRutaDto de Application).
+/// Solo llegan hojas que el despachador ya despachó desde el Backoffice (RF 17).
+/// </summary>
 public sealed record HojaDeRutaItem(
     Guid Id,
     DateOnly Fecha,
     TimeOnly? HoraSalida,
     string Repartidor,
-    IReadOnlyList<ParadaItem> Paradas)
+    IReadOnlyList<ParadaItem> Paradas,
+    string Estado = "Despachada")
 {
-    /// <summary>Los bultos que se cargan en el depósito: los de los retiros todavía están en los domicilios.</summary>
-    public int CantidadBultos => Paradas.Where(p => p.TipoOperacion != "Retiro").Sum(p => p.Bultos.Count);
+    /// <summary>Las paradas que faltan hacer (las resueltas en la jornada también llegan, para verlas hasta rendir).</summary>
+    public IReadOnlyList<ParadaItem> ParadasActivas => Paradas.Where(p => p.Activa).ToList();
 
-    /// <summary>Ya salió: ningún envío sigue "Asignado a ruta". Los retiros siguen asignados hasta que se recogen.</summary>
-    public bool YaDespachada =>
-        Paradas.Any(p => p.TipoOperacion == "Entrega") &&
-        Paradas.Where(p => p.TipoOperacion == "Entrega").All(p => p.Estado != "AsignadoARuta");
+    /// <summary>Los bultos que se cargan en el depósito: los de los retiros todavía están en los domicilios.</summary>
+    public int CantidadBultos => ParadasActivas.Where(p => p.TipoOperacion != "Retiro").Sum(p => p.Bultos.Count);
+
+    /// <summary>RF 22: el repartidor ya la rindió (falte o no el control del depósito); la jornada de esta hoja terminó.</summary>
+    public bool EsRendida => Estado is "Rendida" or "PendienteDeControl";
 
     public string Titulo => HoraSalida is { } hora ? $"Salida {hora:HH}:{hora:mm}" : "Sin hora de salida";
 
     public string Detalle =>
-        $"{Paradas.Count} {(Paradas.Count == 1 ? "parada" : "paradas")}, {CantidadBultos} bultos"
-        + (YaDespachada ? " · ya despachada" : string.Empty);
+        $"{ParadasActivas.Count} {(ParadasActivas.Count == 1 ? "parada" : "paradas")}, {CantidadBultos} bultos"
+        + (EsRendida ? " · rendida" : string.Empty);
 }
 
 /// <param name="Bultos">Identificaciones de los bultos: las que se escanean al cargar el vehículo.</param>
 /// <param name="TipoOperacion">RF 39: Entrega, DevolucionComercio, Retiro (se suben bultos) o EntregaRetiroComercio.</param>
+/// <param name="Activa">False: ya se resolvió en la jornada; se muestra con su resultado hasta rendir.</param>
 public sealed record ParadaItem(
     int Orden,
     Guid? EnvioId,
@@ -37,7 +43,8 @@ public sealed record ParadaItem(
     IReadOnlyList<string> Bultos,
     IReadOnlyList<BultoItem>? DetalleBultos = null,
     Guid? RetiroId = null,
-    string TipoOperacion = "Entrega")
+    string TipoOperacion = "Entrega",
+    bool Activa = true)
 {
     /// <summary>Cómo se muestra un retiro en la carga del vehículo (no tiene referencia del comercio).</summary>
     public string TituloRetiro =>

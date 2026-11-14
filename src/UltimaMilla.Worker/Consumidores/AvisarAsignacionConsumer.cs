@@ -22,7 +22,7 @@ public sealed class AvisarAsignacionConsumer(TenantDelMensaje tenant, AvisarAsig
 
         // ADR-002: el operador viaja en el mensaje y se fija antes de tocar la base.
         tenant.Fijar(m.OperadorId);
-        await handler.Handle(new AvisarAsignacionCommand(m.EnvioId), context.CancellationToken);
+        await handler.Handle(new AvisarAsignacionCommand(m.EnvioId, m.OcurridoEn), context.CancellationToken);
     }
 }
 

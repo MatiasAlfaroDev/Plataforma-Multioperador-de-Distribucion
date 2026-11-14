@@ -81,6 +81,30 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
 
         VerificarEditable();
 
+        AgregarParadaDeEnvio(envio);
+    }
+
+    /// <summary>
+    /// Reasignación urgente (letra 6.11): el despachador suma un envío del depósito a una hoja que ya salió.
+    /// Es la única modificación que admite una hoja despachada; la parada va al final del recorrido, el
+    /// repartidor recibe un push y la app le marca el bulto como faltante en la carga hasta que lo levante.
+    /// Valida lo mismo que una asignación normal (estado del envío, fecha, paradas, peso y volumen).
+    /// </summary>
+    public void AgregarEnvioUrgente(Envio envio)
+    {
+        ArgumentNullException.ThrowIfNull(envio);
+
+        if (Estado != EstadoHojaDeRuta.Despachada)
+            throw new InvalidOperationException(
+                Estado == EstadoHojaDeRuta.Rendida
+                    ? "La hoja de ruta ya fue rendida."
+                    : "La hoja todavía no salió: agregá el envío como una asignación normal.");
+
+        AgregarParadaDeEnvio(envio);
+    }
+
+    private void AgregarParadaDeEnvio(Envio envio)
+    {
         if (envio.OperadorId != OperadorId)
             throw new InvalidOperationException(
                 "El envío pertenece a otro operador.");
@@ -515,11 +539,35 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
     /// RF 22: cierra la jornada de la hoja. Solo una hoja despachada en la que todas las paradas
     /// ya tienen resultado (ninguna sigue activa) puede rendirse.
     /// </summary>
-    public void MarcarRendida()
+    /// <summary>
+    /// RF 22, primer paso: el repartidor rinde desde la app al volver al depósito (escaneó lo que trae de vuelta).
+    /// La hoja deja de estar en curso y queda esperando el control del depósito.
+    /// </summary>
+    public void DeclararRendicion()
     {
         if (Estado != EstadoHojaDeRuta.Despachada)
             throw new InvalidOperationException(
-                "Solo se puede rendir una hoja de ruta despachada.");
+                Estado == EstadoHojaDeRuta.EnPreparacion
+                    ? "Solo se puede rendir una hoja de ruta despachada."
+                    : "El repartidor ya rindió esta hoja de ruta.");
+
+        if (_paradas.Any(p => p.Activa))
+            throw new InvalidOperationException(
+                "La hoja todavía tiene paradas sin resultado.");
+
+        Estado = EstadoHojaDeRuta.PendienteDeControl;
+    }
+
+    /// <summary>
+    /// RF 22, segundo paso: el depósito controla en el Backoffice lo que rindió el repartidor y cierra la hoja.
+    /// </summary>
+    public void MarcarRendida()
+    {
+        if (Estado != EstadoHojaDeRuta.PendienteDeControl)
+            throw new InvalidOperationException(
+                Estado == EstadoHojaDeRuta.Rendida
+                    ? "La rendición de esta hoja ya fue controlada."
+                    : "El repartidor todavía no rindió esta hoja desde la app.");
 
         if (_paradas.Any(p => p.Activa))
             throw new InvalidOperationException(

@@ -785,12 +785,12 @@ public class HojaDeRutaTests
         ruta.AgregarEnvio(CrearEnvio(operadorId));
         ruta.MarcarDespachada(DateTimeOffset.UtcNow);
 
-        Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
+        Assert.Throws<InvalidOperationException>(() => ruta.DeclararRendicion());
         Assert.Equal(EstadoHojaDeRuta.Despachada, ruta.Estado);
     }
 
     [Fact]
-    public void Rendicion_ConTodasLasParadasResueltas_CierraLaHoja()
+    public void Rendicion_PrimeroRindeElRepartidorYDespuesControlaElDeposito()
     {
         var operadorId = Guid.NewGuid();
         var ruta = CrearRuta(operadorId);
@@ -802,6 +802,13 @@ public class HojaDeRutaTests
         retiro.EntregarAlComercio();
         ruta.FinalizarParadaEntregaRetiroComercio(retiro, ahora);
 
+        // Primero rinde el repartidor (app): queda pendiente del control del depósito.
+        Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
+        ruta.DeclararRendicion();
+        Assert.Equal(EstadoHojaDeRuta.PendienteDeControl, ruta.Estado);
+        Assert.Throws<InvalidOperationException>(() => ruta.DeclararRendicion());
+
+        // Después controla el depósito (Backoffice) y la hoja se cierra.
         ruta.MarcarRendida();
 
         Assert.Equal(EstadoHojaDeRuta.Rendida, ruta.Estado);
