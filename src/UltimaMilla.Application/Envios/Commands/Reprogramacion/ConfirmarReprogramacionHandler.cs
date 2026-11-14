@@ -57,6 +57,13 @@ public sealed class ConfirmarReprogramacionHandler(
             throw new InvalidOperationException(
                 "El envío debe estar en depósito para confirmar la reprogramación.");
 
+        if (envio.UltimoMotivoRequiereDevolucion)
+        {
+            throw new InvalidOperationException(
+                "Este envío no puede reprogramarse porque " +
+                "el motivo de no entrega requiere devolución al comercio.");
+        }
+
         if (envio.VersionReglasOperativasId is not Guid versionId)
             throw new InvalidOperationException(
                 "El envío no tiene reglas operativas asignadas.");

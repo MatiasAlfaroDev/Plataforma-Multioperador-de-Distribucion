@@ -61,7 +61,6 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
     public async Task<IActionResult> OnPostRecibirAsync(
         Guid envioId,
         string identificaciones,
-        string responsable,
         CancellationToken ct)
     {
         var codigos = (identificaciones ?? string.Empty)
@@ -75,7 +74,6 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
             var resultado = await api.RecibirEnDepositoAsync(
                 envioId,
                 codigos,
-                responsable ?? string.Empty,
                 ct);
 
             var faltantes = resultado.Discrepancias
@@ -170,4 +168,40 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         }
     }
 
+  public async Task<IActionResult> OnPostIniciarDevolucionAsync(
+    Guid envioId,
+    CancellationToken ct)
+{
+    if (envioId == Guid.Empty)
+        return BadRequest();
+
+    var responsable = User.Identity?.Name;
+
+    if (string.IsNullOrWhiteSpace(responsable))
+    {
+        TempData["MensajeError"] =
+            "No se pudo identificar al usuario responsable.";
+
+        return RedirectToPage();
+    }
+
+    try
+    {
+        await api.IniciarDevolucionAsync(
+            envioId,
+            responsable,
+            ct);
+
+        TempData["MensajeExito"] =
+            "Se inició correctamente la devolución al comercio.";
+    }
+    catch (HttpRequestException ex)
+    {
+        await CargarDatosAsync(ct);
+        Error = $"No se pudo iniciar la devolución: {ex.Message}";
+        return Page();
+    }
+
+    return RedirectToPage();
+}
 }

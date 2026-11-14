@@ -36,7 +36,8 @@ public sealed record EnvioItem(
     decimal PesoTotalKg,
     decimal? TarifaCalculada,
     DateTimeOffset FechaAlta,
-    int IntentosRealizados);
+    int IntentosRealizados,
+    bool UltimoMotivoRequiereDevolucion);
 
 /// <summary>Detalle completo de un envío.</summary>
 public sealed record DetalleEnvioItem(
@@ -205,37 +206,34 @@ public sealed class EnviosApiClient(HttpClient http)
     }
 
     public async Task<ResultadoRecepcionItem> RecibirEnDepositoAsync(
-        Guid envioId,
-        IReadOnlyList<string> identificaciones,
-        string responsable,
-        CancellationToken ct = default)
-    {
-        using var respuesta = await http.PostAsJsonAsync(
-            $"api/envios/{envioId}/recepcion",
-            new
-            {
-                IdentificacionesEscaneadas = identificaciones,
-                Responsable = responsable
-            },
-            ct);
-
-        if (!respuesta.IsSuccessStatusCode)
+    Guid envioId,
+    IReadOnlyList<string> identificaciones,
+    CancellationToken ct = default)
+{
+    using var respuesta = await http.PostAsJsonAsync(
+        $"api/envios/{envioId}/recepcion",
+        new
         {
-            var detalle = await respuesta.Content
-                .ReadAsStringAsync(ct);
+            IdentificacionesEscaneadas = identificaciones
+        },
+        ct);
 
-            throw new HttpRequestException(
-                string.IsNullOrWhiteSpace(detalle)
-                    ? $"La API rechazó la recepción (HTTP {(int)respuesta.StatusCode})."
-                    : $"La API respondió: {detalle}",
-                null,
-                respuesta.StatusCode);
-        }
+    if (!respuesta.IsSuccessStatusCode)
+    {
+        var detalle = await respuesta.Content.ReadAsStringAsync(ct);
 
-        return await respuesta.Content
-            .ReadFromJsonAsync<ResultadoRecepcionItem>(ct)
-            ?? new ResultadoRecepcionItem(true, []);
+        throw new HttpRequestException(
+            string.IsNullOrWhiteSpace(detalle)
+                ? $"La API rechazó la recepción (HTTP {(int)respuesta.StatusCode})."
+                : $"La API respondió: {detalle}",
+            null,
+            respuesta.StatusCode);
     }
+
+    return await respuesta.Content
+        .ReadFromJsonAsync<ResultadoRecepcionItem>(ct)
+        ?? new ResultadoRecepcionItem(true, []);
+}
 
     public async Task RetornarADepositoAsync(
         Guid envioId,

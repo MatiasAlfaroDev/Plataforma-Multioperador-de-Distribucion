@@ -19,4 +19,5 @@ public sealed record EnvioDto(
     decimal PesoTotalKg,
     decimal? TarifaCalculada,
     DateTimeOffset FechaAlta,
-    int IntentosRealizados);
+    int IntentosRealizados,
+    bool UltimoMotivoRequiereDevolucion);

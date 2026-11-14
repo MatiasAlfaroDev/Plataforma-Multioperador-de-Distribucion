@@ -205,6 +205,16 @@ else
                                     Asignar a ruta
                                 </a>
                             }
+                           else if (e.Estado == "EnDeposito" &&
+                                    e.UltimoMotivoRequiereDevolucion)
+                            {
+                                <button type="button"
+                                        class="abrir-devolucion primario py-1.5 text-sm"
+                                        data-envio-id="@e.Id"
+                                        data-referencia="@e.ReferenciaExterna">
+                                    Iniciar devolución
+                                </button>
+                            }
                             else if (e.Estado == "EnDeposito" &&
                                     e.IntentosRealizados > 0)
                             {
@@ -302,19 +312,6 @@ else
                 <p class="nota mt-1.5">Ingresá todos los códigos de los bultos recibidos.</p>
             </div>
 
-            <div class="modal-campo">
-                <label for="responsable">
-                    Responsable de recepción
-                </label>
-
-                <input type="text"
-                       id="responsable"
-                       name="responsable"
-                       placeholder="Nombre del operario"
-                       required />
-
-                <p class="nota mt-1.5">Provisorio hasta implementar la identificación de usuarios.</p>
-            </div>
 
             <div class="modal-acciones acciones justify-end">
                 <button type="button"
@@ -373,6 +370,59 @@ else
             });
     </script>
 }
+
+<dialog id="modalDevolucion"
+        class="modal-recepcion w-[min(32rem,calc(100vw-2rem))] m-auto"
+        aria-labelledby="tituloDevolucion">
+
+    <form method="post"
+          asp-page-handler="IniciarDevolucion"
+          id="formDevolucion">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden"
+               name="envioId"
+               id="devolucionEnvioId" />
+
+        <div class="modal-encabezado flex items-start justify-between gap-4">
+            <h2 id="tituloDevolucion"
+                class="mt-0 font-display text-xl font-bold tracking-tight">
+                Iniciar devolución
+            </h2>
+
+            <button type="button"
+                    class="cerrar-devolucion border-0 bg-transparent p-1 text-xl text-suave"
+                    aria-label="Cerrar">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+
+        <div class="modal-info mt-4 grid gap-2 rounded-xl bg-hundido px-4 py-3 text-sm">
+            <p>
+                <strong>Envío:</strong>
+                <span id="devolucionReferencia"></span>
+            </p>
+
+            <p>
+                Este envío requiere devolución al comercio.
+                ¿Confirmás que querés iniciar el proceso?
+            </p>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+            <button type="button"
+                    class="cerrar-devolucion btn-secundario px-4 py-2">
+                Cancelar
+            </button>
+
+            <button type="submit"
+                    class="primario px-4 py-2">
+                Confirmar devolución
+            </button>
+        </div>
+    </form>
+</dialog>
 
 @if (hayReprogramaciones)
 {
@@ -438,6 +488,41 @@ else
                 boton.disabled = true;
                 boton.textContent = "Procesando...";
             });
+
+            const modalDevolucion = document.getElementById("modalDevolucion");
+
+if (modalDevolucion) {
+
+    document.querySelectorAll(".abrir-devolucion")
+        .forEach(boton => {
+
+            boton.addEventListener("click", () => {
+
+                document.getElementById("devolucionEnvioId").value =
+                    boton.dataset.envioId;
+
+                document.getElementById("devolucionReferencia").textContent =
+                    boton.dataset.referencia;
+
+                modalDevolucion.showModal();
+            });
+        });
+
+    document.querySelectorAll(".cerrar-devolucion")
+        .forEach(boton => {
+
+            boton.addEventListener("click", () => {
+                modalDevolucion.close();
+            });
+        });
+
+    modalDevolucion.addEventListener("click", evento => {
+
+        if (evento.target === modalDevolucion) {
+            modalDevolucion.close();
+        }
+    });
+}
         })();
     </script>
 }
