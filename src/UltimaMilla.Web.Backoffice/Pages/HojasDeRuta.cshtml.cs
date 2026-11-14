@@ -168,6 +168,57 @@ public sealed class HojasDeRutaModel(
 }
 
     /// <summary>
+/// Agrega un envío a una hoja de ruta todavía no despachada.
+/// </summary>
+public async Task<IActionResult> OnPostAgregarEnvioAsync(
+    Guid hojaId,
+    Guid envioId,
+    string? franjaSeleccionada,
+    CancellationToken ct)
+{
+    if (OperadorIdSesion == Guid.Empty)
+    {
+        Error = "No hay un operador seleccionado.";
+        await CargarAsync(ct);
+        return Page();
+    }
+
+    if (hojaId == Guid.Empty || envioId == Guid.Empty)
+    {
+        Error = "Elegí un envío para agregar a la hoja.";
+        await CargarAsync(ct);
+        return Page();
+    }
+
+    if (!IntentarObtenerFranja(
+        franjaSeleccionada, out var desde, out var hasta))
+    {
+        Error = "Elegí una franja horaria válida.";
+        await CargarAsync(ct);
+        return Page();
+    }
+
+    try
+    {
+        await api.AgregarEnvioARutaAsync(
+            hojaId, envioId, desde, hasta, ct);
+
+        TempData["Exito"] =
+            "El envío se agregó correctamente a la hoja de ruta.";
+
+        return RedirectToPage("/HojasDeRuta");
+    }
+    catch (Exception ex) when (
+        ex is HttpRequestException ||
+        ex is InvalidOperationException)
+    {
+        Error = ex.Message;
+        await CargarAsync(ct);
+        return Page();
+    }
+}
+
+    /// <summary>
     /// Reasignación urgente (letra 6.11): suma un envío del depósito a una hoja ya despachada.
     /// Si el envío no tiene franja comprometida, se usa la elegida.
     /// </summary>
