@@ -73,6 +73,10 @@ else
                 </tr>
             </thead>
             <tbody>
+                @if (!RetirosFiltrados.Any())
+                {
+                    <tr><td colspan="7" class="nota">No hay retiros con esos filtros.</td></tr>
+                }
                 @foreach (var r in RetirosFiltrados)
                 {
                     <tr>
