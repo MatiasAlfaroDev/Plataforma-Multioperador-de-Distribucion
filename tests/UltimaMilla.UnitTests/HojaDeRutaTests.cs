@@ -648,6 +648,21 @@ public class HojaDeRutaTests
     }
 
     [Fact]
+    public void DevolucionComercio_ExtraviadaLiberaParadaYCapacidad()
+    {
+        var operadorId = Guid.NewGuid();
+        var ruta = CrearRuta(operadorId);
+        var (envio, _) = CrearEnvioEnDevolucion(operadorId);
+
+        ruta.AgregarDevolucionComercio(envio);
+        ruta.LiberarParadaPorExtravio(envio, DateTimeOffset.UtcNow);
+
+        Assert.False(Assert.Single(ruta.Paradas).Activa);
+        Assert.Equal(0m, ruta.PesoAsignadoKg);
+        Assert.Equal(0m, ruta.VolumenAsignadoM3);
+    }
+
+    [Fact]
     public void DevolucionComercio_NoFinalizaSinConfirmacion()
     {
         var operadorId = Guid.NewGuid();

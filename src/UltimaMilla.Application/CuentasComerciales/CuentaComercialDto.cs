@@ -9,4 +9,5 @@ public sealed record CuentaComercialDto(
     Guid ComercioId,
     string ComercioNombre,
     bool Activa,
-    EstadoCuentaComercial Estado);
+    EstadoCuentaComercial Estado,
+    string? DireccionRecepcion = null);

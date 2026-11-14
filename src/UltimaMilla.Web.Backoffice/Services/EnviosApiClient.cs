@@ -261,9 +261,23 @@ public sealed class EnviosApiClient(HttpClient http)
         await http.GetFromJsonAsync<List<RetiroTableroItem>>("api/retiros", ct) ?? [];
 
     /// <summary>accion: recibir-deposito, entregar-comercio o reprogramar.</summary>
-    public async Task GestionarRetiroAsync(Guid retiroId, string accion, CancellationToken ct = default)
+    public Task GestionarRetiroAsync(Guid retiroId, string accion, CancellationToken ct = default) =>
+        EnviarProtegidoAsync($"api/retiros/{retiroId}/{accion}", new { }, ct);
+
+    // Extravío (despacho) y reaparición en el depósito, escaneando todos los bultos (informe, sección 4.1).
+    public Task DeclararExtravioAsync(Guid envioId, string justificacion, string responsable, CancellationToken ct = default) =>
+        EnviarProtegidoAsync($"api/envios/{envioId}/extravio",
+            new { Justificacion = justificacion, Responsable = responsable }, ct);
+
+    public Task RegistrarReaparicionAsync(
+        Guid envioId, IReadOnlyList<string> identificaciones, string responsable, CancellationToken ct = default) =>
+        EnviarProtegidoAsync($"api/envios/{envioId}/reaparicion",
+            new { IdentificacionesEscaneadas = identificaciones, Responsable = responsable }, ct);
+
+    /// <summary>POST con token antifalsificación; si la API lo rechaza, lanza con su detalle.</summary>
+    private async Task EnviarProtegidoAsync(string ruta, object datos, CancellationToken ct)
     {
-        using var respuesta = await PostProtegidoAsync($"api/retiros/{retiroId}/{accion}", new { }, ct);
+        using var respuesta = await PostProtegidoAsync(ruta, datos, ct);
 
         if (!respuesta.IsSuccessStatusCode)
         {

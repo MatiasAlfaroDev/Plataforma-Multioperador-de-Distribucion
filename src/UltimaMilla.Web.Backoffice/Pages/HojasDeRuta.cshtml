@@ -242,6 +242,46 @@
             </div>
         }
 
+        <h3>Devoluciones al comercio</h3>
+        <p class="nota">
+            Envíos en devolución: la parada los lleva a la dirección de recepción de la cuenta comercial.
+            Solo aparecen los de cuentas con dirección configurada dentro de una zona de cobertura.
+        </p>
+
+        @if (Model.Devoluciones.Count == 0)
+        {
+            <p class="nota">No hay devoluciones pendientes de asignar.</p>
+        }
+        else
+        {
+            <div class="tabla">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Referencia</th>
+                            <th>Localidad del comercio</th>
+                            <th>Peso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var devolucion in Model.Devoluciones)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="Formulario.DevolucionesIds" value="@devolucion.Id"
+                                           checked="@(Model.Formulario.DevolucionesIds.Contains(devolucion.Id))" />
+                                </td>
+                                <td><i class="ph ph-arrow-u-up-left"></i> @devolucion.ReferenciaExterna</td>
+                                <td>@devolucion.Localidad</td>
+                                <td class="num">@devolucion.PesoKg kg</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
         @if (Model.RetiroHabilitado)
         {
         <h3>Retiros a domicilio</h3>
@@ -271,7 +311,7 @@
                     <tbody>
                         @foreach (var retiro in Model.Retiros)
                         {
-                            <tr>
+                            <tr data-fecha-retiro="@retiro.Fecha.ToString("yyyy-MM-dd")">
                                 <td>
                                     <input type="checkbox" name="Formulario.RetirosIds" value="@retiro.Id"
                                            checked="@(Model.Formulario.RetirosIds.Contains(retiro.Id))" />
@@ -305,7 +345,7 @@
 
         <button type="submit"
                 class="btn-primario"
-                disabled="@(Model.Envios.Count + Model.Retiros.Count + Model.EntregasRetiros.Count == 0)">
+                disabled="@(Model.Envios.Count + Model.Retiros.Count + Model.EntregasRetiros.Count + Model.Devoluciones.Count == 0)">
             Crear y asignar hoja de ruta
         </button>
     </form>
@@ -421,6 +461,31 @@
                                             Despachar
                                         </button>
                                     </form>
+
+                                    @* RF 39: mientras la hoja está en preparación se le puede sumar un retiro del mismo día. *@
+                                    var retirosDelDia = Model.Retiros.Where(r => r.Fecha == hoja.Fecha).ToList();
+                                    @if (Model.RetiroHabilitado && retirosDelDia.Count > 0)
+                                    {
+                                        <form method="post"
+                                              asp-page-handler="AgregarRetiro"
+                                              asp-route-hojaId="@hoja.Id"
+                                              class="mt-1.5 flex flex-wrap items-center gap-2">
+
+                                            @Html.AntiForgeryToken()
+
+                                            <select name="retiroId" aria-label="Retiro" required>
+                                                <option value="">Retiro…</option>
+                                                @foreach (var retiro in retirosDelDia)
+                                                {
+                                                    <option value="@retiro.Id">@retiro.Motivo (@retiro.Localidad, @retiro.HoraDesde a @retiro.HoraHasta)</option>
+                                                }
+                                            </select>
+
+                                            <button type="submit" class="btn-secundario">
+                                                Agregar retiro
+                                            </button>
+                                        </form>
+                                    }
                                 }
                             </td>
                         </tr>
@@ -477,3 +542,18 @@
         </div>
     }
 }
+
+@* Un retiro solo puede ir en una hoja de su misma fecha: se ocultan los de otros días. *@
+<script>
+    (() => {
+        const fecha = document.getElementById("Formulario_Fecha");
+        if (!fecha) return;
+        const filtrar = () => document.querySelectorAll("[data-fecha-retiro]").forEach(fila => {
+            const mismoDia = fila.dataset.fechaRetiro === fecha.value;
+            fila.hidden = !mismoDia;
+            if (!mismoDia) fila.querySelector("input").checked = false;
+        });
+        fecha.addEventListener("change", filtrar);
+        filtrar();
+    })();
+</script>

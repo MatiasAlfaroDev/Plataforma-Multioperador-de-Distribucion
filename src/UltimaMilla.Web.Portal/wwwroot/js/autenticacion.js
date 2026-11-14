@@ -351,7 +351,7 @@ async listarOperadores() {
     return await respuesta.json();
 },
 
-async solicitarVinculacion(operadorId) {
+async solicitarVinculacion(operadorId, direccionRecepcion) {
     const respuestaToken = await fetch("/api/antiforgery/token", {
         method: "GET",
         credentials: "same-origin",
@@ -371,7 +371,7 @@ async solicitarVinculacion(operadorId) {
             "X-CSRF-TOKEN": token
         },
         credentials: "same-origin",
-        body: JSON.stringify({ operadorId })
+        body: JSON.stringify({ operadorId, direccionRecepcion })
     });
 
     if (!respuesta.ok) {
@@ -390,6 +390,43 @@ async solicitarVinculacion(operadorId) {
     return await respuesta.json();
 },
 
+
+async guardarDireccionRecepcion(cuentaComercialId, direccion) {
+    const respuestaToken = await fetch("/api/antiforgery/token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!respuestaToken.ok) {
+        throw new Error("No se pudo obtener el token de seguridad.");
+    }
+
+    const { token } = await respuestaToken.json();
+
+    const respuesta = await fetch(`/api/vinculaciones/${cuentaComercialId}/direccion-recepcion`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": token
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(direccion)
+    });
+
+    if (!respuesta.ok) {
+        let mensaje = `No se pudo guardar la dirección (HTTP ${respuesta.status}).`;
+
+        try {
+            const error = await respuesta.json();
+            mensaje = error.mensaje ?? error.title ?? mensaje;
+        } catch {
+            // Mantener el mensaje HTTP.
+        }
+
+        throw new Error(mensaje);
+    }
+},
 
 async listarEnvios() {
     const respuesta = await fetch("/api/envios", {

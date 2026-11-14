@@ -201,7 +201,7 @@ public class CuentasComercialesHandlersTests
     // ----- ConfigurarDireccionRecepcion -----
 
     private ConfigurarDireccionRecepcionHandler Configurar(ITenantContext sesion) =>
-        new(_cuentas, _unidad, sesion);
+        new(_cuentas, _unidad, sesion, new OperadorActivoFalso());
 
     private static ConfigurarDireccionRecepcionCommand NuevaDireccion(Guid cuentaId) =>
         new(cuentaId, "Rivera", "55", "Libertad", "San José");
@@ -282,7 +282,15 @@ public class CuentasComercialesHandlersTests
 
         public Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(
             Guid comercioId, CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<CuentaComercialDto>>([]);
+            Task.FromResult<IReadOnlyList<CuentaComercialDto>>(Lista
+                .Where(c => c.ComercioId == comercioId)
+                .Select(c => new CuentaComercialDto(c.Id, c.OperadorId, "", c.ComercioId, "", c.Activa, c.Estado))
+                .ToList());
+    }
+
+    private sealed class OperadorActivoFalso : IOperadorActivo
+    {
+        public void SeleccionarOperador(Guid operadorId) { }
     }
 
     private sealed class OperadoresEnMemoria : IOperadorRepository

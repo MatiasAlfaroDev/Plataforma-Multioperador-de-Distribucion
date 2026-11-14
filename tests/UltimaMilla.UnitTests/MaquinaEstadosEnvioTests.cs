@@ -38,7 +38,9 @@ public class MaquinaEstadosEnvioTests
     }
 
     [Theory]
+    [InlineData(EstadoEnvio.Admitido)]
     [InlineData(EstadoEnvio.EnDeposito)]
+    [InlineData(EstadoEnvio.EntregadoParcialmente)]
     [InlineData(EstadoEnvio.AsignadoARuta)]
     [InlineData(EstadoEnvio.EnTransito)]
     [InlineData(EstadoEnvio.NoEntregado)]

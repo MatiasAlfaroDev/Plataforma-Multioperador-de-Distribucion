@@ -52,6 +52,7 @@ public static class MaquinaEstadosEnvio
         // Extraviado es accesible desde todos los estados no finales.
         EstadoEnvio[] estadosNoFinales =
         [
+            EstadoEnvio.Admitido,
             EstadoEnvio.EnDeposito,
             EstadoEnvio.AsignadoARuta,
             EstadoEnvio.EnTransito,

@@ -25,6 +25,7 @@ public sealed class HojasDeRutaModel(
     public List<RetiroRutaApiDto> Retiros { get; private set; } = [];
     public bool RetiroHabilitado { get; private set; } = true;
     public List<EntregaRetiroRutaApiDto> EntregasRetiros { get; private set; } = [];
+    public List<DevolucionRutaApiDto> Devoluciones { get; private set; } = [];
 
     public List<HojaRutaApiDto> Hojas { get; private set; } = [];
 
@@ -66,11 +67,12 @@ public sealed class HojasDeRutaModel(
         }
 
         // RF 39: la hoja puede ser mixta; alcanza con una parada de cualquier tipo.
-        if (Formulario.EnviosIds.Count + Formulario.RetirosIds.Count + Formulario.EntregasRetirosIds.Count == 0)
+        if (Formulario.EnviosIds.Count + Formulario.RetirosIds.Count + Formulario.EntregasRetirosIds.Count
+            + Formulario.DevolucionesIds.Count == 0)
         {
             ModelState.AddModelError(
                 "",
-                "Seleccioná al menos un envío o retiro.");
+                "Seleccioná al menos un envío, devolución o retiro.");
         }
 
         var franjaValida = IntentarObtenerFranja(
@@ -104,7 +106,8 @@ public sealed class HojasDeRutaModel(
                 Formulario.MaximoParadas,
                 Formulario.EnviosIds,
                 Formulario.RetirosIds,
-                Formulario.EntregasRetirosIds);
+                Formulario.EntregasRetirosIds,
+                Formulario.DevolucionesIds);
 
             var hojaId = await api.CrearAsync(
                 solicitud, ct);
@@ -210,6 +213,29 @@ public sealed class HojasDeRutaModel(
         }
     }
 
+    public async Task<IActionResult> OnPostAgregarRetiroAsync(Guid hojaId, Guid retiroId, CancellationToken ct)
+    {
+        if (hojaId == Guid.Empty || retiroId == Guid.Empty)
+        {
+            Error = "Elegí el retiro que querés sumar a la hoja.";
+            await CargarAsync(ct);
+            return Page();
+        }
+
+        try
+        {
+            await api.AgregarRetiroAsync(hojaId, retiroId, ct);
+            TempData["Exito"] = "Retiro agregado a la hoja de ruta.";
+            return RedirectToPage("/HojasDeRuta");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+        {
+            Error = ex.Message;
+            await CargarAsync(ct);
+            return Page();
+        }
+    }
+
    private async Task CargarAsync(CancellationToken ct)
 {
     try
@@ -232,6 +258,7 @@ public sealed class HojasDeRutaModel(
         RetiroHabilitado = (await api.ObtenerBanderasAsync(ct)).GetValueOrDefault("retiro-domicilio", true);
         Retiros = RetiroHabilitado ? opciones.Retiros ?? [] : [];
         EntregasRetiros = RetiroHabilitado ? opciones.EntregasRetiros ?? [] : [];
+        Devoluciones = opciones.Devoluciones ?? [];
         Franjas = opciones.Franjas;
 
         Hojas = await api.ListarAsync(operadorId, ct);
@@ -311,5 +338,6 @@ public sealed class HojasDeRutaModel(
         public List<Guid> EnviosIds { get; set; } = [];
         public List<Guid> RetirosIds { get; set; } = [];
         public List<Guid> EntregasRetirosIds { get; set; } = [];
+        public List<Guid> DevolucionesIds { get; set; } = [];
     }
 }

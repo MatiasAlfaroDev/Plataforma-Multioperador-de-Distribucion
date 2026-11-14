@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Avisos;
@@ -72,6 +73,21 @@ public static class DbSeeder
 
             await db.SaveChangesAsync(ct);
         }
+
+        // Dirección de recepción de las cuentas de demostración: es adonde vuelven las devoluciones
+        // y los retiros sin destino propio. Se completa también en bases sembradas antes.
+        var direccionesDemo = new Dictionary<Guid, Direccion>
+        {
+            [Guid.Parse("33333333-0000-0000-0000-000000000001")] = new("Rivera", "1450", "San José", "San José"),
+            [Guid.Parse("33333333-0000-0000-0000-000000000002")] = new("Rivera", "1450", "San José", "San José"),
+            [Guid.Parse("33333333-0000-0000-0000-000000000003")] = new("Artigas", "620", "San José", "San José")
+        };
+        var cuentasDemo = await db.CuentasComerciales
+            .Where(c => direccionesDemo.Keys.Contains(c.Id))
+            .ToListAsync(ct);
+        foreach (var cuenta in cuentasDemo.Where(c => c.DireccionRecepcion is null))
+            cuenta.ConfigurarDireccionRecepcion(direccionesDemo[cuenta.Id]);
+        await db.SaveChangesAsync(ct);
 
         if (!await db.ZonasCobertura.AnyAsync(ct))
         {

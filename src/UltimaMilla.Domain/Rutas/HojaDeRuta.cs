@@ -613,13 +613,6 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             throw new InvalidOperationException(
                 "El envío pertenece a otro operador.");
 
-        if (envio.Estado != EstadoEnvio.AsignadoARuta &&
-            envio.Estado != EstadoEnvio.EnTransito)
-        {
-            throw new InvalidOperationException(
-                "El envío no está en un estado válido para liberar su parada por extravío.");
-        }
-
         var parada = _paradas.SingleOrDefault(
             p => p.EnvioId == envio.Id && p.Activa);
 
@@ -627,9 +620,31 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             throw new InvalidOperationException(
                 "No existe una parada activa para este envío.");
 
+        // La parada de devolución deja el envío en EnDevolucion y solo carga los bultos que vuelven.
+        var devolucion = parada.TipoOperacion == TipoOperacionRuta.DevolucionComercio;
+
+        var estadoValido = devolucion
+            ? envio.Estado == EstadoEnvio.EnDevolucion
+            : envio.Estado is EstadoEnvio.AsignadoARuta or EstadoEnvio.EnTransito;
+
+        if (!estadoValido)
+        {
+            throw new InvalidOperationException(
+                "El envío no está en un estado válido para liberar su parada por extravío.");
+        }
+
         parada.Liberar(fecha.ToUniversalTime());
 
-        PesoAsignadoKg -= envio.PesoTotalKg;
-        VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+        if (devolucion)
+        {
+            var bultos = envio.Bultos.Where(b => b.Estado == EstadoBulto.EnDevolucion).ToList();
+            PesoAsignadoKg -= bultos.Sum(b => b.PesoKg);
+            VolumenAsignadoM3 -= bultos.Sum(b => b.VolumenMetrosCubicos);
+        }
+        else
+        {
+            PesoAsignadoKg -= envio.PesoTotalKg;
+            VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+        }
     }
 }
