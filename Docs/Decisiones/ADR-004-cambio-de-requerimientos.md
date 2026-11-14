@@ -35,7 +35,7 @@ modificaron, qué resultó sencillo y qué no.
 | RF | Cómo se resolvió | Componentes |
 | :-- | :-- | :-- |
 | 37 | El comercio lo solicita desde el Portal (página *Retiros*) o **por API**, con una clave por usuario del comercio en el encabezado `X-Api-Key`. Por defecto se entrega en la dirección de recepción de la cuenta. | Portal, Api (`ClaveApiAuthenticationHandler`) |
-| 38 | `Retiro` tiene su propia máquina Stateless: solicitado, asignado a ruta, retirado, no retirado, en depósito, entregado al comercio. Un retiro no retirado se reprograma. | Domain, Application |
+| 38 | `Retiro` tiene su propia máquina Stateless: solicitado, asignado a ruta, retirado, no retirado, en depósito, entregado al comercio. Un retiro no retirado se reprograma. Después se sumaron *cancelado* (el comercio o el despacho, con motivo, mientras está solicitado) y *desasignar* (quitar la parada de una hoja en preparación). Diagrama en `Docs/Modelado/maquina-estados-retiro.md`. | Domain, Application, Portal, Backoffice |
 | 39 | `ParadaRuta` distingue entrega, devolución, retiro y entrega de retiro al comercio. `PlanificacionHojaDeRuta` simula la carga parada por parada: los bultos retirados ocupan lugar desde que se suben. | Domain, Backoffice |
 | 40 | La app registra el retiro sin conexión con el escaneo de los bultos, una foto y la firma de quien entrega, en la misma cola que las entregas. | Mobile, Api |
 | 41 | Tiene su tarifa (`TipoServicioTarifario.RetiroDomicilio`), usa el **mismo enlace público** que los envíos (`/seguimiento/{token}`) y está en avisos, en el tablero del Backoffice y en reportes. | Application, Api, Portal, Backoffice |

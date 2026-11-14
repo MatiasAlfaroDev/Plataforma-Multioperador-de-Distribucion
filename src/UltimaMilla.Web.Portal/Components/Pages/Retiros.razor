@@ -33,11 +33,38 @@ else if (retiros.Count == 0)
 }
 else
 {
+    <div class="filtro">
+        <div>
+            <label for="filtroEstado">Estado</label>
+            <select id="filtroEstado" @bind="filtroEstado">
+                <option value="">Todos</option>
+                @foreach (var e in TextosEstado)
+                {
+                    <option value="@e.Key">@e.Value</option>
+                }
+            </select>
+        </div>
+        @if (nombresOperador.Count > 1)
+        {
+            <div>
+                <label for="filtroOperador">Operador</label>
+                <select id="filtroOperador" @bind="filtroOperador">
+                    <option value="@Guid.Empty">Todos</option>
+                    @foreach (var o in nombresOperador)
+                    {
+                        <option value="@o.Key">@o.Value</option>
+                    }
+                </select>
+            </div>
+        }
+    </div>
+
     <div class="tabla">
         <table>
             <thead>
                 <tr>
                     <th>Fecha</th>
+                    <th>Operador</th>
                     <th>Domicilio</th>
                     <th>Bultos</th>
                     <th>Estado</th>
@@ -46,13 +73,37 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var r in retiros)
+                @foreach (var r in RetirosFiltrados)
                 {
                     <tr>
                         <td>@r.FechaSolicitada.ToString("dd/MM/yyyy") @r.HoraDesde.ToString("HH:mm")–@r.HoraHasta.ToString("HH:mm")</td>
+                        <td>@nombresOperador.GetValueOrDefault(r.OperadorId, "-")</td>
                         <td>@r.DomicilioRetiro.Calle @r.DomicilioRetiro.Numero, @r.DomicilioRetiro.Localidad</td>
                         <td>@r.Bultos.Count</td>
-                        <td>@r.Estado</td>
+                        <td>
+                            @TextosEstado.GetValueOrDefault(r.Estado, r.Estado)
+                            @if (r.MotivoCancelacion is not null)
+                            {
+                                <br /><span class="nota">@r.MotivoCancelacion</span>
+                            }
+                            @if (r.Estado == "Solicitado")
+                            {
+                                @if (cancelando == r.Id)
+                                {
+                                    <form class="mt-2 flex flex-wrap items-center gap-1.5" @onsubmit="() => CancelarAsync(r.Id)" @onsubmit:preventDefault>
+                                        <input @bind="motivoCancelacion" maxlength="1000" required placeholder="Motivo" aria-label="Motivo de la cancelación" />
+                                        <button type="submit" class="peligro" disabled="@guardando">Confirmar</button>
+                                        <button type="button" @onclick="() => cancelando = null">Volver</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <button type="button" class="mt-2" @onclick="() => { cancelando = r.Id; motivoCancelacion = string.Empty; }">
+                                        <i class="ph ph-x-circle"></i>Cancelar retiro
+                                    </button>
+                                }
+                            }
+                        </td>
                         <td>@(r.TarifaCalculada?.ToString("C2") ?? "-")</td>
                         <td>
                             @if (enlaces.TryGetValue(r.Id, out var enlace))
@@ -154,6 +205,28 @@ else
     private bool cargando = true, guardando, exito;
     private string? mensaje;
 
+    // Filtros del listado: se aplican sobre lo ya cargado (son los retiros de un solo comercio).
+    private string filtroEstado = "";
+    private Guid filtroOperador;
+    private Dictionary<Guid, string> nombresOperador = [];
+    private Guid? cancelando;
+    private string motivoCancelacion = "";
+
+    private static readonly Dictionary<string, string> TextosEstado = new()
+    {
+        ["Solicitado"] = "Solicitado",
+        ["AsignadoARuta"] = "Asignado a ruta",
+        ["Retirado"] = "Retirado",
+        ["NoRetirado"] = "No retirado",
+        ["EnDeposito"] = "En depósito",
+        ["EntregadoAlComercio"] = "Entregado al comercio",
+        ["Cancelado"] = "Cancelado"
+    };
+
+    private IEnumerable<RetiroItem> RetirosFiltrados => retiros
+        .Where(r => filtroEstado == "" || r.Estado == filtroEstado)
+        .Where(r => filtroOperador == Guid.Empty || r.OperadorId == filtroOperador);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -168,7 +241,11 @@ else
             retiros = await JS.InvokeAsync<List<RetiroItem>>("retirosPortal.listar");
             // Aclaración 3.2: solo los operadores que tienen habilitado el retiro a domicilio.
             var banderas = await JS.InvokeAsync<Dictionary<Guid, Dictionary<string, bool>>>("retirosPortal.banderas");
-            cuentas = (await JS.InvokeAsync<List<CuentaItem>>("autenticacionPortal.obtenerCuentasComerciales"))
+            var todasLasCuentas = await JS.InvokeAsync<List<CuentaItem>>("autenticacionPortal.obtenerCuentasComerciales");
+            nombresOperador = todasLasCuentas
+                .GroupBy(c => c.OperadorId)
+                .ToDictionary(g => g.Key, g => g.First().OperadorNombre);
+            cuentas = todasLasCuentas
                 .Where(c => c.Activa && c.Estado == CuentaConfirmada)
                 .Where(c => !banderas.TryGetValue(c.OperadorId, out var b) || b.GetValueOrDefault("retiro-domicilio", true))
                 .ToList();
@@ -224,6 +301,34 @@ else
         }
     }
 
+    private async Task CancelarAsync(Guid id)
+    {
+        if (guardando)
+            return;
+
+        guardando = true;
+        try
+        {
+            var resultado = await JS.InvokeAsync<ResultadoOperacion>("retirosPortal.cancelar", id, motivoCancelacion);
+            exito = resultado.Exito;
+            mensaje = resultado.Mensaje;
+            if (exito)
+            {
+                cancelando = null;
+                await CargarAsync();
+            }
+        }
+        catch (JSException ex)
+        {
+            exito = false;
+            mensaje = ex.Message;
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
     private async Task GenerarEnlaceAsync(Guid id)
     {
         try
@@ -249,8 +354,8 @@ else
     private sealed record DireccionItem(string Calle, string Numero, string Localidad, string Departamento);
     private sealed record BultoItem(Guid Id, string Identificacion);
     private sealed record RetiroItem(
-        Guid Id, DateOnly FechaSolicitada, TimeOnly HoraDesde, TimeOnly HoraHasta, string Estado,
-        DireccionItem DomicilioRetiro, decimal? TarifaCalculada, List<BultoItem> Bultos);
+        Guid Id, Guid OperadorId, DateOnly FechaSolicitada, TimeOnly HoraDesde, TimeOnly HoraHasta, string Estado,
+        DireccionItem DomicilioRetiro, decimal? TarifaCalculada, List<BultoItem> Bultos, string? MotivoCancelacion);
     private sealed record CuentaItem(Guid Id, Guid OperadorId, string OperadorNombre, bool Activa, int Estado);
     private sealed record ResultadoOperacion(bool Exito, string Mensaje);
 }

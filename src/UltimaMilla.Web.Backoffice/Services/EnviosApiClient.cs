@@ -258,7 +258,22 @@ public sealed class EnviosApiClient(HttpClient http)
 
     // RF 41: el tablero de operación incorpora los retiros a domicilio.
     public async Task<IReadOnlyList<RetiroTableroItem>> ListarRetirosAsync(CancellationToken ct = default) =>
-        await http.GetFromJsonAsync<List<RetiroTableroItem>>("api/retiros", ct) ?? [];
+        await ListarRetirosAsync(null, null, null, ct);
+
+    public async Task<IReadOnlyList<RetiroTableroItem>> ListarRetirosAsync(
+        string? estado, DateOnly? desde, DateOnly? hasta, CancellationToken ct = default)
+    {
+        var filtros = new List<string>();
+        if (!string.IsNullOrWhiteSpace(estado)) filtros.Add($"estado={Uri.EscapeDataString(estado)}");
+        if (desde is not null) filtros.Add($"desde={desde:yyyy-MM-dd}");
+        if (hasta is not null) filtros.Add($"hasta={hasta:yyyy-MM-dd}");
+
+        var ruta = filtros.Count == 0 ? "api/retiros" : "api/retiros?" + string.Join("&", filtros);
+        return await http.GetFromJsonAsync<List<RetiroTableroItem>>(ruta, ct) ?? [];
+    }
+
+    public Task CancelarRetiroAsync(Guid retiroId, string motivo, CancellationToken ct = default) =>
+        EnviarProtegidoAsync($"api/retiros/{retiroId}/cancelar", new { Motivo = motivo }, ct);
 
     /// <summary>accion: recibir-deposito, entregar-comercio o reprogramar.</summary>
     public Task GestionarRetiroAsync(Guid retiroId, string accion, CancellationToken ct = default) =>
@@ -410,4 +425,9 @@ public sealed record RetiroTableroItem(
     DateOnly FechaSolicitada,
     string Estado,
     RetiroDireccionItem DomicilioRetiro,
-    List<RetiroBultoItem> Bultos);
+    List<RetiroBultoItem> Bultos,
+    TimeOnly HoraDesde = default,
+    TimeOnly HoraHasta = default,
+    RetiroDireccionItem? DomicilioDestino = null,
+    Guid? HojaDeRutaId = null,
+    string? MotivoCancelacion = null);

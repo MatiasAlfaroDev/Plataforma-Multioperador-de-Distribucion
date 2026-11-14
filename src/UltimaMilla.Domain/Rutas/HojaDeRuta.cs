@@ -388,6 +388,28 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
         }
     }
 
+    /// <summary>Saca un retiro de la hoja en preparación; el retiro vuelve a Solicitado.</summary>
+    public void QuitarRetiro(Retiro retiro, DateTimeOffset fecha)
+    {
+        ArgumentNullException.ThrowIfNull(retiro);
+        VerificarEditable();
+
+        if (retiro.OperadorId != OperadorId)
+            throw new InvalidOperationException(
+                "El retiro pertenece a otro operador.");
+
+        var parada = _paradas.SingleOrDefault(
+            p => p.RetiroId == retiro.Id &&
+                 p.TipoOperacion == TipoOperacionRuta.Retiro &&
+                 p.Activa)
+            ?? throw new InvalidOperationException(
+                "El retiro no tiene una parada activa en esta ruta.");
+
+        // La carga del retiro no suma a PesoAsignadoKg (se simula parada por parada), así que no se descuenta.
+        retiro.Desasignar();
+        parada.Liberar(fecha.ToUniversalTime());
+    }
+
     public void QuitarEnvio(Envio envio, DateTimeOffset fecha)
     {
         ArgumentNullException.ThrowIfNull(envio);

@@ -30,6 +30,8 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
     public string? ReferenciaFirma { get; private set; }
     public DateTimeOffset? RetiradoEn { get; private set; }
 
+    public string? MotivoCancelacion { get; private set; }
+
     public IReadOnlyCollection<BultoRetiro> Bultos => _bultos;
 
     public decimal PesoTotalKg => _bultos.Sum(b => b.PesoKg);
@@ -166,6 +168,26 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
         CrearMaquina().Fire(DisparadorRetiro.EntregarAlComercio);
     }
 
+    /// <summary>El comercio o el operador lo cancelan mientras nadie salió a buscarlo.</summary>
+    public void Cancelar(string motivo)
+    {
+        if (string.IsNullOrWhiteSpace(motivo) || motivo.Trim().Length > 1000)
+            throw new ArgumentException(
+                "El motivo de la cancelación es obligatorio y admite hasta 1000 caracteres.");
+
+        CrearMaquina().Fire(DisparadorRetiro.Cancelar);
+
+        MotivoCancelacion = motivo.Trim();
+    }
+
+    /// <summary>Se sacó la parada de la hoja antes de despacharla: vuelve a estar para planificar.</summary>
+    public void Desasignar()
+    {
+        CrearMaquina().Fire(DisparadorRetiro.Desasignar);
+
+        HojaDeRutaId = null;
+    }
+
     private StateMachine<EstadoRetiro, DisparadorRetiro> CrearMaquina()
     {
         var maquina = new StateMachine<EstadoRetiro, DisparadorRetiro>(
@@ -175,9 +197,15 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
         maquina.Configure(EstadoRetiro.Solicitado)
             .Permit(
                 DisparadorRetiro.AsignarARuta,
-                EstadoRetiro.AsignadoARuta);
+                EstadoRetiro.AsignadoARuta)
+            .Permit(
+                DisparadorRetiro.Cancelar,
+                EstadoRetiro.Cancelado);
 
         maquina.Configure(EstadoRetiro.AsignadoARuta)
+            .Permit(
+                DisparadorRetiro.Desasignar,
+                EstadoRetiro.Solicitado)
             .Permit(
                 DisparadorRetiro.RegistrarRetiro,
                 EstadoRetiro.Retirado)

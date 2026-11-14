@@ -229,7 +229,7 @@ línea 289 en adelante son tres imágenes en base64 que pesan 350 KB; hay que le
 `sed -n '1,288p' Docs/Planificacion/spec-inicial.md`.
 
 `Docs/Modelado/` tiene `stack-tecnologico.md` —fuente de verdad del stack— y
-`diagrama-arquitectura.md`, más `img/` con los cuatro diagramas del informe exportados a PNG:
+`diagrama-arquitectura.md`, `maquina-estados-retiro.md` (RF 38, con cancelación y desasignación), más `img/` con los cuatro diagramas del informe exportados a PNG:
 `arquitectura-logica`, `modelo-dominio`, `despliegue` y `maquina-estados`.
 
 `Docs/Decisiones/` tiene ADR-001 a ADR-008: ADR-003 (conflictos de sincronización, también por bulto

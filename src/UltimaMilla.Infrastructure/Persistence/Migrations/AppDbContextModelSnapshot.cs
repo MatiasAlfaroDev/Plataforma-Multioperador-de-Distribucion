@@ -1643,6 +1643,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("MotivoCancelacion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<Guid>("OperadorId")
                         .HasColumnType("uuid");
 
