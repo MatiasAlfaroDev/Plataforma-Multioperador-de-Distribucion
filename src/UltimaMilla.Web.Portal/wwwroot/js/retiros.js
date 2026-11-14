@@ -50,6 +50,37 @@ window.retirosPortal = {
         return { exito: false, mensaje: await mensajeDeProblema(respuesta) };
     },
 
+    // El comercio cancela un retiro mientras sigue solicitado (nadie salió a buscarlo).
+    async cancelar(id, motivo) {
+        const respuestaToken = await fetch("/api/antiforgery/token", {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        if (!respuestaToken.ok) {
+            return { exito: false, mensaje: "No se pudo obtener el token de seguridad." };
+        }
+
+        const { token } = await respuestaToken.json();
+
+        const respuesta = await fetch(`/api/retiros/${encodeURIComponent(id)}/cancelar`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": token
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({ motivo })
+        });
+
+        if (respuesta.ok) {
+            return { exito: true, mensaje: "Retiro cancelado." };
+        }
+
+        return { exito: false, mensaje: await mensajeDeProblema(respuesta) };
+    },
+
     async enlacePublico(id) {
         const respuesta = await fetch(`/api/retiros/${encodeURIComponent(id)}/enlace-publico`, {
             method: "GET",

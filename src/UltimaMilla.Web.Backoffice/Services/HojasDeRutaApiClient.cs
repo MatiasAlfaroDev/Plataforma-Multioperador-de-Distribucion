@@ -49,13 +49,23 @@ public sealed record EntregaRetiroRutaApiDto(
     decimal PesoKg,
     decimal VolumenM3);
 
+// Envío en devolución: la parada lo lleva a la dirección de recepción de la cuenta comercial.
+public sealed record DevolucionRutaApiDto(
+    Guid Id,
+    string ReferenciaExterna,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3);
+
 public sealed record OpcionesHojaRutaApiDto(
     List<RepartidorRutaApiDto> Repartidores,
     List<VehiculoRutaApiDto> Vehiculos,
     List<EnvioRutaApiDto> Envios,
     List<FranjaRutaApiDto> Franjas,
     List<RetiroRutaApiDto>? Retiros = null,
-    List<EntregaRetiroRutaApiDto>? EntregasRetiros = null);
+    List<EntregaRetiroRutaApiDto>? EntregasRetiros = null,
+    List<DevolucionRutaApiDto>? Devoluciones = null);
 
 public sealed record HojaRutaApiDto(
     Guid Id,
@@ -95,7 +105,8 @@ public sealed record CrearHojaRutaApiRequest(
     int MaximoParadas,
     IReadOnlyList<Guid> EnviosIds,
     IReadOnlyList<Guid>? RetirosIds = null,
-    IReadOnlyList<Guid>? EntregasRetirosIds = null);
+    IReadOnlyList<Guid>? EntregasRetirosIds = null,
+    IReadOnlyList<Guid>? DevolucionesIds = null);
 
 public sealed class HojasDeRutaApiClient(HttpClient http)
 {
@@ -220,6 +231,29 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
             var contenido = await respuesta.Content.ReadAsStringAsync(ct);
             throw new InvalidOperationException(
                 $"No se pudo agregar el envío urgente. HTTP {(int)respuesta.StatusCode}: {contenido}");
+        }
+    }
+
+    /// <summary>RF 39: suma un retiro a una hoja que todavía está en preparación.</summary>
+    public Task AgregarRetiroAsync(Guid hojaId, Guid retiroId, CancellationToken ct) =>
+        EnviarAsync(HttpMethod.Post, $"api/hojas-de-ruta/{hojaId}/retiros",
+            JsonContent.Create(new { retiroId }), "No se pudo agregar el retiro a la hoja", ct);
+
+    /// <summary>Saca un retiro de una hoja en preparación; el retiro vuelve a quedar solicitado.</summary>
+    public Task QuitarRetiroAsync(Guid hojaId, Guid retiroId, CancellationToken ct) =>
+        EnviarAsync(HttpMethod.Delete, $"api/hojas-de-ruta/{hojaId}/retiros/{retiroId}",
+            null, "No se pudo quitar el retiro de la hoja", ct);
+
+    private async Task EnviarAsync(
+        HttpMethod metodo, string ruta, HttpContent? contenido, string mensaje, CancellationToken ct)
+    {
+        using var solicitud = await CrearSolicitudProtegidaAsync(metodo, ruta, contenido, ct);
+        using var respuesta = await http.SendAsync(solicitud, ct);
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var detalle = await respuesta.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"{mensaje}. HTTP {(int)respuesta.StatusCode}: {detalle}");
         }
     }
 

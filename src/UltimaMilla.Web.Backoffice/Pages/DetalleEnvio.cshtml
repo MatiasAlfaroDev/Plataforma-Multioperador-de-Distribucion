@@ -19,7 +19,8 @@
         @Model.Error
     </div>
 }
-else if (Model.Envio is { } envio)
+
+@if (Model.Envio is { } envio)
 {
     <h2>Información general</h2>
 
@@ -138,6 +139,73 @@ else if (Model.Envio is { } envio)
         </form>
     </section>
 }
+    @if (Model.PuedeDeclararExtravio)
+    {
+        <section class="mt-6">
+            <h2>Declarar extraviado</h2>
+
+            <p class="nota">
+                El envío queda fuera de la operación hasta que reaparezca en el depósito.
+                Si tiene una parada activa en una hoja de ruta, se libera.
+            </p>
+
+            <form method="post" asp-page-handler="DeclararExtravio" asp-route-id="@envio.Id">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-campo">
+                    <label for="justificacionExtravio">Justificación</label>
+                    <textarea id="justificacionExtravio" name="justificacion" maxlength="1000" rows="3" required></textarea>
+                </div>
+
+                <div class="modal-campo">
+                    <label for="responsableExtravio">Responsable</label>
+                    <input type="text" id="responsableExtravio" name="responsable" maxlength="150" required />
+                </div>
+
+                <button type="submit" class="peligro">
+                    <i class="ph ph-warning"></i>Declarar extraviado
+                </button>
+            </form>
+        </section>
+    }
+
+    @if (Model.PuedeRegistrarReaparicion)
+    {
+        <section class="mt-6">
+            <h2>Registrar reaparición</h2>
+
+            <p class="nota">
+                Confirmá todos los bultos extraviados que aparecieron en el depósito.
+                El envío vuelve a quedar en depósito.
+            </p>
+
+            <form method="post" asp-page-handler="RegistrarReaparicion" asp-route-id="@envio.Id">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-campo">
+                    <label for="responsableReaparicion">Responsable de recepción</label>
+                    <input type="text" id="responsableReaparicion" name="responsable" maxlength="150" required />
+                </div>
+
+                <fieldset>
+                    <legend>Bultos escaneados</legend>
+
+                    @foreach (var bulto in envio.Bultos.Where(b => b.Estado == "Extraviado"))
+                    {
+                        <label class="checkbox">
+                            <input type="checkbox" name="identificaciones" value="@bulto.Identificacion" />
+                            @bulto.Identificacion
+                        </label>
+                    }
+                </fieldset>
+
+                <button type="submit" class="primario">
+                    <i class="ph ph-arrow-counter-clockwise"></i>Registrar reaparición
+                </button>
+            </form>
+        </section>
+    }
+
     @if (Model.Discrepancias.Count > 0)
     {
         <h2>Discrepancias de recepción</h2>

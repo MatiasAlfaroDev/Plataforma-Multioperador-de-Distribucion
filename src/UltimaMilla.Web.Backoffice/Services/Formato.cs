@@ -47,4 +47,16 @@ public static class Formato
         "Extraviado" => "Extraviado",
         _ => estado
     };
+
+    public static string EstadoRetiro(string estado) => estado switch
+    {
+        "Solicitado" => "Solicitado",
+        "AsignadoARuta" => "Asignado a ruta",
+        "Retirado" => "Retirado",
+        "NoRetirado" => "No retirado",
+        "EnDeposito" => "En depósito",
+        "EntregadoAlComercio" => "Entregado al comercio",
+        "Cancelado" => "Cancelado",
+        _ => estado
+    };
 }

@@ -78,6 +78,9 @@ using UltimaMilla.Application.Configuracion.Commands.CrearTarifa;
 using UltimaMilla.Application.Retiros.Queries;
 using UltimaMilla.Application.Rutas.Commands.AgregarRetiroARuta;
 using UltimaMilla.Application.Retiros.Commands.GestionarRetiro;
+using UltimaMilla.Application.Retiros.Commands.CancelarRetiro;
+using UltimaMilla.Application.Rutas.Commands.QuitarRetiroDeRuta;
+using UltimaMilla.Domain.Retiros;
 using UltimaMilla.Application.Retiros.Commands.RegistrarEventoRetiro;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResumenRetiros;
 using System.Security.Cryptography;
@@ -836,11 +839,15 @@ api.MapPost("/retiros", async (
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.PersonalComercio));
 
 // RF37: listar retiros del comercio o del operador autenticado.
+// GET /api/retiros?estado=Solicitado&desde=2026-11-01&hasta=2026-11-30 (todos los filtros son opcionales).
 api.MapGet("/retiros", async (
+    EstadoRetiro? estado,
+    DateOnly? desde,
+    DateOnly? hasta,
     ConsultarRetirosHandler handler,
     CancellationToken ct) =>
 {
-    var resultado = await handler.ListarAsync(ct);
+    var resultado = await handler.ListarAsync(estado, desde, hasta, ct);
 
     return Results.Ok(resultado);
 })
@@ -923,6 +930,30 @@ api.MapPost("/retiros/{retiroId:guid}/recibir-deposito",
 
 
 // POST /api/retiros/{id}/reprogramar → un retiro no retirado vuelve a Solicitado (RF 38).
+// El comercio dueño (Portal o clave de API) o el despacho cancelan un retiro todavía solicitado.
+api.MapPost("/retiros/{retiroId:guid}/cancelar",
+    async (
+        Guid retiroId,
+        CancelarRetiroRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        CancelarRetiroHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!ClaveApiAuthenticationHandler.EsLlamadaConClave(context) &&
+            !await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        await handler.Handle(new CancelarRetiroCommand(retiroId, request.Motivo), ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.DespachoYComercio));
+
 api.MapPost("/retiros/{retiroId:guid}/reprogramar",
     async (
         Guid retiroId,
@@ -1601,6 +1632,37 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios-urgentes",
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
+// Saca un retiro de una hoja en preparación; el retiro vuelve a Solicitado.
+api.MapDelete("/hojas-de-ruta/{hojaId:guid}/retiros/{retiroId:guid}",
+    async (
+        Guid hojaId,
+        Guid retiroId,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        QuitarRetiroDeRutaHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(new QuitarRetiroDeRutaCommand(operadorId, hojaId, retiroId), ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
+
 api.MapPost("/hojas-de-ruta/{hojaId:guid}/retiros",
     async (
         Guid hojaId,
@@ -1840,6 +1902,7 @@ public sealed record EditarZonaRequest(
 /// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/carga; la hoja viaja en la URL.</summary>
 public sealed record VerificarMiCargaRequest(IReadOnlyList<string>? BultosEscaneados);
 
+public sealed record CancelarRetiroRequest(string Motivo);
 public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
 public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
 public sealed record IniciarDevolucionRequest( string Responsable);

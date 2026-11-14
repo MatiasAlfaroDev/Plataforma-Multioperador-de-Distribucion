@@ -40,24 +40,6 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         }
     }
 
-    public async Task<IActionResult> OnPostRetiroAsync(Guid retiroId, string accion, CancellationToken ct)
-    {
-        if (accion is not ("recibir-deposito" or "entregar-comercio" or "reprogramar"))
-            return BadRequest();
-
-        try
-        {
-            await api.GestionarRetiroAsync(retiroId, accion, ct);
-            TempData["MensajeExito"] = "Retiro actualizado.";
-        }
-        catch (HttpRequestException ex)
-        {
-            TempData["MensajeExito"] = ex.Message;
-        }
-
-        return RedirectToPage();
-    }
-
     public async Task<IActionResult> OnPostRecibirAsync(
         Guid envioId,
         string identificaciones,

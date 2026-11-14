@@ -71,10 +71,12 @@ public sealed class DeclararExtravioHandler(
         }
 
         // Evitamos dejar paradas activas asociadas
-        // a estados que no deberían tenerlas.
+        // a estados que no deberían tenerlas. La parada de devolución al comercio
+        // mantiene el envío en EnDevolucion.
         if (hoja is not null &&
             estadoAnterior != EstadoEnvio.AsignadoARuta &&
-            estadoAnterior != EstadoEnvio.EnTransito)
+            estadoAnterior != EstadoEnvio.EnTransito &&
+            estadoAnterior != EstadoEnvio.EnDevolucion)
         {
             throw new InvalidOperationException(
                 "El estado del envío no coincide con su asignación de ruta.");

@@ -11,6 +11,24 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
 
     public string? Error { get; private set; }
 
+    // Mismos estados que MaquinaEstadosEnvio: cualquiera no final puede declararse extraviado.
+    private static readonly string[] EstadosQuePermitenExtravio =
+    [
+        "Admitido", "EnDeposito", "AsignadoARuta", "EnTransito", "NoEntregado",
+        "EntregadoParcialmente", "Reprogramado", "EnDevolucion"
+    ];
+
+    public bool PuedeDeclararExtravio =>
+        Envio is not null && EstadosQuePermitenExtravio.Contains(Envio.Estado) &&
+        PuedeGestionarDespacho;
+
+    public bool PuedeRegistrarReaparicion =>
+        Envio?.Estado == "Extraviado" &&
+        (PuedeGestionarDespacho || User.IsInRole("OperarioDeposito"));
+
+    private bool PuedeGestionarDespacho =>
+        User.IsInRole("AdministradorOperador") || User.IsInRole("Despachador") || User.IsInRole("Operador");
+
     public async Task<IActionResult> OnGetAsync(
         Guid id,
         CancellationToken ct)
@@ -77,6 +95,47 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         return Page();
     }
 }
+
+    public Task<IActionResult> OnPostDeclararExtravioAsync(
+        Guid id, string justificacion, string responsable, CancellationToken ct) =>
+        EjecutarAsync(id, ct,
+            string.IsNullOrWhiteSpace(justificacion) || string.IsNullOrWhiteSpace(responsable)
+                ? "Indicá la justificación y el responsable."
+                : null,
+            () => api.DeclararExtravioAsync(id, justificacion.Trim(), responsable.Trim(), ct));
+
+    public Task<IActionResult> OnPostRegistrarReaparicionAsync(
+        Guid id, string responsable, List<string> identificaciones, CancellationToken ct) =>
+        EjecutarAsync(id, ct,
+            string.IsNullOrWhiteSpace(responsable) ? "Indicá el responsable."
+            : identificaciones is null || identificaciones.Count == 0 ? "Escaneá los bultos que reaparecieron."
+            : null,
+            () => api.RegistrarReaparicionAsync(id, identificaciones, responsable.Trim(), ct));
+
+    private async Task<IActionResult> EjecutarAsync(
+        Guid id, CancellationToken ct, string? errorDeValidacion, Func<Task> accion)
+    {
+        if (id == Guid.Empty)
+            return BadRequest();
+
+        var error = errorDeValidacion;
+        if (error is null)
+        {
+            try
+            {
+                await accion();
+                return RedirectToPage("/DetalleEnvio", new { id });
+            }
+            catch (HttpRequestException ex)
+            {
+                error = ex.Message;
+            }
+        }
+
+        var resultado = await OnGetAsync(id, ct);
+        Error = error;
+        return resultado;
+    }
 
         public async Task<IActionResult> OnPostRetornarDepositoAsync(
             Guid id,

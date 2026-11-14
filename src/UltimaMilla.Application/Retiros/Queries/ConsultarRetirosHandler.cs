@@ -12,6 +12,21 @@ public sealed class ConsultarRetirosHandler(
     ITenantContext tenant,
     IOperadorActivo operadorActivo)
 {
+    /// <summary>Listado con filtros opcionales por estado y por fecha solicitada (desde/hasta inclusive).</summary>
+    public async Task<IReadOnlyList<RetiroDto>> ListarAsync(
+        EstadoRetiro? estado,
+        DateOnly? desde,
+        DateOnly? hasta,
+        CancellationToken ct)
+    {
+        // ponytail: se filtra en memoria sobre el listado completo; pasarlo al repositorio si crece el volumen.
+        return (await ListarAsync(ct))
+            .Where(r => estado is null || r.Estado == estado.ToString())
+            .Where(r => desde is null || r.FechaSolicitada >= desde)
+            .Where(r => hasta is null || r.FechaSolicitada <= hasta)
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<RetiroDto>> ListarAsync(
         CancellationToken ct)
     {
@@ -198,6 +213,7 @@ public sealed class ConsultarRetirosHandler(
                     b.AnchoCm,
                     b.ProfundidadCm,
                     b.VolumenMetrosCubicos))
-                .ToList());
+                .ToList(),
+            retiro.MotivoCancelacion);
     }
 }

@@ -46,11 +46,29 @@ else
             {
                 <p>Estado: Sin vinculación</p>
 
-                <button type="button"
-                        disabled="@enviando"
-                        @onclick="() => SolicitarAsync(operador.Id)">
-                    Solicitar vinculación
-                </button>
+                <AuthorizeView Policy="AdministradorComercio" Context="admin">
+                    <Authorized>
+                        @if (formularios.TryGetValue(operador.Id, out var pedido))
+                        {
+                            <form @onsubmit="() => SolicitarAsync(operador.Id)" @onsubmit:preventDefault>
+                                @CamposDireccion(pedido, operador.Id)
+                                <div class="acciones">
+                                    <button type="submit" class="primario" disabled="@enviando">Enviar solicitud</button>
+                                    <button type="button" @onclick="() => formularios.Remove(operador.Id)">Cancelar</button>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            <button type="button" @onclick="() => formularios[operador.Id] = new DireccionFormulario()">
+                                Solicitar vinculación
+                            </button>
+                        }
+                    </Authorized>
+                    <NotAuthorized>
+                        <p class="nota">Solo el administrador del comercio puede solicitar la vinculación.</p>
+                    </NotAuthorized>
+                </AuthorizeView>
             }
            else if (cuenta.Estado == EstadoVinculacion.Confirmada
                     && cuenta.Activa)
@@ -67,6 +85,33 @@ else
             else if (cuenta.Estado == EstadoVinculacion.Pendiente)
             {
                 <p>Estado: Pendiente de aprobación</p>
+            }
+
+            @if (cuenta is not null && cuenta.Estado != EstadoVinculacion.Rechazada)
+            {
+                <p class="nota flex items-center gap-1.5">
+                    <i class="ph ph-map-pin"></i>
+                    Dirección de recepción: @(cuenta.DireccionRecepcion ?? "sin configurar")
+                </p>
+
+                <AuthorizeView Policy="AdministradorComercio" Context="admin">
+                    @if (formularios.TryGetValue(operador.Id, out var edicion))
+                    {
+                        <form @onsubmit="() => GuardarDireccionAsync(operador.Id, cuenta.Id)" @onsubmit:preventDefault>
+                            @CamposDireccion(edicion, operador.Id)
+                            <div class="acciones">
+                                <button type="submit" class="primario" disabled="@enviando">Guardar dirección</button>
+                                <button type="button" @onclick="() => formularios.Remove(operador.Id)">Cancelar</button>
+                            </div>
+                        </form>
+                    }
+                    else
+                    {
+                        <button type="button" @onclick="() => formularios[operador.Id] = new DireccionFormulario()">
+                            <i class="ph ph-pencil-simple"></i>Cambiar dirección
+                        </button>
+                    }
+                </AuthorizeView>
             }
             else if (cuenta.Estado == EstadoVinculacion.Rechazada)
             {
@@ -121,6 +166,54 @@ else
         }
     }
 
+    // Dirección de recepción (RF 37 y devoluciones): adonde el operador lleva lo que vuelve al comercio.
+    private readonly Dictionary<Guid, DireccionFormulario> formularios = new();
+
+    private RenderFragment CamposDireccion(DireccionFormulario d, Guid operadorId) => __builder =>
+    {
+        <fieldset>
+            <legend>Dirección de recepción</legend>
+            <div class="campos">
+                <div><label for="@($"calle-{operadorId}")">Calle</label><input id="@($"calle-{operadorId}")" @bind="d.Calle" required /></div>
+                <div><label for="@($"numero-{operadorId}")">Número</label><input id="@($"numero-{operadorId}")" @bind="d.Numero" required /></div>
+                <div><label for="@($"localidad-{operadorId}")">Localidad</label><input id="@($"localidad-{operadorId}")" @bind="d.Localidad" required /></div>
+                <div><label for="@($"departamento-{operadorId}")">Departamento</label><input id="@($"departamento-{operadorId}")" @bind="d.Departamento" required /></div>
+            </div>
+        </fieldset>
+    };
+
+    private async Task GuardarDireccionAsync(Guid operadorId, Guid cuentaId)
+    {
+        if (enviando)
+            return;
+
+        enviando = true;
+        error = null;
+        mensaje = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "autenticacionPortal.guardarDireccionRecepcion",
+                cuentaId,
+                formularios[operadorId]);
+
+            formularios.Remove(operadorId);
+            mensaje = "Dirección de recepción actualizada.";
+
+            cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
+                "autenticacionPortal.obtenerCuentasComerciales");
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+
     private async Task SolicitarAsync(Guid operadorId)
     {
         if (enviando)
@@ -134,8 +227,10 @@ else
         {
             await JS.InvokeVoidAsync(
                 "autenticacionPortal.solicitarVinculacion",
-                operadorId);
+                operadorId,
+                formularios[operadorId]);
 
+            formularios.Remove(operadorId);
             mensaje = "Solicitud enviada correctamente.";
 
             cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
@@ -167,6 +262,15 @@ else
         public string ComercioNombre { get; set; } = "";
         public bool Activa { get; set; }
         public EstadoVinculacion Estado { get; set; }
+        public string? DireccionRecepcion { get; set; }
+    }
+
+    private sealed class DireccionFormulario
+    {
+        public string Calle { get; set; } = "";
+        public string Numero { get; set; } = "";
+        public string Localidad { get; set; } = "";
+        public string Departamento { get; set; } = "";
     }
 
     private enum EstadoVinculacion

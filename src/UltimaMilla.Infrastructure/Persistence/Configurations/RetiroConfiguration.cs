@@ -29,6 +29,9 @@ public sealed class RetiroConfiguration : IEntityTypeConfiguration<Retiro>
         builder.Property(r => r.ReferenciaFirma)
             .HasMaxLength(500);
 
+        builder.Property(r => r.MotivoCancelacion)
+            .HasMaxLength(1000);
+
         builder.Ignore(r => r.PesoTotalKg);
         builder.Ignore(r => r.VolumenTotalMetrosCubicos);
 

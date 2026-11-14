@@ -39,6 +39,7 @@ public static class TiposAviso
     public const string RetiroEnDeposito = "retiro.en_deposito";
     public const string RetiroEntregadoAlComercio =
         "retiro.entregado_al_comercio";
+    public const string RetiroCancelado = "retiro.cancelado";
 
     /// <summary>
     /// Todos los tipos de aviso disponibles.
@@ -62,6 +63,7 @@ public static class TiposAviso
         RetiroNoRetirado,
         RetiroEnDeposito,
         RetiroEntregadoAlComercio,
+        RetiroCancelado,
         BultoEntregado,
         BultoNoEntregado,
         BultoEnDevolucion,
@@ -122,6 +124,9 @@ public static class TiposAviso
 
         EstadoRetiro.EntregadoAlComercio =>
             RetiroEntregadoAlComercio,
+
+        EstadoRetiro.Cancelado =>
+            RetiroCancelado,
 
         _ => null
     };

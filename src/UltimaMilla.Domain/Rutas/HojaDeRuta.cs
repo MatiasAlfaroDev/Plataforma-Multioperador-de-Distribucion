@@ -388,6 +388,28 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
         }
     }
 
+    /// <summary>Saca un retiro de la hoja en preparación; el retiro vuelve a Solicitado.</summary>
+    public void QuitarRetiro(Retiro retiro, DateTimeOffset fecha)
+    {
+        ArgumentNullException.ThrowIfNull(retiro);
+        VerificarEditable();
+
+        if (retiro.OperadorId != OperadorId)
+            throw new InvalidOperationException(
+                "El retiro pertenece a otro operador.");
+
+        var parada = _paradas.SingleOrDefault(
+            p => p.RetiroId == retiro.Id &&
+                 p.TipoOperacion == TipoOperacionRuta.Retiro &&
+                 p.Activa)
+            ?? throw new InvalidOperationException(
+                "El retiro no tiene una parada activa en esta ruta.");
+
+        // La carga del retiro no suma a PesoAsignadoKg (se simula parada por parada), así que no se descuenta.
+        retiro.Desasignar();
+        parada.Liberar(fecha.ToUniversalTime());
+    }
+
     public void QuitarEnvio(Envio envio, DateTimeOffset fecha)
     {
         ArgumentNullException.ThrowIfNull(envio);
@@ -613,13 +635,6 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             throw new InvalidOperationException(
                 "El envío pertenece a otro operador.");
 
-        if (envio.Estado != EstadoEnvio.AsignadoARuta &&
-            envio.Estado != EstadoEnvio.EnTransito)
-        {
-            throw new InvalidOperationException(
-                "El envío no está en un estado válido para liberar su parada por extravío.");
-        }
-
         var parada = _paradas.SingleOrDefault(
             p => p.EnvioId == envio.Id && p.Activa);
 
@@ -627,9 +642,31 @@ public sealed class HojaDeRuta : AuditableEntity, ITenantEntity
             throw new InvalidOperationException(
                 "No existe una parada activa para este envío.");
 
+        // La parada de devolución deja el envío en EnDevolucion y solo carga los bultos que vuelven.
+        var devolucion = parada.TipoOperacion == TipoOperacionRuta.DevolucionComercio;
+
+        var estadoValido = devolucion
+            ? envio.Estado == EstadoEnvio.EnDevolucion
+            : envio.Estado is EstadoEnvio.AsignadoARuta or EstadoEnvio.EnTransito;
+
+        if (!estadoValido)
+        {
+            throw new InvalidOperationException(
+                "El envío no está en un estado válido para liberar su parada por extravío.");
+        }
+
         parada.Liberar(fecha.ToUniversalTime());
 
-        PesoAsignadoKg -= envio.PesoTotalKg;
-        VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+        if (devolucion)
+        {
+            var bultos = envio.Bultos.Where(b => b.Estado == EstadoBulto.EnDevolucion).ToList();
+            PesoAsignadoKg -= bultos.Sum(b => b.PesoKg);
+            VolumenAsignadoM3 -= bultos.Sum(b => b.VolumenMetrosCubicos);
+        }
+        else
+        {
+            PesoAsignadoKg -= envio.PesoTotalKg;
+            VolumenAsignadoM3 -= envio.VolumenTotalMetrosCubicos;
+        }
     }
 }

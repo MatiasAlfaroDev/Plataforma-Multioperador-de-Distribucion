@@ -7,7 +7,8 @@ public enum EstadoRetiro
     Retirado,
     NoRetirado,
     EnDeposito,
-    EntregadoAlComercio
+    EntregadoAlComercio,
+    Cancelado
 }
 
 public enum DisparadorRetiro
@@ -17,5 +18,7 @@ public enum DisparadorRetiro
     RegistrarRetiroFallido,
     Reprogramar,
     RecibirEnDeposito,
-    EntregarAlComercio
+    EntregarAlComercio,
+    Cancelar,
+    Desasignar
 }

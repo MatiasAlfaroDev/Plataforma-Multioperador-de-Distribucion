@@ -20,7 +20,8 @@ public sealed record RetiroDto(
     decimal VolumenTotalMetrosCubicos,
     Guid? VersionTarifariaId,
     decimal? TarifaCalculada,
-    IReadOnlyList<BultoRetiroDto> Bultos);
+    IReadOnlyList<BultoRetiroDto> Bultos,
+    string? MotivoCancelacion = null);
 
 public sealed record DireccionRetiroDto(
     string Calle,
