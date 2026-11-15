@@ -114,4 +114,17 @@ public async Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(
         )
     ).ToListAsync(ct);
 }
+
+public Task<CuentaComercial?> ObtenerPorComercioAsync(
+    Guid cuentaComercialId,
+    Guid comercioId,
+    CancellationToken ct)
+{
+    return db.CuentasComerciales
+        .IgnoreQueryFilters()
+        .FirstOrDefaultAsync(c =>
+            c.Id == cuentaComercialId &&
+            c.ComercioId == comercioId,
+            ct);
+}
 }

@@ -26,8 +26,10 @@ public sealed class ObtenerDireccionRecepcionHandler(
             throw new ArgumentException(
                 "La cuenta comercial es obligatoria.");
 
-        var cuenta = await cuentas.ObtenerAsync(
-            query.CuentaComercialId, ct);
+        var cuenta = await cuentas.ObtenerPorComercioAsync(
+            query.CuentaComercialId,
+            tenant.ComercioId.Value,
+            ct);
 
         if (cuenta is null ||
             cuenta.ComercioId != tenant.ComercioId.Value)

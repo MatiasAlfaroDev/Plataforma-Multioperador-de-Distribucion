@@ -1043,6 +1043,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DocumentoReceptor")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<Guid>("EnvioId")
                         .HasColumnType("uuid");
 
@@ -1062,6 +1066,14 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("RecibidoEn")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferenciaFirma")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReferenciaFotografia")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Tipo")
                         .IsRequired()
@@ -1564,6 +1576,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreadoEn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DocumentoReceptor")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.PrimitiveCollection<string[]>("IdentificacionesBultos")
                         .IsRequired()
                         .HasColumnType("text[]");
@@ -1577,6 +1593,10 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("OperadorId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Receptor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<DateTimeOffset>("RecibidoEn")
                         .HasColumnType("timestamp with time zone");
@@ -1983,7 +2003,7 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ComercioId");
 
-                    b.HasIndex("UsuarioId", "ComercioId")
+                    b.HasIndex("UsuarioId")
                         .IsUnique();
 
                     b.ToTable("usuarios_comercios", (string)null);

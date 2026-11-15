@@ -20,6 +20,15 @@ public sealed class EventoMovilConfiguration : IEntityTypeConfiguration<EventoMo
         builder.Property(e => e.Motivo).HasMaxLength(200);
         builder.Property(e => e.Receptor).HasMaxLength(200);
 
+        builder.Property(e => e.DocumentoReceptor)
+            .HasMaxLength(100);
+
+        builder.Property(e => e.ReferenciaFirma)
+            .HasMaxLength(500);
+
+        builder.Property(e => e.ReferenciaFotografia)
+            .HasMaxLength(500);
+
         builder.HasOne<Envio>().WithMany().HasForeignKey(e => e.EnvioId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.EnvioId);

@@ -63,6 +63,63 @@ else
                 href="@($"/?cuentaComercialId={cuenta.Id}")">
                     Crear envío
                 </a>
+                            <div class="mt-4">
+                <h4>Dirección de recepción</h4>
+
+                @if (cuenta.DireccionCargada)
+                {
+                    <p>
+                        @cuenta.Calle @cuenta.Numero,
+                        @cuenta.Localidad, @cuenta.Departamento
+                    </p>
+                }
+                else
+                {
+                    <p>Esta cuenta todavía no tiene dirección configurada.</p>
+                }
+
+                @if (cuenta.EditandoDireccion)
+                {
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                            <label>Calle</label>
+                            <input @bind="cuenta.Calle"
+                                placeholder="Calle" />
+                        </div>
+
+                        <div>
+                            <label>Número</label>
+                            <input @bind="cuenta.Numero"
+                                placeholder="Número" />
+                        </div>
+
+                        <div>
+                            <label>Localidad</label>
+                            <input @bind="cuenta.Localidad"
+                                placeholder="Localidad" />
+                        </div>
+
+                        <div>
+                            <label>Departamento</label>
+                            <input @bind="cuenta.Departamento"
+                                placeholder="Departamento" />
+                        </div>
+                    </div>
+
+                    <button type="button"
+                            disabled="@enviando"
+                            @onclick="() => GuardarDireccionAsync(cuenta)">
+                        Guardar dirección
+                    </button>
+                }
+                else
+                {
+                    <button type="button"
+                            @onclick="() => EditarDireccionAsync(cuenta)">
+                        Configurar dirección
+                    </button>
+                }
+            </div>
             }
             else if (cuenta.Estado == EstadoVinculacion.Pendiente)
             {
@@ -81,9 +138,91 @@ else
 }
 
 @code {
+    private async Task EditarDireccionAsync(CuentaComercialDto cuenta)
+{
+    error = null;
+
+    try
+    {
+        var direccion = await JS.InvokeAsync<DireccionDto?>(
+            "autenticacionPortal.obtenerDireccionRecepcion",
+            cuenta.Id);
+
+        if (direccion is not null)
+        {
+            cuenta.Calle = direccion.Calle;
+            cuenta.Numero = direccion.Numero;
+            cuenta.Localidad = direccion.Localidad;
+            cuenta.Departamento = direccion.Departamento;
+            cuenta.DireccionCargada = true;
+        }
+
+        cuenta.EditandoDireccion = true;
+    }
+    catch (JSException ex)
+    {
+        error = ex.Message;
+    }
+}
+
+private async Task GuardarDireccionAsync(CuentaComercialDto cuenta)
+{
+    
+    if (enviando)
+        return;
+
+    error = null;
+    mensaje = null;
+
+    if (string.IsNullOrWhiteSpace(cuenta.Calle) ||
+        string.IsNullOrWhiteSpace(cuenta.Numero) ||
+        string.IsNullOrWhiteSpace(cuenta.Localidad) ||
+        string.IsNullOrWhiteSpace(cuenta.Departamento))
+    {
+        error = "Completá todos los campos de la dirección.";
+        return;
+    }
+
+    enviando = true;
+
+    try
+    {
+        await JS.InvokeVoidAsync(
+            "autenticacionPortal.guardarDireccionRecepcion",
+            cuenta.Id,
+            new
+            {
+                cuenta.Calle,
+                cuenta.Numero,
+                cuenta.Localidad,
+                cuenta.Departamento
+            });
+
+        cuenta.DireccionCargada = true;
+        cuenta.EditandoDireccion = false;
+
+        mensaje = "Dirección guardada correctamente.";
+    }
+    catch (JSException ex)
+    {
+        error = ex.Message;
+    }
+    finally
+    {
+        enviando = false;
+    }
+}
+
+private sealed class DireccionDto
+{
+    public string Calle { get; set; } = "";
+    public string Numero { get; set; } = "";
+    public string Localidad { get; set; } = "";
+    public string Departamento { get; set; } = "";
+}
+
     private List<OperadorDto> operadores = new();
     private List<CuentaComercialDto> cuentas = new();
-
     private bool cargando = true;
     private bool enviando;
     private string? error;
@@ -159,15 +298,25 @@ else
     }
 
     private sealed class CuentaComercialDto
-    {
-        public Guid Id { get; set; }
-        public Guid OperadorId { get; set; }
-        public string OperadorNombre { get; set; } = "";
-        public Guid ComercioId { get; set; }
-        public string ComercioNombre { get; set; } = "";
-        public bool Activa { get; set; }
-        public EstadoVinculacion Estado { get; set; }
-    }
+{
+    public Guid Id { get; set; }
+    public Guid OperadorId { get; set; }
+    public string OperadorNombre { get; set; } = "";
+    public Guid ComercioId { get; set; }
+    public string ComercioNombre { get; set; } = "";
+    public bool Activa { get; set; }
+    public EstadoVinculacion Estado { get; set; }
+
+    // Datos de la dirección de recepción
+    public string Calle { get; set; } = "";
+    public string Numero { get; set; } = "";
+    public string Localidad { get; set; } = "";
+    public string Departamento { get; set; } = "";
+
+    // Estado del formulario
+    public bool DireccionCargada { get; set; }
+    public bool EditandoDireccion { get; set; }
+}
 
     private enum EstadoVinculacion
     {

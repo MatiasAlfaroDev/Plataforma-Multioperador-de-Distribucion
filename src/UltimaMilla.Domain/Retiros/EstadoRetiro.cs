@@ -1,3 +1,4 @@
+
 namespace UltimaMilla.Domain.Retiros;
 
 public enum EstadoRetiro
@@ -7,7 +8,12 @@ public enum EstadoRetiro
     Retirado,
     NoRetirado,
     EnDeposito,
-    EntregadoAlComercio
+    EntregadoAlComercio,
+    EnTransito,
+
+    // Segunda distribución: depósito -> comercio
+    AsignadoARutaComercio,
+    EnTransitoComercio
 }
 
 public enum DisparadorRetiro
@@ -17,5 +23,10 @@ public enum DisparadorRetiro
     RegistrarRetiroFallido,
     Reprogramar,
     RecibirEnDeposito,
-    EntregarAlComercio
+    EntregarAlComercio,
+    Despachar,
+
+    // Segunda distribución
+    AsignarARutaComercio,
+    DespacharAlComercio
 }

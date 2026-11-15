@@ -55,16 +55,45 @@ public sealed class RegistrarEventoRetiroHandler(
         if (retiro.OperadorId != operadorId)
             throw new NoEncontradoException(
                 "El retiro no existe.");
+        var tipo = command.Tipo?.Trim();
 
-        if (retiro.Estado != EstadoRetiro.AsignadoARuta ||
-            retiro.HojaDeRutaId is not Guid hojaId)
-            throw new InvalidOperationException(
-                "El retiro no está pendiente de ejecución.");
+        var esEntregaComercio = tipo == "EntregadoAlComercio";
 
-        var hoja = await hojas.ObtenerAsync(
-            operadorId, hojaId, ct)
-            ?? throw new NoEncontradoException(
-                "La hoja de ruta no existe.");
+        if (tipo is not ("Retirado" or "NoRetirado" or "EntregadoAlComercio"))
+        {
+            throw new ArgumentException(
+                "El tipo de evento de retiro no es válido.");
+        }
+
+        HojaDeRuta hoja;
+
+if (esEntregaComercio)
+{
+    if (retiro.Estado != EstadoRetiro.EnTransitoComercio)
+    {
+        throw new InvalidOperationException(
+            "El retiro no está en tránsito hacia el comercio.");
+    }
+
+    hoja = await hojas.ObtenerPorRetiroEnEntregaActivoAsync(
+        operadorId, retiro.Id, ct)
+        ?? throw new NoEncontradoException(
+            "No existe una hoja activa para entregar el retiro al comercio.");
+}
+else
+{
+    if (retiro.Estado != EstadoRetiro.EnTransito ||
+        retiro.HojaDeRutaId is not Guid hojaId)
+    {
+        throw new InvalidOperationException(
+            "El retiro no está en tránsito o no tiene una hoja de ruta asignada.");
+    }
+
+    hoja = await hojas.ObtenerAsync(
+        operadorId, hojaId, ct)
+        ?? throw new NoEncontradoException(
+            "La hoja de ruta no existe.");
+}
 
         if (hoja.RepartidorId != repartidor.Id)
             throw new UnauthorizedAccessException(
@@ -74,23 +103,27 @@ public sealed class RegistrarEventoRetiroHandler(
             throw new InvalidOperationException(
                 "La hoja de ruta todavía no fue despachada.");
 
-        if (!hoja.Paradas.Any(p =>
-            p.RetiroId == retiro.Id && p.Activa))
-            throw new InvalidOperationException(
-                "El retiro no tiene una parada activa.");
+        var tipoOperacionEsperada = esEntregaComercio
+            ? TipoOperacionRuta.EntregaRetiroComercio
+            : TipoOperacionRuta.Retiro;
 
-        var tipo = command.Tipo?.Trim();
+        if (!hoja.Paradas.Any(p =>
+            p.RetiroId == retiro.Id &&
+            p.TipoOperacion == tipoOperacionEsperada &&
+            p.Activa))
+        {
+            throw new InvalidOperationException(
+                "El retiro no tiene una parada activa para esta operación.");
+        }
+
 
         var identificacionesInformadas = command.IdentificacionesBultos
             ?? command.IdsBultos?
                 .Select(id => retiro.Bultos.FirstOrDefault(b => b.Id == id)?.Identificacion ?? id.ToString())
                 .ToList();
 
-        if (tipo != "Retirado" && tipo != "NoRetirado")
-            throw new ArgumentException(
-                "El tipo debe ser Retirado o NoRetirado.");
 
-        if (tipo == "Retirado")
+    if (tipo is "Retirado" or "EntregadoAlComercio")
         {
             var identificaciones =
                 identificacionesInformadas?
@@ -121,36 +154,54 @@ public sealed class RegistrarEventoRetiroHandler(
         // Se valida y construye el evento antes
         // de cambiar el estado del retiro.
         var evento = EventoRetiroMovil.Crear(
-            command.IdEvento,
-            retiro,
-            tipo,
-            command.FechaHora,
-            reloj.GetUtcNow(),
-            identificacionesInformadas,
-            command.ReferenciaFotografia,
-            command.ReferenciaFirma,
-            command.MotivoFallo);
+        command.IdEvento,
+        retiro,
+        tipo!,
+        command.FechaHora,
+        reloj.GetUtcNow(),
+        identificacionesInformadas,
+        command.ReferenciaFotografia,
+        command.ReferenciaFirma,
+        command.MotivoFallo,
+        command.Receptor,
+        command.DocumentoReceptor);
 
-        if (tipo == "Retirado")
-        {
-            retiro.RegistrarRetiro(
-                evento.OcurridoEn,
-                evento.ReferenciaFotografia!,
-                evento.ReferenciaFirma!);
-        }
-        else
-        {
-            retiro.RegistrarRetiroFallido();
-        }
+        if (esEntregaComercio)
+{
+    retiro.EntregarAlComercio();
 
-        hoja.FinalizarParadaRetiro(
-            retiro, evento.OcurridoEn);
+    hoja.FinalizarParadaEntregaRetiroComercio(
+        retiro,
+        evento.OcurridoEn);
+}
+else
+{
+    if (tipo == "Retirado")
+    {
+        retiro.RegistrarRetiro(
+            evento.OcurridoEn,
+            evento.ReferenciaFotografia!,
+            evento.ReferenciaFirma!);
+    }
+    else
+    {
+        retiro.RegistrarRetiroFallido();
+    }
+
+    hoja.FinalizarParadaRetiro(
+        retiro,
+        evento.OcurridoEn);
+}
 
         await eventosMovil.AgregarAsync(evento, ct);
 
-        var tipoAviso = tipo == "Retirado"
-            ? TiposAviso.RetiroRetirado
-            : TiposAviso.RetiroNoRetirado;
+        var tipoAviso = tipo switch
+{
+    "Retirado" => TiposAviso.RetiroRetirado,
+    "NoRetirado" => TiposAviso.RetiroNoRetirado,
+    "EntregadoAlComercio" => TiposAviso.RetiroEntregadoAlComercio,
+    _ => throw new ArgumentException("Tipo de evento no válido.")
+};
 
         await avisos.PrepararAsync(
             retiro.Id,

@@ -326,7 +326,13 @@ public sealed class RegistrarEventoRetiroHandlerTests
             Guid retiroId,
             CancellationToken ct)
         {
-            return Task.FromResult<HojaDeRuta?>(null);
+            return Task.FromResult(
+                Lista.FirstOrDefault(h =>
+                    h.OperadorId == operadorId &&
+                    h.Paradas.Any(p =>
+                        p.RetiroId == retiroId &&
+                        p.TipoOperacion == TipoOperacionRuta.EntregaRetiroComercio &&
+                        p.Activa)));
         }
     }
 

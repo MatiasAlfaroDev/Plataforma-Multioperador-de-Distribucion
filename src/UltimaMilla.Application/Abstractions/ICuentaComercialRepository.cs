@@ -21,6 +21,11 @@ public interface ICuentaComercialRepository
         Guid comercioId,
         CancellationToken ct);
 
+    Task<CuentaComercial?> ObtenerPorComercioAsync(
+    Guid cuentaComercialId,
+    Guid comercioId,
+    CancellationToken ct);
+
     // Registrar una nueva solicitud de vinculación.
     Task AgregarAsync(
         CuentaComercial cuenta,

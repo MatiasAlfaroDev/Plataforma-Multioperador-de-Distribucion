@@ -31,42 +31,167 @@
     <div class="aviso" role="status">@mensajeExito</div>
 }
 
+@if (TempData["MensajeError"] is string mensajeError)
+{
+    <div class="aviso error" role="alert">
+        @mensajeError
+    </div>
+}
+
 @if (Model.Retiros.Count > 0)
 {
     <section>
         <h2>Retiros a domicilio</h2>
+
         <p class="nota">
-            @string.Join(" · ", Model.Retiros.GroupBy(r => r.Estado).Select(g => $"{g.Key}: {g.Count()}"))
+            @string.Join(" · ",
+                Model.Retiros
+                    .GroupBy(r => r.Estado)
+                    .Select(g => $"{g.Key}: {g.Count()}"))
         </p>
+
         <div class="tabla">
             <table>
                 <thead>
-                    <tr><th>Fecha</th><th>Motivo</th><th>Localidad</th><th>Bultos</th><th>Estado</th><th>Acción</th></tr>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Motivo</th>
+                        <th>Localidad</th>
+                        <th>Bultos</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    @foreach (var r in Model.Retiros.OrderBy(r => r.FechaSolicitada))
+                    @foreach (var r in Model.Retiros
+                        .OrderBy(r => r.FechaSolicitada))
                     {
                         var accion = r.Estado switch
                         {
-                            "Retirado" => ("recibir-deposito", "Recibir en depósito"),
-                            "EnDeposito" => ("entregar-comercio", "Entregar al comercio"),
-                            "NoRetirado" => ("reprogramar", "Reprogramar"),
+                        
+                            "NoRetirado" =>
+                                ("reprogramar", "Reprogramar"),
+
                             _ => default
                         };
+
                         <tr>
-                            <td>@r.FechaSolicitada.ToString("dd/MM/yyyy")</td>
-                            <td>@r.Motivo</td>
-                            <td>@r.DomicilioRetiro.Localidad</td>
-                            <td class="num">@r.Bultos.Count</td>
-                            <td>@r.Estado</td>
                             <td>
-                                @if (accion != default)
+                                @r.FechaSolicitada.ToString("dd/MM/yyyy")
+                            </td>
+
+                            <td>@r.Motivo</td>
+
+                            <td>@r.DomicilioRetiro.Localidad</td>
+
+                            <td class="num">@r.Bultos.Count</td>
+
+                            <td>
+                                @switch (r.Estado)
                                 {
-                                    <form method="post" asp-page-handler="Retiro" class="inline">
-                                        <input type="hidden" name="retiroId" value="@r.Id" />
-                                        <input type="hidden" name="accion" value="@accion.Item1" />
-                                        <button type="submit">@accion.Item2</button>
+                                    case "Solicitado":
+                                        <span class="chip chip-acento">
+                                            Solicitado
+                                        </span>
+                                        break;
+
+                                    case "AsignadoARuta":
+                                        <span class="chip chip-exito">
+                                            Asignado a ruta
+                                        </span>
+                                        break;
+
+                                    case "EnTransito":
+                                        <span class="chip chip-acento">
+                                            En tránsito
+                                        </span>
+                                        break;
+
+                                    case "Retirado":
+                                        <span class="chip chip-exito">
+                                            Retirado
+                                        </span>
+                                        break;
+
+                                    case "NoRetirado":
+                                        <span class="chip chip-alerta">
+                                            No retirado
+                                        </span>
+                                        break;
+
+                                    case "EnDeposito":
+                                        <span class="chip chip-alerta">
+                                            En depósito
+                                        </span>
+                                        break;
+
+                                    case "EntregadoAlComercio":
+                                        <span class="chip chip-exito">
+                                            Entregado al comercio
+                                        </span>
+                                        break;
+
+                                    default:
+                                        <span class="nota">@r.Estado</span>
+                                        break;
+                                }
+                            </td>
+
+                            <td class="text-right">
+                                <a asp-page="/DetalleRetiro"
+                                   asp-route-id="@r.Id"
+                                   class="btn-secundario py-1.5 text-sm">
+                                    Ver detalle
+                                </a>
+
+                                @if (r.Estado == "Retirado" && r.HojaDeRutaId is Guid hojaId)
+                                {
+                                    <a asp-page="/Rendicion"
+                                    asp-route-hojaId="@hojaId"
+                                    class="btn-secundario py-1.5 text-sm">
+                                        Recibir en depósito
+                                    </a>
+                                }
+                                else if (r.Estado == "EnDeposito")
+                                {
+                                    <a asp-page="/HojasDeRuta"
+                                    asp-route-entregaRetiroId="@r.Id"
+                                    class="btn-secundario py-1.5 text-sm">
+                                        Asignar a segunda ruta
+                                    </a>
+                                }
+                                else if (accion != default)
+                                {
+                                    <form method="post"
+                                        asp-page-handler="Retiro"
+                                        class="inline">
+
+                                        @Html.AntiForgeryToken()
+
+                                        <input type="hidden"
+                                            name="retiroId"
+                                            value="@r.Id" />
+
+                                        <input type="hidden"
+                                            name="accion"
+                                            value="@accion.Item1" />
+
+                                        <button type="submit"
+                                                class="primario py-1.5 text-sm">
+                                            @accion.Item2
+                                        </button>
                                     </form>
+                                }
+                                                                else if (r.Estado == "Solicitado")
+                                {
+                                    <a asp-page="/HojasDeRuta"
+                                       class="btn-secundario py-1.5 text-sm">
+                                        Asignar a ruta
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span class="nota">Sin acciones</span>
                                 }
                             </td>
                         </tr>
@@ -76,6 +201,7 @@
         </div>
     </section>
 }
+
 
 @if (Model.Envios.Count == 0)
 {

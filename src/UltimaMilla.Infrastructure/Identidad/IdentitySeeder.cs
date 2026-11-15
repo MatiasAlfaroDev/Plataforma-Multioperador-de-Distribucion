@@ -85,8 +85,7 @@ public static class IdentitySeeder
         var administradorModa = await CrearUsuarioAsync(
             "admin@modaexpress.test", "Administrador Moda Express", Perfiles.AdministradorComercio, null, null);
         await VincularComercioAsync(administradorModa, DbSeeder.ModaExpressId, Perfiles.AdministradorComercio);
-        // Trabaja también para Tienda Norte: demuestra la selección de comercio al iniciar sesión.
-        await VincularComercioAsync(administradorModa, DbSeeder.TiendaNorteId, Perfiles.Comercio);
+        
 
         // Personal del operador (letra 3.3): despachador y operario de depósito.
         await CrearUsuarioAsync("despachador.rapi@demo.local", "Despachador RapiEnvíos", Perfiles.Despachador, DbSeeder.RapiEnviosId, null);
@@ -114,27 +113,39 @@ public static class IdentitySeeder
                 null),
             DbSeeder.LogisticaSurId);
 
-        async Task VincularComercioAsync(Usuario usuario, Guid comercioId, string perfil)
-        {
-            var vinculacion = await db.UsuariosComercios
-                .FirstOrDefaultAsync(uc => uc.UsuarioId == usuario.Id && uc.ComercioId == comercioId, ct);
+        async Task VincularComercioAsync(
+    Usuario usuario,
+    Guid comercioId,
+    string perfil)
+{
+    var vinculacion = await db.UsuariosComercios
+        .IgnoreQueryFilters()
+        .FirstOrDefaultAsync(
+            uc => uc.UsuarioId == usuario.Id,
+            ct);
 
-            if (vinculacion is null)
-            {
-                db.UsuariosComercios.Add(new UsuarioComercio
-                {
-                    UsuarioId = usuario.Id,
-                    ComercioId = comercioId,
-                    Perfil = perfil,
-                    Activa = true
-                });
-            }
-            else
-            {
-                vinculacion.Perfil = perfil;
-                vinculacion.Activa = true;
-            }
+    if (vinculacion is null)
+    {
+        db.UsuariosComercios.Add(new UsuarioComercio
+        {
+            UsuarioId = usuario.Id,
+            ComercioId = comercioId,
+            Perfil = perfil,
+            Activa = true
+        });
+    }
+    else
+    {
+        if (vinculacion.ComercioId != comercioId)
+        {
+            throw new InvalidOperationException(
+                $"El usuario {usuario.Email} ya pertenece a otro comercio.");
         }
+
+        vinculacion.Perfil = perfil;
+        vinculacion.Activa = true;
+    }
+}
 
         async Task VincularRepartidorAsync(Usuario usuario, Guid operadorId)
         {

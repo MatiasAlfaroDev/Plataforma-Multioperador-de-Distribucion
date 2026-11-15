@@ -480,6 +480,66 @@ async confirmarDevolucion(envioId, datos) {
         exito: false,
         mensaje
     };
+},
+
+async obtenerDireccionRecepcion(cuentaComercialId) {
+    const respuesta = await fetch(
+        `/api/vinculaciones/${encodeURIComponent(cuentaComercialId)}/direccion-recepcion`,
+        {
+            method: "GET",
+            credentials: "same-origin"
+        }
+    );
+
+    if (!respuesta.ok) {
+        throw new Error(
+            `No se pudo consultar la dirección de recepción (HTTP ${respuesta.status}).`
+        );
+    }
+
+    return await respuesta.json();
+},
+
+async guardarDireccionRecepcion(cuentaComercialId, direccion) {
+    const respuestaToken = await fetch("/api/antiforgery/token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!respuestaToken.ok) {
+        throw new Error("No se pudo obtener el token de seguridad.");
+    }
+
+    const { token } = await respuestaToken.json();
+
+    const respuesta = await fetch(
+        `/api/vinculaciones/${encodeURIComponent(cuentaComercialId)}/direccion-recepcion`,
+        {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": token
+            },
+            credentials: "same-origin",
+            body: JSON.stringify(direccion)
+        }
+    );
+
+    if (!respuesta.ok) {
+        let mensaje = `No se pudo guardar la dirección (HTTP ${respuesta.status}).`;
+
+        try {
+            const problema = await respuesta.json();
+            mensaje = problema.mensaje ?? problema.detail ?? problema.title ?? mensaje;
+        } catch {
+            // Mantener el mensaje HTTP.
+        }
+
+        throw new Error(mensaje);
+    }
+
+    return await respuesta.json();
 }
 
 

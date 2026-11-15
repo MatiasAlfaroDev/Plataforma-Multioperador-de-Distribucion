@@ -258,6 +258,15 @@ public sealed class EnviosApiClient(HttpClient http)
     public async Task<IReadOnlyList<RetiroTableroItem>> ListarRetirosAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<RetiroTableroItem>>("api/retiros", ct) ?? [];
 
+    public async Task<DetalleRetiroItem?> ObtenerDetalleRetiroAsync(
+    Guid retiroId,
+    CancellationToken ct = default)
+{
+    return await http.GetFromJsonAsync<DetalleRetiroItem>(
+        $"api/retiros/{retiroId}",
+        ct);
+}
+
     /// <summary>accion: recibir-deposito, entregar-comercio o reprogramar.</summary>
     public async Task GestionarRetiroAsync(Guid retiroId, string accion, CancellationToken ct = default)
     {
@@ -394,4 +403,36 @@ public sealed record RetiroTableroItem(
     DateOnly FechaSolicitada,
     string Estado,
     RetiroDireccionItem DomicilioRetiro,
-    List<RetiroBultoItem> Bultos);
+    List<RetiroBultoItem> Bultos,
+    Guid? HojaDeRutaId = null);
+
+public sealed record DetalleRetiroItem(
+    Guid Id,
+    Guid OperadorId,
+    Guid CuentaComercialId,
+    string Motivo,
+    RetiroDireccionItem DomicilioRetiro,
+    RetiroDireccionItem DomicilioDestino,
+    DateOnly FechaSolicitada,
+    TimeOnly HoraDesde,
+    TimeOnly HoraHasta,
+    string Estado,
+    DateTimeOffset SolicitadoEn,
+    Guid? HojaDeRutaId,
+    DateTimeOffset? RetiradoEn,
+    string? ReferenciaFotografia,
+    string? ReferenciaFirma,
+    decimal PesoTotalKg,
+    decimal VolumenTotalMetrosCubicos,
+    Guid? VersionTarifariaId,
+    decimal? TarifaCalculada,
+    IReadOnlyList<DetalleBultoRetiroItem> Bultos);
+
+public sealed record DetalleBultoRetiroItem(
+    Guid Id,
+    string Identificacion,
+    decimal PesoKg,
+    int AltoCm,
+    int AnchoCm,
+    int ProfundidadCm,
+    decimal VolumenMetrosCubicos);

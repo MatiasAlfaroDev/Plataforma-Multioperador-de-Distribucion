@@ -144,7 +144,7 @@ public class EnviosApi : IEnviosApi
     public async Task<(ResultadoEnvio Resultado, string? Detalle)> EnviarEventoAsync(EventoPendiente evento, CancellationToken ct = default)
     {
         // RF 40: los retiros van a su propio endpoint; EnvioId es el Id del retiro.
-        if (evento.Tipo is "Retirado" or "NoRetirado")
+       if (evento.Tipo is "Retirado" or "NoRetirado" or "EntregadoAlComercio")
         {
             return await EnviarAsync($"api/retiros/{evento.EnvioId}/eventos-movil", new
             {
@@ -155,7 +155,9 @@ public class EnviosApi : IEnviosApi
                 idsBultos = evento.BultosEntregados,
                 referenciaFotografia = evento.ReferenciaFoto,
                 referenciaFirma = evento.ReferenciaFirma,
-                motivoFallo = evento.Motivo
+                motivoFallo = evento.Motivo,
+                receptor = evento.Receptor,
+                documentoReceptor = evento.DocumentoReceptor
             }, ct);
         }
 

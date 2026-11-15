@@ -121,8 +121,13 @@ public static class PersonalEndpoints
             var comercioId = tenant.ComercioId ?? throw new UnauthorizedAccessException();
             var usuario = await ObtenerOCrearUsuarioAsync(request.NombreCompleto, request.Email, request.Password, userManager);
 
-            if (await db.UsuariosComercios.AnyAsync(uc => uc.UsuarioId == usuario.Id && uc.ComercioId == comercioId, ct))
-                throw new ConflictoException("El usuario ya pertenece al comercio.");
+            if (await db.UsuariosComercios
+                .IgnoreQueryFilters()
+                .AnyAsync(uc => uc.UsuarioId == usuario.Id, ct))
+            {
+                throw new ConflictoException(
+                    "El usuario ya pertenece a un comercio y no puede vincularse a otro.");
+            }
 
             db.UsuariosComercios.Add(new UsuarioComercio
             {

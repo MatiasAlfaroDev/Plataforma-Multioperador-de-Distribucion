@@ -37,6 +37,7 @@ public sealed class HojasDeRutaModel(
 
  public async Task OnGetAsync(
     Guid? envioId,
+    Guid? entregaRetiroId,
     CancellationToken ct)
 {
     await CargarAsync(ct);
@@ -45,6 +46,12 @@ public sealed class HojasDeRutaModel(
         Envios.Any(x => x.Id == envioId.Value))
     {
         Formulario.EnviosIds = [envioId.Value];
+    }
+
+    if (entregaRetiroId.HasValue &&
+        EntregasRetiros.Any(x => x.Id == entregaRetiroId.Value))
+    {
+        Formulario.EntregasRetirosIds = [entregaRetiroId.Value];
     }
 }
     public async Task<IActionResult> OnPostAsync(

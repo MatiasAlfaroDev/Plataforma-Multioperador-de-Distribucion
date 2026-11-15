@@ -1,0 +1,268 @@
+
+@page "{id:guid}"
+@model DetalleRetiroModel
+@using UltimaMilla.Web.Backoffice.Services
+
+@{
+    ViewData["Title"] = "Detalle de retiro";
+}
+
+<div class="encabezado">
+    <div>
+        <a asp-page="/Index">Volver a envíos y retiros</a>
+        <h1>Detalle de retiro</h1>
+    </div>
+</div>
+
+@if (TempData["MensajeExito"] is string mensaje)
+{
+    <div class="aviso" role="status">@mensaje</div>
+}
+
+@if (Model.Error is not null)
+{
+    <div class="aviso error" role="alert">
+        @Model.Error
+    </div>
+}
+
+@if (Model.Retiro is { } retiro)
+{
+    <h2>Información general</h2>
+
+    <div class="tabla">
+        <table>
+            <tbody>
+                <tr>
+                    <th>Identificador</th>
+                    <td class="codigo">@retiro.Id</td>
+                </tr>
+                <tr>
+                    <th>Estado</th>
+                    <td>
+                        @switch (retiro.Estado)
+                        {
+                            case "EnTransito":
+                                <span class="chip chip-acento">En tránsito</span>
+                                break;
+
+                            case "AsignadoARuta":
+                                <span class="chip chip-exito">Asignado a ruta</span>
+                                break;
+
+                            case "EnDeposito":
+                                <span class="chip chip-alerta">En depósito</span>
+                                break;
+
+                            case "NoRetirado":
+                                <span class="chip chip-alerta">No retirado</span>
+                                break;
+
+                            case "EntregadoAlComercio":
+                                <span class="chip chip-exito">Entregado al comercio</span>
+                                break;
+
+                            case "Retirado":
+                                <span class="chip chip-exito">Retirado</span>
+                                break;
+
+                            default:
+                                <span class="chip chip-acento">@retiro.Estado</span>
+                                break;
+                        }
+                    </td>
+                </tr>
+                <tr>
+                    <th>Motivo</th>
+                    <td>@retiro.Motivo</td>
+                </tr>
+                <tr>
+                    <th>Fecha solicitada</th>
+                    <td>@retiro.FechaSolicitada.ToString("dd/MM/yyyy")</td>
+                </tr>
+                <tr>
+                    <th>Horario solicitado</th>
+                    <td>
+                        @retiro.HoraDesde.ToString("HH:mm") -
+                        @retiro.HoraHasta.ToString("HH:mm")
+                    </td>
+                </tr>
+                <tr>
+                    <th>Fecha de solicitud</th>
+                    <td>@Formato.Hora(retiro.SolicitadoEn)</td>
+                </tr>
+                <tr>
+                    <th>Hoja de ruta</th>
+                    <td>
+                        @(retiro.HojaDeRutaId?.ToString() ?? "Sin asignar")
+                    </td>
+                </tr>
+                <tr>
+                    <th>Cuenta comercial</th>
+                    <td class="codigo">@retiro.CuentaComercialId</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Direcciones</h2>
+
+    <div class="tabla">
+        <table>
+            <tbody>
+                <tr>
+                    <th>Domicilio de retiro</th>
+                    <td>
+                        @retiro.DomicilioRetiro.Calle
+                        @retiro.DomicilioRetiro.Numero,
+                        @retiro.DomicilioRetiro.Localidad,
+                        @retiro.DomicilioRetiro.Departamento
+                    </td>
+                </tr>
+                <tr>
+                    <th>Domicilio de destino</th>
+                    <td>
+                        @retiro.DomicilioDestino.Calle
+                        @retiro.DomicilioDestino.Numero,
+                        @retiro.DomicilioDestino.Localidad,
+                        @retiro.DomicilioDestino.Departamento
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Bultos</h2>
+
+    <div class="tabla">
+        <table>
+            <thead>
+                <tr>
+                    <th>Identificación</th>
+                    <th>Peso (kg)</th>
+                    <th>Dimensiones (cm)</th>
+                    <th>Volumen (m³)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var bulto in retiro.Bultos)
+                {
+                    <tr>
+                        <td class="codigo">@bulto.Identificacion</td>
+                        <td>@Formato.Numero(bulto.PesoKg)</td>
+                        <td>
+                            @bulto.AltoCm ×
+                            @bulto.AnchoCm ×
+                            @bulto.ProfundidadCm
+                        </td>
+                        <td>
+                            @Formato.Numero(bulto.VolumenMetrosCubicos)
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Información logística y económica</h2>
+
+    <div class="tabla">
+        <table>
+            <tbody>
+                <tr>
+                    <th>Peso total</th>
+                    <td>@Formato.Numero(retiro.PesoTotalKg) kg</td>
+                </tr>
+                <tr>
+                    <th>Volumen total</th>
+                    <td>
+                        @Formato.Numero(retiro.VolumenTotalMetrosCubicos) m³
+                    </td>
+                </tr>
+                <tr>
+                    <th>Tarifa calculada</th>
+                    <td>
+                        @(retiro.TarifaCalculada is decimal tarifa
+                            ? Formato.Moneda(tarifa)
+                            : "Sin tarifa")
+                    </td>
+                </tr>
+                <tr>
+                    <th>Fecha de retiro efectivo</th>
+                    <td>
+                        @(retiro.RetiradoEn is { } fecha
+                            ? Formato.Hora(fecha)
+                            : "Pendiente")
+                    </td>
+                </tr>
+                <tr>
+                    <th>Referencia de fotografía</th>
+                    <td>
+                        @(retiro.ReferenciaFotografia ?? "Sin registrar")
+                    </td>
+                </tr>
+                <tr>
+                    <th>Referencia de firma</th>
+                    <td>
+                        @(retiro.ReferenciaFirma ?? "Sin registrar")
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    @if (retiro.Estado is "Retirado" or "NoRetirado" or "EnDeposito")
+    {
+        <section class="mt-6">
+            <h2>Acciones disponibles</h2>
+
+            @if (retiro.Estado == "Retirado")
+            {
+                @if (retiro.HojaDeRutaId is Guid hojaId)
+                {
+                    <p class="nota">
+                        Para recibir este retiro en depósito,
+                        primero se deben verificar los bultos
+                        mediante el control de rendición de
+                        su hoja de ruta.
+                    </p>
+
+                    <a asp-page="/Rendicion"
+                       asp-route-hojaId="@hojaId"
+                       class="btn-primario">
+                        Recibir en depósito
+                    </a>
+                }
+                else
+                {
+                    <p class="nota">
+                        Este retiro no tiene una hoja de ruta
+                        asignada. No se puede iniciar el
+                        control de rendición.
+                    </p>
+                }
+            }
+            else if (retiro.Estado == "NoRetirado")
+            {
+                <form method="post"
+                      asp-page-handler="Gestionar"
+                      asp-route-id="@retiro.Id">
+
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden"
+                           name="accion"
+                           value="reprogramar" />
+
+                    <button type="submit" class="primario">
+                        Reprogramar retiro
+                    </button>
+                </form>
+            }
+            else if (retiro.Estado == "EnDeposito")
+            {
+                
+            }
+        </section>
+    }
+}

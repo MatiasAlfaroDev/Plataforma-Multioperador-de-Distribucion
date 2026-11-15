@@ -52,7 +52,7 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         }
         catch (HttpRequestException ex)
         {
-            TempData["MensajeExito"] = ex.Message;
+            TempData["MensajeError"] = ex.Message;
         }
 
         return RedirectToPage();

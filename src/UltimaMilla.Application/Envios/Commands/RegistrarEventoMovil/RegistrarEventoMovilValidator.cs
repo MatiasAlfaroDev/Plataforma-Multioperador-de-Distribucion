@@ -12,14 +12,15 @@ public sealed class RegistrarEventoMovilValidator : AbstractValidator<RegistrarE
         RuleFor(x => x.FechaHora).NotEmpty();
         RuleFor(x => x.Tipo)
             .Must(t => Enum.TryParse<TipoEventoMovil>(t, ignoreCase: true, out _))
-            .WithMessage("El tipo debe ser Entregado, EntregadoParcialmente o NoEntregado.");
+            .WithMessage("El tipo debe ser Entregado, EntregadoParcialmente, NoEntregado o DevueltoAlComercio.");
 
         RuleFor(x => x.Receptor)
             .NotEmpty()
             .WithMessage("Una entrega debe indicar quién recibió los bultos.")
             .When(x =>
                 EsTipo(x.Tipo, TipoEventoMovil.Entregado) ||
-                EsTipo(x.Tipo, TipoEventoMovil.EntregadoParcialmente));
+                EsTipo(x.Tipo, TipoEventoMovil.EntregadoParcialmente ) ||
+                EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
         RuleFor(x => x.Motivo)
             .NotEmpty().WithMessage("Un intento fallido debe indicar el motivo.")
             .When(x => EsTipo(x.Tipo, TipoEventoMovil.NoEntregado));
@@ -55,8 +56,44 @@ public sealed class RegistrarEventoMovilValidator : AbstractValidator<RegistrarE
                 bulto.RuleFor(x => x.Motivo).NotEmpty();
                 bulto.RuleFor(x => x.Evidencia).NotEmpty();
             });
-    }
+    
 
+        RuleFor(x => x.BultosDevueltos)
+        .NotNull()
+        .Must(b => b is { Count: > 0 })
+        .WithMessage("La devolución debe incluir los bultos escaneados.")
+        .When(x => EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
+
+    RuleForEach(x => x.BultosDevueltos)
+        .NotEmpty();
+
+    RuleFor(x => x)
+        .Must(x => x.BultosDevueltos is null)
+        .WithMessage("Solo una devolución puede informar bultos devueltos.")
+        .When(x => !EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
+
+    RuleFor(x => x.DocumentoReceptor)
+        .NotEmpty()
+        .When(x => EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
+
+    RuleFor(x => x.ReferenciaFirma)
+        .NotEmpty()
+        .When(x => EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
+
+    RuleFor(x => x.ReferenciaFotografia)
+        .NotEmpty()
+        .When(x => EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
+
+    RuleFor(x => x.Latitud)
+        .NotNull()
+        .InclusiveBetween(-90m, 90m)
+        .When(x => EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
+
+    RuleFor(x => x.Longitud)
+        .NotNull()
+        .InclusiveBetween(-180m, 180m)
+        .When(x => EsTipo(x.Tipo, TipoEventoMovil.DevueltoAlComercio));
+    }
     private static bool EsTipo(string? texto, TipoEventoMovil tipo) =>
         Enum.TryParse<TipoEventoMovil>(texto, ignoreCase: true, out var t) && t == tipo;
 }

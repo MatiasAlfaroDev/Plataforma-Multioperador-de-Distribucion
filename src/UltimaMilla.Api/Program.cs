@@ -695,7 +695,8 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                         b.BultoId,
                         b.Motivo,
                         b.Evidencia))
-                    .ToArray()), ct);
+                    .ToArray(),
+                request.BultosDevueltos), ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
@@ -1845,8 +1846,21 @@ public partial class Program { }
 
 public sealed record BultoNoEntregadoRequest( Guid BultoId, string Motivo, string Evidencia);
 
-public sealed record EventoMovilRequest( Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null, IReadOnlyCollection<Guid>? BultosEntregados = null,
-    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null);
+public sealed record EventoMovilRequest(
+    Guid IdEvento,
+    string Tipo,
+    string? Motivo,
+    string? Receptor,
+    DateTimeOffset FechaHora,
+    string? DocumentoReceptor = null,
+    string? ReferenciaFirma = null,
+    string? ReferenciaFotografia = null,
+    decimal? Latitud = null,
+    decimal? Longitud = null,
+    string? EvidenciaFallo = null,
+    IReadOnlyCollection<Guid>? BultosEntregados = null,
+    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null,
+    IReadOnlyCollection<Guid>? BultosDevueltos = null);
 public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
 public sealed record RegistrarRecepcionRequest(
     IReadOnlyList<string> IdentificacionesEscaneadas);

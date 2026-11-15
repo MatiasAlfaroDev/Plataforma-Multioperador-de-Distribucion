@@ -44,6 +44,11 @@ public sealed class EventoPendiente
     /// <summary>Entrega parcial (RF 32): Ids de los bultos que se entregaron.</summary>
     public IReadOnlyList<Guid>? BultosEntregados { get; set; }
 
+    /// <summary>
+/// Identificadores de todos los bultos escaneados al devolver
+/// un envío al comercio.
+/// </summary>
+public IReadOnlyList<Guid>? BultosDevueltos { get; set; }
     /// <summary>Entrega parcial (RF 32): los bultos que no se entregaron, cada uno con motivo y evidencia.</summary>
     public IReadOnlyList<BultoNoEntregado>? BultosNoEntregados { get; set; }
 
