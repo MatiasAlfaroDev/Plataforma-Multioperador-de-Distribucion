@@ -296,6 +296,7 @@ app.MapHub<TableroHub>("/api/hubs/tablero")
 app.MapAutenticacionEndpoints();
 app.MapVinculacionesComercialesEndpoints();
 app.MapPersonalEndpoints();
+app.MapVehiculosEndpoints();
 app.MapBanderasEndpoints();
 
 

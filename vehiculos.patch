@@ -1,0 +1,463 @@
+diff --git a/src/UltimaMilla.Api/Endpoints/VehiculosEndpoints.cs b/src/UltimaMilla.Api/Endpoints/VehiculosEndpoints.cs
+new file mode 100644
+index 0000000..696cde7
+--- /dev/null
++++ b/src/UltimaMilla.Api/Endpoints/VehiculosEndpoints.cs
+@@ -0,0 +1,117 @@
++using Microsoft.AspNetCore.Antiforgery;
++using Microsoft.EntityFrameworkCore;
++using UltimaMilla.Api.Seguridad;
++using UltimaMilla.Application.Common;
++using UltimaMilla.Application.Seguridad;
++using UltimaMilla.Domain.Organizacion;
++using UltimaMilla.Infrastructure.Persistence;
++
++namespace UltimaMilla.Api.Endpoints;
++
++/// <summary>
++/// Letra 5.1, requerimiento 6: gestión de vehículos del operador, con su capacidad de carga.
++/// Misma política que el resto de la configuración del operador.
++/// </summary>
++public static class VehiculosEndpoints
++{
++    public static IEndpointRouteBuilder MapVehiculosEndpoints(this IEndpointRouteBuilder app)
++    {
++        var grupo = app.MapGroup("/api/vehiculos")
++            .WithTags("Vehiculos")
++            .RequireAuthorization(policy => policy.RequireRole(Perfiles.Configuracion));
++
++        grupo.MapGet("", async (ITenantContext tenant, AppDbContext db, CancellationToken ct) =>
++        {
++            var operadorId = tenant.OperadorId ?? throw new UnauthorizedAccessException();
++
++            var vehiculos = await db.Vehiculos
++                .AsNoTracking()
++                .Where(v => v.OperadorId == operadorId)
++                .OrderByDescending(v => v.Activo)
++                .ThenBy(v => v.Matricula)
++                .Select(v => new VehiculoItem(
++                    v.Id, v.Matricula, v.CapacidadPesoKg, v.CapacidadVolumenM3, v.Activo))
++                .ToListAsync(ct);
++
++            return Results.Ok(vehiculos);
++        });
++
++        grupo.MapPost("", async (
++            AltaVehiculoRequest request,
++            HttpContext context,
++            IAntiforgery antiforgery,
++            ITenantContext tenant,
++            AppDbContext db,
++            CancellationToken ct) =>
++        {
++            if (!await antiforgery.IsRequestValidAsync(context))
++                return TokenInvalido();
++
++            var operadorId = tenant.OperadorId ?? throw new UnauthorizedAccessException();
++
++            if (string.IsNullOrWhiteSpace(request.Matricula))
++                throw new ArgumentException("La matrícula es obligatoria.");
++            if (request.CapacidadPesoKg <= 0)
++                throw new ArgumentException("La capacidad de peso debe ser mayor que cero.");
++            if (request.CapacidadVolumenM3 <= 0)
++                throw new ArgumentException("La capacidad de volumen debe ser mayor que cero.");
++
++            var matricula = request.Matricula.Trim().ToUpperInvariant();
++            if (await db.Vehiculos.AnyAsync(v => v.OperadorId == operadorId && v.Matricula == matricula, ct))
++                throw new ConflictoException($"Ya existe un vehículo con la matrícula {matricula}.");
++
++            var vehiculo = Vehiculo.Crear(
++                operadorId, matricula, request.CapacidadPesoKg, request.CapacidadVolumenM3);
++            db.Vehiculos.Add(vehiculo);
++            await db.SaveChangesAsync(ct);
++
++            return Results.Created(
++                $"/api/vehiculos/{vehiculo.Id}",
++                new VehiculoItem(
++                    vehiculo.Id, vehiculo.Matricula, vehiculo.CapacidadPesoKg,
++                    vehiculo.CapacidadVolumenM3, vehiculo.Activo));
++        });
++
++        // Baja lógica: un vehículo inactivo deja de ofrecerse al armar hojas de ruta, pero las existentes lo conservan.
++        grupo.MapPost("/{id:guid}/activo", async (
++            Guid id,
++            CambiarEstadoVehiculoRequest request,
++            HttpContext context,
++            IAntiforgery antiforgery,
++            ITenantContext tenant,
++            AppDbContext db,
++            CancellationToken ct) =>
++        {
++            if (!await antiforgery.IsRequestValidAsync(context))
++                return TokenInvalido();
++
++            var operadorId = tenant.OperadorId ?? throw new UnauthorizedAccessException();
++
++            var vehiculo = await db.Vehiculos
++                .FirstOrDefaultAsync(v => v.Id == id && v.OperadorId == operadorId, ct);
++            if (vehiculo is null)
++                return Results.NotFound();
++
++            if (request.Activo) vehiculo.Activar(); else vehiculo.Desactivar();
++            await db.SaveChangesAsync(ct);
++
++            return Results.Ok(new VehiculoItem(
++                vehiculo.Id, vehiculo.Matricula, vehiculo.CapacidadPesoKg,
++                vehiculo.CapacidadVolumenM3, vehiculo.Activo));
++        });
++
++        return app;
++    }
++
++    private static IResult TokenInvalido() => Results.Problem(
++        statusCode: StatusCodes.Status400BadRequest,
++        title: "Token de seguridad inválido",
++        detail: "La solicitud no contiene un token antifalsificación válido.");
++}
++
++public sealed record AltaVehiculoRequest(string Matricula, decimal CapacidadPesoKg, decimal CapacidadVolumenM3);
++
++public sealed record CambiarEstadoVehiculoRequest(bool Activo);
++
++public sealed record VehiculoItem(
++    Guid Id, string Matricula, decimal CapacidadPesoKg, decimal CapacidadVolumenM3, bool Activo);
+diff --git a/src/UltimaMilla.Api/Program.cs b/src/UltimaMilla.Api/Program.cs
+index 03da732..a54d3ec 100644
+--- a/src/UltimaMilla.Api/Program.cs
++++ b/src/UltimaMilla.Api/Program.cs
+@@ -296,6 +296,7 @@ app.MapHub<TableroHub>("/api/hubs/tablero")
+ app.MapAutenticacionEndpoints();
+ app.MapVinculacionesComercialesEndpoints();
+ app.MapPersonalEndpoints();
++app.MapVehiculosEndpoints();
+ app.MapBanderasEndpoints();
+ 
+ 
+diff --git a/src/UltimaMilla.Web.Backoffice/Pages/Shared/_Layout.cshtml b/src/UltimaMilla.Web.Backoffice/Pages/Shared/_Layout.cshtml
+index e6893f9..e6aa732 100644
+--- a/src/UltimaMilla.Web.Backoffice/Pages/Shared/_Layout.cshtml
++++ b/src/UltimaMilla.Web.Backoffice/Pages/Shared/_Layout.cshtml
+@@ -44,6 +44,7 @@
+             entradas.Add(("/Tarifas", "ph-currency-dollar", "Tarifas"));
+             entradas.Add(("/ReglasOperativas", "ph-sliders-horizontal", "Reglas operativas"));
+             entradas.Add(("/Personal", "ph-users-three", "Personal"));
++            entradas.Add(("/Vehiculos", "ph-truck", "Vehículos"));
+             entradas.Add(("/SolicitudesComerciales", "ph-handshake", "Solicitudes de comercios"));
+         }
+     }
+diff --git a/src/UltimaMilla.Web.Backoffice/Pages/Vehiculos.cshtml b/src/UltimaMilla.Web.Backoffice/Pages/Vehiculos.cshtml
+new file mode 100644
+index 0000000..70fdd81
+--- /dev/null
++++ b/src/UltimaMilla.Web.Backoffice/Pages/Vehiculos.cshtml
+@@ -0,0 +1,88 @@
++@page
++@model UltimaMilla.Web.Backoffice.Pages.VehiculosModel
++
++@{
++    ViewData["Title"] = "Vehículos";
++}
++
++<div class="encabezado">
++    <div>
++        <h1>Vehículos</h1>
++        <p>Flota del operador y su capacidad de carga. Las hojas de ruta solo ofrecen los vehículos activos.</p>
++    </div>
++</div>
++
++@if (TempData["Mensaje"] is string mensaje)
++{
++    <p class="aviso ok" role="status">@mensaje</p>
++}
++
++@if (!string.IsNullOrWhiteSpace(Model.Error))
++{
++    <p class="aviso error" role="alert">@Model.Error</p>
++}
++
++<section>
++    <h2>Flota</h2>
++
++    @if (Model.Vehiculos.Count == 0)
++    {
++        <p class="nota">Todavía no hay vehículos dados de alta.</p>
++    }
++    else
++    {
++        <div class="tabla">
++            <table>
++                <thead>
++                    <tr><th>Matrícula</th><th>Peso (kg)</th><th>Volumen (m³)</th><th>Estado</th><th></th></tr>
++                </thead>
++                <tbody>
++                    @foreach (var v in Model.Vehiculos)
++                    {
++                        <tr>
++                            <td>@v.Matricula</td>
++                            <td>@v.CapacidadPesoKg.ToString("0.##")</td>
++                            <td>@v.CapacidadVolumenM3.ToString("0.##")</td>
++                            <td>@(v.Activo ? "Activo" : "Inactivo")</td>
++                            <td>
++                                <form method="post" asp-page-handler="Estado">
++                                    <input type="hidden" name="id" value="@v.Id" />
++                                    <input type="hidden" name="activo" value="@((!v.Activo).ToString().ToLowerInvariant())" />
++                                    <button type="submit">@(v.Activo ? "Dar de baja" : "Reactivar")</button>
++                                </form>
++                            </td>
++                        </tr>
++                    }
++                </tbody>
++            </table>
++        </div>
++    }
++</section>
++
++<section>
++    <h2>Dar de alta</h2>
++
++    <form method="post">
++        <div asp-validation-summary="All" class="error"></div>
++
++        <div class="campos">
++            <div>
++                <label asp-for="Formulario.Matricula">Matrícula</label>
++                <input asp-for="Formulario.Matricula" />
++                <span asp-validation-for="Formulario.Matricula" class="error"></span>
++            </div>
++            <div>
++                <label asp-for="Formulario.CapacidadPesoKg">Capacidad de peso (kg)</label>
++                <input asp-for="Formulario.CapacidadPesoKg" type="number" step="0.01" min="0.01" />
++                <span asp-validation-for="Formulario.CapacidadPesoKg" class="error"></span>
++            </div>
++            <div>
++                <label asp-for="Formulario.CapacidadVolumenM3">Capacidad de volumen (m³)</label>
++                <input asp-for="Formulario.CapacidadVolumenM3" type="number" step="0.01" min="0.01" />
++                <span asp-validation-for="Formulario.CapacidadVolumenM3" class="error"></span>
++            </div>
++        </div>
++
++        <button type="submit" class="primario"><i class="ph ph-truck"></i>Dar de alta</button>
++    </form>
++</section>
+diff --git a/src/UltimaMilla.Web.Backoffice/Pages/Vehiculos.cshtml.cs b/src/UltimaMilla.Web.Backoffice/Pages/Vehiculos.cshtml.cs
+new file mode 100644
+index 0000000..bfbbce6
+--- /dev/null
++++ b/src/UltimaMilla.Web.Backoffice/Pages/Vehiculos.cshtml.cs
+@@ -0,0 +1,81 @@
++using System.ComponentModel.DataAnnotations;
++using Microsoft.AspNetCore.Mvc;
++using Microsoft.AspNetCore.Mvc.RazorPages;
++using UltimaMilla.Web.Backoffice.Services;
++
++namespace UltimaMilla.Web.Backoffice.Pages;
++
++// Letra 5.1, requerimiento 6: gestión de vehículos con su capacidad de carga. La política se fija en Program.cs.
++public sealed class VehiculosModel(VehiculosApiClient api) : PageModel
++{
++    public IReadOnlyList<VehiculoAdminDto> Vehiculos { get; private set; } = [];
++    public string? Error { get; private set; }
++
++    [BindProperty]
++    public FormularioVehiculo Formulario { get; set; } = new();
++
++    public async Task OnGetAsync(CancellationToken ct) => await CargarAsync(ct);
++
++    public async Task<IActionResult> OnPostAsync(CancellationToken ct)
++    {
++        if (!ModelState.IsValid)
++        {
++            await CargarAsync(ct);
++            return Page();
++        }
++
++        try
++        {
++            await api.AltaAsync(new AltaVehiculo(
++                Formulario.Matricula, Formulario.CapacidadPesoKg, Formulario.CapacidadVolumenM3), ct);
++            TempData["Mensaje"] = $"Vehículo {Formulario.Matricula.Trim().ToUpperInvariant()} dado de alta.";
++            return RedirectToPage();
++        }
++        catch (HttpRequestException ex)
++        {
++            Error = $"No se pudo dar de alta: {ex.Message}";
++            await CargarAsync(ct);
++            return Page();
++        }
++    }
++
++    public async Task<IActionResult> OnPostEstadoAsync(Guid id, bool activo, CancellationToken ct)
++    {
++        try
++        {
++            await api.CambiarEstadoAsync(id, activo, ct);
++            TempData["Mensaje"] = activo ? "Vehículo reactivado." : "Vehículo dado de baja.";
++            return RedirectToPage();
++        }
++        catch (HttpRequestException ex)
++        {
++            Error = $"No se pudo cambiar el estado: {ex.Message}";
++            await CargarAsync(ct);
++            return Page();
++        }
++    }
++
++    private async Task CargarAsync(CancellationToken ct)
++    {
++        try
++        {
++            Vehiculos = await api.ListarAsync(ct);
++        }
++        catch (HttpRequestException ex)
++        {
++            Error ??= $"No se pudo cargar la flota: {ex.Message}";
++        }
++    }
++
++    public sealed class FormularioVehiculo
++    {
++        [Required(ErrorMessage = "La matrícula es obligatoria.")]
++        public string Matricula { get; set; } = string.Empty;
++
++        [Range(0.01, 100000, ErrorMessage = "La capacidad de peso debe ser mayor que cero.")]
++        public decimal CapacidadPesoKg { get; set; }
++
++        [Range(0.01, 1000, ErrorMessage = "La capacidad de volumen debe ser mayor que cero.")]
++        public decimal CapacidadVolumenM3 { get; set; }
++    }
++}
+diff --git a/src/UltimaMilla.Web.Backoffice/Program.cs b/src/UltimaMilla.Web.Backoffice/Program.cs
+index 8a0ef4d..d65ba12 100644
+--- a/src/UltimaMilla.Web.Backoffice/Program.cs
++++ b/src/UltimaMilla.Web.Backoffice/Program.cs
+@@ -60,7 +60,7 @@ builder.Services.AddAuthorization(options =>
+ builder.Services.AddRazorPages(options =>
+ {
+     // Letra 3.3: la configuración es del administrador; la planificación, del despachador.
+-    foreach (var pagina in new[] { "/Zonas", "/EditarZona", "/Tarifas", "/ReglasOperativas", "/SolicitudesComerciales", "/Personal" })
++    foreach (var pagina in new[] { "/Zonas", "/EditarZona", "/Tarifas", "/ReglasOperativas", "/SolicitudesComerciales", "/Personal", "/Vehiculos" })
+         options.Conventions.AuthorizePage(pagina, "AdministradorOperador");
+     foreach (var pagina in new[] { "/Tablero", "/HojasDeRuta", "/Avisos", "/Reportes" })
+         options.Conventions.AuthorizePage(pagina, "Despacho");
+@@ -150,6 +150,12 @@ builder.Services.AddHttpClient<PersonalApiClient>(c =>
+         ?? "http://localhost:5080/"))
+     .AddHttpMessageHandler<CookieAutenticacionHandler>();
+ 
++builder.Services.AddHttpClient<VehiculosApiClient>(c =>
++    c.BaseAddress = new Uri(
++        builder.Configuration["Api:BaseUrl"]
++        ?? "http://localhost:5080/"))
++    .AddHttpMessageHandler<CookieAutenticacionHandler>();
++
+ // Observabilidad.
+ builder.Logging.AddOpenTelemetry(
+     o => o.IncludeFormattedMessage = true);
+diff --git a/src/UltimaMilla.Web.Backoffice/Services/VehiculosApiClient.cs b/src/UltimaMilla.Web.Backoffice/Services/VehiculosApiClient.cs
+new file mode 100644
+index 0000000..12b44b0
+--- /dev/null
++++ b/src/UltimaMilla.Web.Backoffice/Services/VehiculosApiClient.cs
+@@ -0,0 +1,48 @@
++using System.Net.Http.Json;
++
++namespace UltimaMilla.Web.Backoffice.Services;
++
++public sealed record VehiculoAdminDto(
++    Guid Id, string Matricula, decimal CapacidadPesoKg, decimal CapacidadVolumenM3, bool Activo);
++
++public sealed record AltaVehiculo(string Matricula, decimal CapacidadPesoKg, decimal CapacidadVolumenM3);
++
++public sealed class VehiculosApiClient(HttpClient http)
++{
++    public async Task<IReadOnlyList<VehiculoAdminDto>> ListarAsync(CancellationToken ct = default) =>
++        await http.GetFromJsonAsync<List<VehiculoAdminDto>>("api/vehiculos", ct) ?? [];
++
++    public async Task AltaAsync(AltaVehiculo alta, CancellationToken ct = default)
++    {
++        using var solicitud = await CrearSolicitudAsync(HttpMethod.Post, "api/vehiculos", alta, ct);
++        await EnviarAsync(solicitud, ct);
++    }
++
++    public async Task CambiarEstadoAsync(Guid id, bool activo, CancellationToken ct = default)
++    {
++        using var solicitud = await CrearSolicitudAsync(
++            HttpMethod.Post, $"api/vehiculos/{id}/activo", new { Activo = activo }, ct);
++        await EnviarAsync(solicitud, ct);
++    }
++
++    private async Task<HttpRequestMessage> CrearSolicitudAsync(
++        HttpMethod metodo, string url, object contenido, CancellationToken ct)
++    {
++        using var respuestaToken = await http.GetAsync("api/antiforgery/token", ct);
++        respuestaToken.EnsureSuccessStatusCode();
++        var token = await respuestaToken.Content.ReadFromJsonAsync<TokenAntiforgery>(cancellationToken: ct);
++
++        var solicitud = new HttpRequestMessage(metodo, url) { Content = JsonContent.Create(contenido) };
++        solicitud.Headers.Add("X-CSRF-TOKEN", token?.Token);
++        return solicitud;
++    }
++
++    private async Task EnviarAsync(HttpRequestMessage solicitud, CancellationToken ct)
++    {
++        using var respuesta = await http.SendAsync(solicitud, ct);
++        if (!respuesta.IsSuccessStatusCode)
++            throw new HttpRequestException(await respuesta.Content.ReadAsStringAsync(ct), null, respuesta.StatusCode);
++    }
++
++    private sealed record TokenAntiforgery(string Token);
++}
+diff --git a/tests/UltimaMilla.UnitTests/VehiculoTests.cs b/tests/UltimaMilla.UnitTests/VehiculoTests.cs
+new file mode 100644
+index 0000000..5df2068
+--- /dev/null
++++ b/tests/UltimaMilla.UnitTests/VehiculoTests.cs
+@@ -0,0 +1,49 @@
++using UltimaMilla.Domain.Organizacion;
++using Xunit;
++
++namespace UltimaMilla.UnitTests;
++
++public class VehiculoTests
++{
++    [Fact]
++    public void Crear_normaliza_la_matricula_y_queda_activo()
++    {
++        var vehiculo = Vehiculo.Crear(Guid.NewGuid(), "  stp1234 ", 500m, 12m);
++
++        Assert.Equal("STP1234", vehiculo.Matricula);
++        Assert.Equal(500m, vehiculo.CapacidadPesoKg);
++        Assert.Equal(12m, vehiculo.CapacidadVolumenM3);
++        Assert.True(vehiculo.Activo);
++    }
++
++    [Theory]
++    [InlineData("")]
++    [InlineData("   ")]
++    public void Crear_rechaza_matricula_vacia(string matricula)
++    {
++        Assert.ThrowsAny<ArgumentException>(() => Vehiculo.Crear(Guid.NewGuid(), matricula, 500m, 12m));
++    }
++
++    [Theory]
++    [InlineData(0, 12)]
++    [InlineData(-1, 12)]
++    [InlineData(500, 0)]
++    [InlineData(500, -3)]
++    public void Crear_rechaza_capacidades_que_no_son_positivas(int pesoKg, int volumenM3)
++    {
++        Assert.ThrowsAny<ArgumentException>(
++            () => Vehiculo.Crear(Guid.NewGuid(), "STP1234", pesoKg, volumenM3));
++    }
++
++    [Fact]
++    public void Se_puede_dar_de_baja_y_reactivar()
++    {
++        var vehiculo = Vehiculo.Crear(Guid.NewGuid(), "STP1234", 500m, 12m);
++
++        vehiculo.Desactivar();
++        Assert.False(vehiculo.Activo);
++
++        vehiculo.Activar();
++        Assert.True(vehiculo.Activo);
++    }
++}
