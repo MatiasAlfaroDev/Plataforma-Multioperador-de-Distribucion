@@ -10,6 +10,7 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
     public IReadOnlyList<DiscrepanciaRecepcionItem> Discrepancias { get; private set; } = [];
 
     public string? Error { get; private set; }
+    public string? ErrorAccion { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(
         Guid id,
@@ -35,6 +36,90 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         }
 
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostDeclararExtravioAsync(
+        Guid id,
+        string justificacion,
+        CancellationToken ct)
+    {
+        if (id == Guid.Empty)
+            return BadRequest();
+
+        // El responsable es quien tiene la sesión iniciada.
+        var responsable = User.Identity?.Name;
+        string? error = null;
+
+        if (string.IsNullOrWhiteSpace(responsable))
+        {
+            error = "No se pudo identificar al usuario de la sesión.";
+        }
+        else if (string.IsNullOrWhiteSpace(justificacion))
+        {
+            error = "Indicá la justificación del extravío.";
+        }
+        else
+        {
+            try
+            {
+                await api.DeclararExtravioAsync(
+                    id, justificacion.Trim(), responsable, ct);
+
+                return RedirectToPage("/DetalleEnvio", new { id });
+            }
+            catch (HttpRequestException ex)
+            {
+                error = ex.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "No tenés permisos para declarar el extravío."
+                    : "No se pudo declarar el extravío: " + ex.Message;
+            }
+        }
+
+        var resultado = await OnGetAsync(id, ct);
+        ErrorAccion = error;
+        return resultado;
+    }
+
+    public async Task<IActionResult> OnPostReaparicionAsync(
+        Guid id,
+        List<string> identificaciones,
+        CancellationToken ct)
+    {
+        if (id == Guid.Empty)
+            return BadRequest();
+
+        // El responsable es quien tiene la sesión iniciada.
+        var responsable = User.Identity?.Name;
+        string? error = null;
+
+        if (string.IsNullOrWhiteSpace(responsable))
+        {
+            error = "No se pudo identificar al usuario de la sesión.";
+        }
+        else if (identificaciones is null || identificaciones.Count == 0)
+        {
+            error = "Marcá los bultos encontrados.";
+        }
+        else
+        {
+            try
+            {
+                await api.RegistrarReaparicionAsync(
+                    id, identificaciones, responsable, ct);
+
+                return RedirectToPage("/DetalleEnvio", new { id });
+            }
+            catch (HttpRequestException ex)
+            {
+                error = ex.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "No tenés permisos para registrar la reaparición."
+                    : "No se pudo registrar la reaparición: " + ex.Message;
+            }
+        }
+
+        var resultado = await OnGetAsync(id, ct);
+        ErrorAccion = error;
+        return resultado;
     }
 
     public async Task<IActionResult> OnPostIniciarDevolucionAsync(

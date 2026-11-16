@@ -21,6 +21,13 @@
 }
 else if (Model.Envio is { } envio)
 {
+    @if (Model.ErrorAccion is not null)
+    {
+        <div class="aviso error" role="alert">
+            @Model.ErrorAccion
+        </div>
+    }
+
     <h2>Información general</h2>
 
     <div class="tabla">
@@ -138,6 +145,74 @@ else if (Model.Envio is { } envio)
         </form>
     </section>
 }
+    @if (envio.Estado is not ("Entregado" or "Devuelto" or "Extraviado"))
+    {
+        <section class="mt-6">
+            <h2>Declarar extravío</h2>
+
+            <p class="nota">
+                Si el envío se perdió, declaralo extraviado. Queda
+                registrado a nombre de quien tiene la sesión, con su justificación, y libera la parada
+                de la hoja de ruta, si la tiene.
+            </p>
+
+            <form method="post"
+                  asp-page-handler="DeclararExtravio"
+                  asp-route-id="@envio.Id">
+
+                @Html.AntiForgeryToken()
+
+                <div class="modal-campo">
+                    <label for="justificacionExtravio">Justificación</label>
+                    <textarea id="justificacionExtravio"
+                              name="justificacion" maxlength="1000"
+                              rows="3" required></textarea>
+                </div>
+
+                <button type="submit" class="primario">
+                    Declarar extraviado
+                </button>
+            </form>
+        </section>
+    }
+
+    @if (envio.Estado == "Extraviado")
+    {
+        <section class="mt-6">
+            <h2>Registrar reaparición</h2>
+
+            <p class="nota">
+                Marcá los bultos encontrados. Tienen que ser todos los del
+                envío; al confirmar vuelve al depósito.
+            </p>
+
+            <form method="post"
+                  asp-page-handler="Reaparicion"
+                  asp-route-id="@envio.Id">
+
+                @Html.AntiForgeryToken()
+
+                <fieldset>
+                    <legend>Bultos encontrados</legend>
+
+                    @foreach (var bulto in envio.Bultos)
+                    {
+                        <label class="checkbox">
+                            <input type="checkbox"
+                                   name="identificaciones"
+                                   value="@bulto.Identificacion" />
+                            @bulto.Identificacion
+                        </label>
+                    }
+                </fieldset>
+
+                <button type="submit" class="primario">
+                    Confirmar reaparición
+                </button>
+            </form>
+        </section>
+    }
+
     @if (Model.Discrepancias.Count > 0)
     {
         <h2>Discrepancias de recepción</h2>

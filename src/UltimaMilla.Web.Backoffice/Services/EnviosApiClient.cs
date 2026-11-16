@@ -254,6 +254,70 @@ public sealed class EnviosApiClient(HttpClient http)
     }
 
 
+    public async Task DeclararExtravioAsync(
+        Guid envioId,
+        string justificacion,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/extravio",
+            new { Justificacion = justificacion, Responsable = responsable },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
+    public async Task RegistrarReaparicionAsync(
+        Guid envioId,
+        IReadOnlyList<string> identificaciones,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/reaparicion",
+            new
+            {
+                IdentificacionesEscaneadas = identificaciones,
+                Responsable = responsable
+            },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
+    // Si la API rechaza la acción, deja el motivo en el mensaje de la excepción.
+    private static async Task VerificarAccionAsync(
+        HttpResponseMessage respuesta,
+        CancellationToken ct)
+    {
+        if (respuesta.IsSuccessStatusCode)
+            return;
+
+        var cuerpo = await respuesta.Content.ReadAsStringAsync(ct);
+        string? motivo = null;
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(cuerpo);
+            if (doc.RootElement.TryGetProperty("detail", out var d) &&
+                d.ValueKind == System.Text.Json.JsonValueKind.String)
+                motivo = d.GetString();
+            else if (doc.RootElement.TryGetProperty("title", out var t) &&
+                t.ValueKind == System.Text.Json.JsonValueKind.String)
+                motivo = t.GetString();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // El cuerpo no es JSON: se usa el mensaje genérico.
+        }
+
+        throw new HttpRequestException(
+            motivo ?? $"La API rechazó la operación (HTTP {(int)respuesta.StatusCode}).",
+            null,
+            respuesta.StatusCode);
+    }
+
     // RF 41: el tablero de operación incorpora los retiros a domicilio.
     public async Task<IReadOnlyList<RetiroTableroItem>> ListarRetirosAsync(CancellationToken ct = default) =>
         await http.GetFromJsonAsync<List<RetiroTableroItem>>("api/retiros", ct) ?? [];
