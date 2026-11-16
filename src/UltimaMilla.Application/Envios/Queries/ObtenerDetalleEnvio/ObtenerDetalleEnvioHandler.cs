@@ -116,7 +116,6 @@ if (esOperador &&
             .ToList(),
 
         envio.Eventos
-            .OrderByDescending(e => e.OcurridoEn)
             .Select(e => new DetalleEventoDto(
                 e.Id,
                 e.EstadoAnterior.ToString(),
@@ -130,7 +129,54 @@ if (esOperador &&
                 e.ReceptorDevolucion,
                 e.ReferenciaConstanciaDevolucion
             ))
+            // Extravíos y reapariciones de un bulto suelto: no cambian el estado del envío,
+            // así que se guardan como eventos del bulto y se muestran junto a los del envío.
+            .Concat(envio.EventosBulto
+                .Where(e => e.Resultado is
+                    UltimaMilla.Domain.Envios.ResultadoBulto.Extraviado or
+                    UltimaMilla.Domain.Envios.ResultadoBulto.Reaparecido)
+                .Select(MapearEventoDeBulto))
+            .OrderByDescending(e => e.OcurridoEn)
             .ToList()
     );
 }
+
+    // El motivo del evento de bulto se guarda como "responsable: justificación"
+    // (extravío) o "Recibido por responsable" (reaparición).
+    private static DetalleEventoDto MapearEventoDeBulto(
+        UltimaMilla.Domain.Envios.EventoBulto e)
+    {
+        var motivo = e.Motivo ?? string.Empty;
+        string responsable;
+        string? justificacion = null;
+
+        if (e.Resultado == UltimaMilla.Domain.Envios.ResultadoBulto.Reaparecido)
+        {
+            const string prefijo = "Recibido por ";
+            responsable = motivo.StartsWith(prefijo, StringComparison.Ordinal)
+                ? motivo[prefijo.Length..]
+                : motivo;
+        }
+        else
+        {
+            var corte = motivo.IndexOf(": ", StringComparison.Ordinal);
+            responsable = corte > 0 ? motivo[..corte] : motivo;
+            justificacion = corte > 0 ? motivo[(corte + 2)..] : null;
+        }
+
+        return new DetalleEventoDto(
+            e.Id,
+            $"Bulto: {e.EstadoAnterior}",
+            $"Bulto: {e.EstadoNuevo}",
+            e.Resultado == UltimaMilla.Domain.Envios.ResultadoBulto.Extraviado
+                ? "Bulto extraviado"
+                : "Bulto reaparecido",
+            e.OcurridoEn,
+            $"Bulto {e.Identificacion}",
+            string.IsNullOrWhiteSpace(responsable) ? "—" : responsable,
+            justificacion,
+            null,
+            null,
+            null);
+    }
 }

@@ -75,6 +75,7 @@ else if (Model.Envio is { } envio)
                     <th>Estado</th>
                     <th>Peso (kg)</th>
                     <th>Dimensiones (cm)</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -88,6 +89,42 @@ else if (Model.Envio is { } envio)
                             @bulto.AltoCm ×
                             @bulto.AnchoCm ×
                             @bulto.ProfundidadCm
+                        </td>
+                        <td>
+                            @if (envio.Estado is "EnDeposito" or "NoEntregado" or "EntregadoParcialmente" or "AsignadoARuta" or "EnTransito")
+                            {
+                                if (bulto.Estado == "Pendiente")
+                                {
+                                    <form method="post"
+                                          asp-page-handler="ExtraviarBulto"
+                                          asp-route-id="@envio.Id"
+                                          style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
+                                        <input type="text"
+                                               name="justificacion"
+                                               maxlength="150"
+                                               required
+                                               style="width:16rem; max-width:100%;"
+                                               placeholder="Qué pasó y quién lo tenía" />
+                                        <button type="submit" class="btn-secundario py-1.5 text-sm">
+                                            Declarar extraviado
+                                        </button>
+                                    </form>
+                                }
+                                else if (bulto.Estado == "Extraviado")
+                                {
+                                    <form method="post"
+                                          asp-page-handler="ReaparecerBulto"
+                                          asp-route-id="@envio.Id">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
+                                        <button type="submit" class="primario py-1.5 text-sm">
+                                            Reaparecer
+                                        </button>
+                                    </form>
+                                }
+                            }
                         </td>
                     </tr>
                 }
@@ -178,12 +215,12 @@ else if (Model.Envio is { } envio)
 
     @if (envio.Estado == "Extraviado")
     {
-        <section class="mt-6">
+        <section class="mt-6" id="reaparicion">
             <h2>Registrar reaparición</h2>
 
             <p class="nota">
-                Marcá los bultos encontrados. Tienen que ser todos los del
-                envío; al confirmar vuelve al depósito.
+                Marcá los bultos encontrados; al confirmar el envío vuelve
+                al depósito y los que no aparecieron siguen extraviados.
             </p>
 
             <form method="post"
@@ -195,7 +232,8 @@ else if (Model.Envio is { } envio)
                 <fieldset>
                     <legend>Bultos encontrados</legend>
 
-                    @foreach (var bulto in envio.Bultos)
+                    @foreach (var bulto in envio.Bultos
+                        .Where(b => b.Estado == "Extraviado"))
                     {
                         <label class="checkbox">
                             <input type="checkbox"

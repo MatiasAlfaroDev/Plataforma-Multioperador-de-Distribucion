@@ -28,6 +28,8 @@ using UltimaMilla.Application.Rutas.Commands.DespacharHojaDeRuta;
 using UltimaMilla.Application.Rutas.Commands.QuitarEnvioDeRuta;
 using UltimaMilla.Application.Rutas.Commands.AgregarEnvioARuta;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravioBulto;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicionBulto;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using UltimaMilla.Application.Rutas.Queries.ObtenerMisHojasDeRuta;
 using UltimaMilla.Application.Rutas.Queries.VerificarMiCarga;
@@ -110,6 +112,8 @@ public static class DependencyInjection
         services.AddScoped<AgregarEnvioARutaHandler>();
         services.AddScoped<AgregarEnvioUrgenteHandler>();
         services.AddScoped<DeclararExtravioHandler>();
+        services.AddScoped<DeclararExtravioBultoHandler>();
+        services.AddScoped<RegistrarReaparicionBultoHandler>();
         services.AddScoped<RegistrarReaparicionHandler>();
         services.AddScoped<ObtenerMisHojasDeRutaHandler>();
         services.AddScoped<VerificarMiCargaHandler>();

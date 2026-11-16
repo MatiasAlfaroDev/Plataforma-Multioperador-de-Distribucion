@@ -80,6 +80,85 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         return resultado;
     }
 
+    public async Task<IActionResult> OnPostExtraviarBultoAsync(
+        Guid id,
+        string identificacion,
+        string justificacion,
+        CancellationToken ct)
+    {
+        if (id == Guid.Empty)
+            return BadRequest();
+
+        var responsable = User.Identity?.Name;
+        string? error = null;
+
+        if (string.IsNullOrWhiteSpace(responsable))
+        {
+            error = "No se pudo identificar al usuario de la sesión.";
+        }
+        else if (string.IsNullOrWhiteSpace(justificacion))
+        {
+            error = "Indicá qué pasó y quién tenía el bulto.";
+        }
+        else
+        {
+            try
+            {
+                await api.DeclararExtravioBultoAsync(
+                    id, identificacion, justificacion.Trim(), responsable, ct);
+
+                return RedirectToPage("/DetalleEnvio", new { id });
+            }
+            catch (HttpRequestException ex)
+            {
+                error = ex.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "No tenés permisos para declarar el extravío."
+                    : "No se pudo declarar el extravío del bulto: " + ex.Message;
+            }
+        }
+
+        var resultado = await OnGetAsync(id, ct);
+        ErrorAccion = error;
+        return resultado;
+    }
+
+    public async Task<IActionResult> OnPostReaparecerBultoAsync(
+        Guid id,
+        string identificacion,
+        CancellationToken ct)
+    {
+        if (id == Guid.Empty)
+            return BadRequest();
+
+        var responsable = User.Identity?.Name;
+        string? error = null;
+
+        if (string.IsNullOrWhiteSpace(responsable))
+        {
+            error = "No se pudo identificar al usuario de la sesión.";
+        }
+        else
+        {
+            try
+            {
+                await api.RegistrarReaparicionBultoAsync(
+                    id, identificacion, responsable, ct);
+
+                return RedirectToPage("/DetalleEnvio", new { id });
+            }
+            catch (HttpRequestException ex)
+            {
+                error = ex.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "No tenés permisos para registrar la reaparición."
+                    : "No se pudo registrar la reaparición del bulto: " + ex.Message;
+            }
+        }
+
+        var resultado = await OnGetAsync(id, ct);
+        ErrorAccion = error;
+        return resultado;
+    }
+
     public async Task<IActionResult> OnPostReaparicionAsync(
         Guid id,
         List<string> identificaciones,

@@ -286,6 +286,35 @@ public sealed class EnviosApiClient(HttpClient http)
         await VerificarAccionAsync(respuesta, ct);
     }
 
+    public async Task DeclararExtravioBultoAsync(
+        Guid envioId,
+        string identificacion,
+        string justificacion,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/bultos/{Uri.EscapeDataString(identificacion)}/extravio",
+            new { Justificacion = justificacion, Responsable = responsable },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
+    public async Task RegistrarReaparicionBultoAsync(
+        Guid envioId,
+        string identificacion,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/bultos/{Uri.EscapeDataString(identificacion)}/reaparicion",
+            new { Responsable = responsable },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
     // Si la API rechaza la acción, deja el motivo en el mensaje de la excepción.
     private static async Task VerificarAccionAsync(
         HttpResponseMessage respuesta,

@@ -38,6 +38,8 @@ using UltimaMilla.Application.Rutas.Queries.VerificarMiCarga;
 using UltimaMilla.Application.Rutas.Commands.AgregarEnvioUrgente;
 using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravioBulto;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicionBulto;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -1088,6 +1090,83 @@ api.MapPost("/envios/{envioId:guid}/reaparicion",
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
 
+// Declarar extraviado un solo bulto de un envío.
+api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/extravio",
+    async (
+        Guid envioId,
+        string identificacion,
+        DeclararExtravioBultoRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        DeclararExtravioBultoHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new DeclararExtravioBultoCommand(
+                operadorId,
+                envioId,
+                identificacion,
+                request.Justificacion,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
+
+// Registrar la reaparición de un solo bulto extraviado.
+api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/reaparicion",
+    async (
+        Guid envioId,
+        string identificacion,
+        ReaparicionBultoRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        RegistrarReaparicionBultoHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new RegistrarReaparicionBultoCommand(
+                operadorId,
+                envioId,
+                identificacion,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
+
 // Solicitudes de reprogramación pendientes para Backoffice.
 
 // Solicitar la reprogramación de un envío desde Backoffice.
@@ -1883,6 +1962,8 @@ public sealed record VerificarMiCargaRequest(IReadOnlyList<string>? BultosEscane
 
 public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
 public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record DeclararExtravioBultoRequest(string Justificacion, string Responsable);
+public sealed record ReaparicionBultoRequest(string Responsable);
 public sealed record IniciarDevolucionRequest( string Responsable);
 
 public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);
