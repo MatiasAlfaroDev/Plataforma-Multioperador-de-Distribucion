@@ -36,7 +36,8 @@ public sealed record EnvioItem(
     decimal PesoTotalKg,
     decimal? TarifaCalculada,
     DateTimeOffset FechaAlta,
-    int IntentosRealizados);
+    int IntentosRealizados,
+    bool UltimoMotivoRequiereDevolucion);
 
 /// <summary>Detalle completo de un envío.</summary>
 public sealed record DetalleEnvioItem(
@@ -275,6 +276,15 @@ public sealed class EnviosApiClient(HttpClient http)
     public Task CancelarRetiroAsync(Guid retiroId, string motivo, CancellationToken ct = default) =>
         EnviarProtegidoAsync($"api/retiros/{retiroId}/cancelar", new { Motivo = motivo }, ct);
 
+    public async Task<DetalleRetiroItem?> ObtenerDetalleRetiroAsync(
+    Guid retiroId,
+    CancellationToken ct = default)
+{
+    return await http.GetFromJsonAsync<DetalleRetiroItem>(
+        $"api/retiros/{retiroId}",
+        ct);
+}
+
     /// <summary>accion: recibir-deposito, entregar-comercio o reprogramar.</summary>
     public Task GestionarRetiroAsync(Guid retiroId, string accion, CancellationToken ct = default) =>
         EnviarProtegidoAsync($"api/retiros/{retiroId}/{accion}", new { }, ct);
@@ -431,3 +441,34 @@ public sealed record RetiroTableroItem(
     RetiroDireccionItem? DomicilioDestino = null,
     Guid? HojaDeRutaId = null,
     string? MotivoCancelacion = null);
+
+public sealed record DetalleRetiroItem(
+    Guid Id,
+    Guid OperadorId,
+    Guid CuentaComercialId,
+    string Motivo,
+    RetiroDireccionItem DomicilioRetiro,
+    RetiroDireccionItem DomicilioDestino,
+    DateOnly FechaSolicitada,
+    TimeOnly HoraDesde,
+    TimeOnly HoraHasta,
+    string Estado,
+    DateTimeOffset SolicitadoEn,
+    Guid? HojaDeRutaId,
+    DateTimeOffset? RetiradoEn,
+    string? ReferenciaFotografia,
+    string? ReferenciaFirma,
+    decimal PesoTotalKg,
+    decimal VolumenTotalMetrosCubicos,
+    Guid? VersionTarifariaId,
+    decimal? TarifaCalculada,
+    IReadOnlyList<DetalleBultoRetiroItem> Bultos);
+
+public sealed record DetalleBultoRetiroItem(
+    Guid Id,
+    string Identificacion,
+    decimal PesoKg,
+    int AltoCm,
+    int AnchoCm,
+    int ProfundidadCm,
+    decimal VolumenMetrosCubicos);

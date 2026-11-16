@@ -91,6 +91,8 @@ using UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
 using Microsoft.AspNetCore.SignalR;
 using Serilog;
 using Serilog.Events;
+using System.Security.Claims;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -696,7 +698,8 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                         b.BultoId,
                         b.Motivo,
                         b.Evidencia))
-                    .ToArray()), ct);
+                    .ToArray(),
+                request.BultosDevueltos), ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
@@ -704,21 +707,42 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
 api.MapPost("/envios/{envioId:guid}/recepcion",
     async (
         Guid envioId,
-        RecibirEnDepositoRequest request,
+        RegistrarRecepcionRequest request,
+        HttpContext context,
+        UserManager<Usuario> userManager,
         RecibirEnDepositoHandler handler,
         CancellationToken ct) =>
     {
+        var usuarioId = context.User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(usuarioId))
+            return Results.Unauthorized();
+
+        var usuario = await userManager.FindByIdAsync(usuarioId);
+
+        if (usuario is null || !usuario.Activo)
+            return Results.Unauthorized();
+
+        var responsable = usuario.NombreCompleto.Trim();
+
+        if (string.IsNullOrWhiteSpace(responsable))
+            return Results.BadRequest(new
+            {
+                mensaje = "El usuario no tiene un nombre registrado."
+            });
+
         var resultado = await handler.Handle(
             new RecibirEnDepositoCommand(
                 envioId,
                 request.IdentificacionesEscaneadas,
-                request.Responsable),
+                responsable),
             ct);
 
-        // RF 10: 200 con el detalle; "recibido: false" indica que faltan bultos declarados.
         return Results.Ok(resultado);
-})
-.RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
+    })
+    .RequireAuthorization(policy =>
+        policy.RequireRole(Perfiles.Deposito));
 
 api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
     async (
@@ -1884,8 +1908,24 @@ public partial class Program { }
 
 public sealed record BultoNoEntregadoRequest( Guid BultoId, string Motivo, string Evidencia);
 
-public sealed record EventoMovilRequest( Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null, IReadOnlyCollection<Guid>? BultosEntregados = null,
-    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null);public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record EventoMovilRequest(
+    Guid IdEvento,
+    string Tipo,
+    string? Motivo,
+    string? Receptor,
+    DateTimeOffset FechaHora,
+    string? DocumentoReceptor = null,
+    string? ReferenciaFirma = null,
+    string? ReferenciaFotografia = null,
+    decimal? Latitud = null,
+    decimal? Longitud = null,
+    string? EvidenciaFallo = null,
+    IReadOnlyCollection<Guid>? BultosEntregados = null,
+    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null,
+    IReadOnlyCollection<Guid>? BultosDevueltos = null);
+public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record RegistrarRecepcionRequest(
+    IReadOnlyList<string> IdentificacionesEscaneadas);
 public sealed record ConfirmarReprogramacionRequest( string Responsable);
 public sealed record QuitarEnvioDeRutaRequest(string Responsable);
 public sealed record AgregarEnvioARutaRequest( Guid EnvioId, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta);

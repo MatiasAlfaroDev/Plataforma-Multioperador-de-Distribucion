@@ -79,7 +79,8 @@ public sealed class ListarEnviosHandler(
                     e.PesoTotalKg,
                     e.TarifaCalculada,
                     e.FechaAlta,
-                    e.IntentosRealizados);
+                    e.IntentosRealizados,
+                    e.UltimoMotivoRequiereDevolucion);
             }).ToList();
         }
 
@@ -127,7 +128,8 @@ public sealed class ListarEnviosHandler(
                 e.PesoTotalKg,
                 e.TarifaCalculada,
                 e.FechaAlta,
-                e.IntentosRealizados);
+                e.IntentosRealizados,
+                e.UltimoMotivoRequiereDevolucion);
 
         }).ToList();
 

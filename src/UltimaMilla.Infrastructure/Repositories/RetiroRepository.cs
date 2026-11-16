@@ -74,8 +74,9 @@ public sealed class RetiroRepository(AppDbContext db) : IRetiroRepository
                 r.OperadorId == operadorId &&
                 r.Estado == EstadoRetiro.EnDeposito &&
                 !db.Set<ParadaRuta>().Any(p =>
-                    p.RetiroId == r.Id &&
-                    p.LiberadaEn == null))
+                p.RetiroId == r.Id &&
+                p.TipoOperacion == TipoOperacionRuta.EntregaRetiroComercio &&
+                p.LiberadaEn == null))
             .OrderBy(r => r.FechaSolicitada)
             .ThenBy(r => r.HoraDesde)
             .ToListAsync(ct);

@@ -52,9 +52,12 @@ public static class Formato
     {
         "Solicitado" => "Solicitado",
         "AsignadoARuta" => "Asignado a ruta",
+        "EnTransito" => "En tránsito",
         "Retirado" => "Retirado",
         "NoRetirado" => "No retirado",
         "EnDeposito" => "En depósito",
+        "AsignadoARutaComercio" => "Asignado a ruta al comercio",
+        "EnTransitoComercio" => "En tránsito al comercio",
         "EntregadoAlComercio" => "Entregado al comercio",
         "Cancelado" => "Cancelado",
         _ => estado

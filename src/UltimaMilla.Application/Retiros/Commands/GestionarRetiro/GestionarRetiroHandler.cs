@@ -63,11 +63,18 @@ public sealed class GestionarRetiroHandler(
             retiro.Id,
             ct);
 
-        if (hojaActiva is not null &&
-            hojaActiva.Estado != EstadoHojaDeRuta.Despachada)
+        if (hojaActiva is null)
         {
             throw new InvalidOperationException(
-                "La hoja de ruta todavía no fue despachada.");
+                "El retiro debe estar asignado a una hoja de ruta " +
+                "de entrega al comercio.");
+        }
+
+        if (hojaActiva.Estado != EstadoHojaDeRuta.Despachada)
+        {
+            throw new InvalidOperationException(
+                "La hoja de ruta de entrega al comercio " +
+                "todavía no fue despachada.");
         }
 
         // La entidad Retiro valida la transición

@@ -23,11 +23,17 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         var insertar = conexion.CreateCommand();
         insertar.Transaction = tx;
         insertar.CommandText = """
-            INSERT INTO eventos_pendientes (id, envio_id, tipo, motivo, receptor, fecha_hora, latitud, longitud, foto, documento, firma,
-                                            bultos_entregados, bultos_no_entregados)
-            VALUES ($id, $envio, $tipo, $motivo, $receptor, $fecha, $lat, $lon, $foto, $documento, $firma,
-                    $bultosEntregados, $bultosNoEntregados)
-            """;
+        INSERT INTO eventos_pendientes (
+            id, envio_id, tipo, motivo, receptor, fecha_hora,
+            latitud, longitud, foto, documento, firma,
+            bultos_entregados, bultos_no_entregados, bultos_devueltos
+        )
+        VALUES (
+            $id, $envio, $tipo, $motivo, $receptor, $fecha,
+            $lat, $lon, $foto, $documento, $firma,
+            $bultosEntregados, $bultosNoEntregados, $bultosDevueltos
+        )
+        """;
         insertar.Parameters.AddWithValue("$id", evento.Id.ToString());
         insertar.Parameters.AddWithValue("$envio", evento.EnvioId.ToString());
         insertar.Parameters.AddWithValue("$tipo", evento.Tipo);
@@ -43,7 +49,16 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         insertar.Parameters.AddWithValue("$bultosEntregados",
             evento.BultosEntregados is null ? DBNull.Value : JsonSerializer.Serialize(evento.BultosEntregados));
         insertar.Parameters.AddWithValue("$bultosNoEntregados",
-            evento.BultosNoEntregados is null ? DBNull.Value : JsonSerializer.Serialize(evento.BultosNoEntregados));
+            evento.BultosNoEntregados is null
+                ? DBNull.Value
+                : JsonSerializer.Serialize(evento.BultosNoEntregados));
+
+        insertar.Parameters.AddWithValue(
+            "$bultosDevueltos",
+            evento.BultosDevueltos is null
+                ? DBNull.Value
+                : JsonSerializer.Serialize(evento.BultosDevueltos));
+
         await insertar.ExecuteNonQueryAsync();
 
         var marcar = conexion.CreateCommand();
@@ -62,11 +77,13 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
         await using var conexion = await db.AbrirAsync();
         var comando = conexion.CreateCommand();
         comando.CommandText = """
-            SELECT id, envio_id, tipo, motivo, receptor, fecha_hora, intentos, ultimo_error, latitud, longitud, foto, documento, firma,
-                   bultos_entregados, bultos_no_entregados
-            FROM eventos_pendientes
-            ORDER BY fecha_hora
-            """;
+        SELECT id, envio_id, tipo, motivo, receptor, fecha_hora,
+            intentos, ultimo_error, latitud, longitud, foto,
+            documento, firma, bultos_entregados,
+            bultos_no_entregados, bultos_devueltos
+        FROM eventos_pendientes
+        ORDER BY fecha_hora
+        """;
 
         var lista = new List<EventoPendiente>();
         await using var lector = await comando.ExecuteReaderAsync();
@@ -88,7 +105,10 @@ public sealed class EventosPendientesRepository(BaseDeDatosLocal db)
                 DocumentoReceptor = lector.IsDBNull(11) ? null : lector.GetString(11),
                 ReferenciaFirma = lector.IsDBNull(12) ? null : lector.GetString(12),
                 BultosEntregados = lector.IsDBNull(13) ? null : JsonSerializer.Deserialize<List<Guid>>(lector.GetString(13)),
-                BultosNoEntregados = lector.IsDBNull(14) ? null : JsonSerializer.Deserialize<List<BultoNoEntregado>>(lector.GetString(14))
+                BultosNoEntregados = lector.IsDBNull(14) ? null : JsonSerializer.Deserialize<List<BultoNoEntregado>>(lector.GetString(14)),
+                BultosDevueltos = lector.IsDBNull(15)
+                ? null
+                : JsonSerializer.Deserialize<List<Guid>>(lector.GetString(15))
             });
         }
         return lista;

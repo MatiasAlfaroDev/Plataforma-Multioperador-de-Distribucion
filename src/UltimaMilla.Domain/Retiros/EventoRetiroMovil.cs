@@ -14,6 +14,9 @@ public sealed class EventoRetiroMovil : AuditableEntity, ITenantEntity
     public string? MotivoFallo { get; private set; }
     public string? ReferenciaFotografia { get; private set; }
     public string? ReferenciaFirma { get; private set; }
+    public string? Receptor { get; private set; }
+    public string? DocumentoReceptor { get; private set; }
+    
 
     public string[] IdentificacionesBultos { get; private set; } = [];
 
@@ -28,7 +31,9 @@ public sealed class EventoRetiroMovil : AuditableEntity, ITenantEntity
         IReadOnlyCollection<string>? identificacionesBultos,
         string? referenciaFotografia,
         string? referenciaFirma,
-        string? motivoFallo)
+        string? motivoFallo,
+        string? receptor = null,
+        string? documentoReceptor = null)
     {
         ArgumentNullException.ThrowIfNull(retiro);
 
@@ -36,20 +41,30 @@ public sealed class EventoRetiroMovil : AuditableEntity, ITenantEntity
             throw new ArgumentException(
                 "El identificador del evento es obligatorio.");
 
-        if (tipo is not ("Retirado" or "NoRetirado"))
-            throw new ArgumentException(
-                "El tipo de evento no es válido.");
+        if (tipo is not ("Retirado" or "NoRetirado" or "EntregadoAlComercio"))
+        throw new ArgumentException(
+        "El tipo de evento no es válido.");
 
         if (ocurridoEn > recibidoEn.AddMinutes(5))
             throw new ArgumentException(
                 "La fecha del evento no puede estar en el futuro.");
 
-        if (tipo == "Retirado")
+        if (tipo is "Retirado" or "EntregadoAlComercio")
         {
             if (string.IsNullOrWhiteSpace(referenciaFotografia) ||
                 string.IsNullOrWhiteSpace(referenciaFirma))
                 throw new ArgumentException(
                     "El retiro requiere fotografía y firma.");
+
+            if (tipo == "EntregadoAlComercio")
+            {
+                if (string.IsNullOrWhiteSpace(receptor) ||
+                    string.IsNullOrWhiteSpace(documentoReceptor))
+                {
+                    throw new ArgumentException(
+                        "La entrega al comercio requiere nombre y documento del receptor.");
+                }
+            }
 
             if (identificacionesBultos is null ||
                 identificacionesBultos.Count == 0)
@@ -74,6 +89,8 @@ public sealed class EventoRetiroMovil : AuditableEntity, ITenantEntity
                 identificacionesBultos?.ToArray() ?? [],
             ReferenciaFotografia = referenciaFotografia?.Trim(),
             ReferenciaFirma = referenciaFirma?.Trim(),
+            Receptor = receptor?.Trim(),
+            DocumentoReceptor = documentoReceptor?.Trim(),
             MotivoFallo = motivoFallo?.Trim()
         };
     }

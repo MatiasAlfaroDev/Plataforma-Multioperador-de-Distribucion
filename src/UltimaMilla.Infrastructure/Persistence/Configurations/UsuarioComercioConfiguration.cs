@@ -29,11 +29,8 @@ public sealed class UsuarioComercioConfiguration
             .HasForeignKey(x => x.ComercioId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => new
-        {
-            x.UsuarioId,
-            x.ComercioId
-        }).IsUnique();
+        builder.HasIndex(x => x.UsuarioId)
+        .IsUnique();
 
         builder.Property(x => x.ClaveApiHash).HasMaxLength(64);
         builder.HasIndex(x => x.ClaveApiHash).IsUnique();

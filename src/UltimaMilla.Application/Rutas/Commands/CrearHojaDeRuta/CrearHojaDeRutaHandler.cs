@@ -404,7 +404,13 @@ public sealed class CrearHojaDeRutaHandler(
                 case TipoOperacionRuta.EntregaRetiroComercio:
                 {
                     var retiro = entregasRetirosPorId[horario.ReferenciaId];
+
+                    // Agrega la parada de entrega al comercio a la nueva hoja.
                     hoja.AgregarEntregaRetiroComercio(retiro);
+
+                    // EnDeposito -> AsignadoARutaComercio.
+                    retiro.AsignarARutaComercio();
+
                     break;
                 }
 

@@ -26,6 +26,9 @@ public class EventoMovil : AuditableEntity, ITenantEntity
     /// <summary>Nombre de quien recibió, solo para Entregado.</summary>
     public string? Receptor { get; private set; }
 
+    public string? DocumentoReceptor { get; private set; }
+    public string? ReferenciaFirma { get; private set; }
+    public string? ReferenciaFotografia { get; private set; }
     /// <summary>Cuándo pasó en la calle (hora del teléfono).</summary>
     public DateTimeOffset OcurridoEn { get; private set; }
 
@@ -42,14 +45,24 @@ public class EventoMovil : AuditableEntity, ITenantEntity
         string? motivo,
         string? receptor,
         DateTimeOffset ocurridoEn,
-        DateTimeOffset ahora)
+        DateTimeOffset ahora,
+        string? documentoReceptor = null,
+        string? referenciaFirma = null,
+        string? referenciaFotografia = null)
     {
         ArgumentNullException.ThrowIfNull(envio);
 
         if (idEvento == Guid.Empty)
             throw new ArgumentException("El evento debe traer el Id generado en el teléfono.", nameof(idEvento));
-       if ((tipo == TipoEventoMovil.Entregado || tipo == TipoEventoMovil.EntregadoParcialmente) && string.IsNullOrWhiteSpace(receptor))
-            throw new ArgumentException("Una entrega debe indicar quién recibió el paquete.", nameof(receptor));
+       if ((tipo == TipoEventoMovil.Entregado ||
+            tipo == TipoEventoMovil.EntregadoParcialmente ||
+            tipo == TipoEventoMovil.DevueltoAlComercio) &&
+            string.IsNullOrWhiteSpace(receptor))
+        {
+            throw new ArgumentException(
+                "La entrega o devolución debe indicar quién recibió los bultos.",
+                nameof(receptor));
+        }
         if (tipo == TipoEventoMovil.NoEntregado && string.IsNullOrWhiteSpace(motivo))
             throw new ArgumentException("Un intento fallido debe indicar el motivo.", nameof(motivo));
         if (ocurridoEn > ahora + ToleranciaReloj)
@@ -64,7 +77,22 @@ public class EventoMovil : AuditableEntity, ITenantEntity
             EnvioId = envio.Id,
             Tipo = tipo,
             Motivo = tipo == TipoEventoMovil.NoEntregado ? motivo!.Trim() : null,
-            Receptor = tipo is TipoEventoMovil.Entregado or TipoEventoMovil.EntregadoParcialmente ? receptor!.Trim() : null,
+            Receptor = tipo is TipoEventoMovil.Entregado
+            or TipoEventoMovil.EntregadoParcialmente
+            or TipoEventoMovil.DevueltoAlComercio
+                ? receptor!.Trim()
+                : null,
+            DocumentoReceptor = tipo == TipoEventoMovil.DevueltoAlComercio
+            ? documentoReceptor?.Trim()
+            : null,
+
+        ReferenciaFirma = tipo == TipoEventoMovil.DevueltoAlComercio
+            ? referenciaFirma?.Trim()
+            : null,
+
+        ReferenciaFotografia = tipo == TipoEventoMovil.DevueltoAlComercio
+            ? referenciaFotografia?.Trim()
+            : null,
             // PostgreSQL (timestamptz) solo acepta fechas en UTC; el teléfono puede mandar otra zona.
             OcurridoEn = ocurridoEn.ToUniversalTime(),
             RecibidoEn = ahora.ToUniversalTime()
@@ -76,5 +104,6 @@ public enum TipoEventoMovil
 {
     Entregado,
     NoEntregado,
-    EntregadoParcialmente
+    EntregadoParcialmente,
+    DevueltoAlComercio
 }

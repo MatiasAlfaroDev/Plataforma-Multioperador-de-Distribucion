@@ -128,6 +128,20 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
         HojaDeRutaId = hojaDeRutaId;
     }
 
+    public void AsignarARutaComercio()
+{
+    CrearMaquina().Fire(DisparadorRetiro.AsignarARutaComercio);
+}
+    public void Despachar()
+{
+    CrearMaquina().Fire(DisparadorRetiro.Despachar);
+}
+
+public void DespacharAlComercio()
+{
+    CrearMaquina().Fire(DisparadorRetiro.DespacharAlComercio);
+}
+
     public void RegistrarRetiro(
         DateTimeOffset fecha,
         string referenciaFotografia,
@@ -207,6 +221,11 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
                 DisparadorRetiro.Desasignar,
                 EstadoRetiro.Solicitado)
             .Permit(
+                DisparadorRetiro.Despachar,
+                EstadoRetiro.EnTransito);
+
+        maquina.Configure(EstadoRetiro.EnTransito)
+            .Permit(
                 DisparadorRetiro.RegistrarRetiro,
                 EstadoRetiro.Retirado)
             .Permit(
@@ -225,9 +244,18 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
 
         maquina.Configure(EstadoRetiro.EnDeposito)
             .Permit(
+                DisparadorRetiro.AsignarARutaComercio,
+                EstadoRetiro.AsignadoARutaComercio);
+
+        maquina.Configure(EstadoRetiro.AsignadoARutaComercio)
+            .Permit(
+                DisparadorRetiro.DespacharAlComercio,
+                EstadoRetiro.EnTransitoComercio);
+
+        maquina.Configure(EstadoRetiro.EnTransitoComercio)
+            .Permit(
                 DisparadorRetiro.EntregarAlComercio,
                 EstadoRetiro.EntregadoAlComercio);
-
         return maquina;
     }
 

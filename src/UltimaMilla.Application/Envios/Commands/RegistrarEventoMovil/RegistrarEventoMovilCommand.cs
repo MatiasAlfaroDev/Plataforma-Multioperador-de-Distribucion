@@ -20,4 +20,5 @@ public sealed record RegistrarEventoMovilCommand(
     decimal? Longitud = null,
     string? EvidenciaFallo = null,
     IReadOnlyCollection<Guid>? BultosEntregados = null,
-    IReadOnlyCollection<BultoNoEntregadoMovil>? BultosNoEntregados = null);
+    IReadOnlyCollection<BultoNoEntregadoMovil>? BultosNoEntregados = null,
+    IReadOnlyCollection<Guid>? BultosDevueltos = null);
