@@ -14,7 +14,7 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
     // Mismos estados que MaquinaEstadosEnvio: cualquiera no final puede declararse extraviado.
     private static readonly string[] EstadosQuePermitenExtravio =
     [
-        "Admitido", "EnDeposito", "AsignadoARuta", "EnTransito", "NoEntregado",
+        "EnDeposito", "AsignadoARuta", "EnTransito", "NoEntregado",
         "EntregadoParcialmente", "Reprogramado", "EnDevolucion"
     ];
 
