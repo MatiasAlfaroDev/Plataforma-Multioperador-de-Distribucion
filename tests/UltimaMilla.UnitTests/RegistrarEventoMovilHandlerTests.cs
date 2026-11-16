@@ -104,25 +104,31 @@ public class RegistrarEventoMovilHandlerTests
             DateOnly.FromDateTime(Alta.Date),
             maximoParadas: 10);
 
-        _hoja.AgregarEnvio(_envio);
+        
+_hoja.AgregarEnvio(_envio);
 
-        _hojas.Lista.Add(_hoja);
+_hojas.Lista.Add(_hoja);
 
-        _envio.Aplicar(
-            DisparadorEnvio.AsignarARuta,
-            _versionReglas,
-            Alta.AddMinutes(20),
-            "Backoffice",
-            "Despachador");
+_envio.Aplicar(
+    DisparadorEnvio.AsignarARuta,
+    _versionReglas,
+    Alta.AddMinutes(20),
+    "Backoffice",
+    "Despachador");
 
-        _envio.Aplicar(
-            DisparadorEnvio.Despachar,
-            _versionReglas,
-            Alta.AddMinutes(30),
-            "Mobile",
-            "Repartidor");
+// Despachamos la hoja de ruta.
+_hoja.MarcarDespachada(Alta.AddMinutes(30));
 
-        _envios.Lista.Add(_envio);
+// Despachamos el envío.
+_envio.Aplicar(
+    DisparadorEnvio.Despachar,
+    _versionReglas,
+    Alta.AddMinutes(30),
+    "Mobile",
+    "Repartidor");
+
+_envios.Lista.Add(_envio);
+
 
         _handler = new RegistrarEventoMovilHandler(
             _envios,

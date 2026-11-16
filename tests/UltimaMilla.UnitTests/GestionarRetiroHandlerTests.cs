@@ -40,8 +40,9 @@ public sealed class GestionarRetiroHandlerTests
             ahora);
 
         _retiro.AsignarARuta(Guid.NewGuid());
-        _retiro.RegistrarRetiro(ahora, "foto.jpg", "firma.png");
-        _retiro.RecibirEnDeposito();
+_retiro.Despachar();
+_retiro.RegistrarRetiro(ahora, "foto.jpg", "firma.png");
+_retiro.RecibirEnDeposito();    
 
         var repartidor = Repartidor.Crear(
             _operadorId, "Repartidor", "099123456");
@@ -71,22 +72,30 @@ public sealed class GestionarRetiroHandlerTests
             new RelojFijo(ahora));
     }
 
-    [Fact]
-    public async Task EntregaConfirmada_LiberaParadaYGuarda()
-    {
-        _hoja.MarcarDespachada(DateTimeOffset.UtcNow);
+    
+[Fact]
+public async Task EntregaConfirmada_LiberaParadaYGuarda()
+{
+    // El retiro se asigna a la segunda ruta.
+    _retiro.AsignarARutaComercio();
 
-        await _handler.EntregarAlComercioAsync(
-            _retiro.Id,
-            CancellationToken.None);
+    // La segunda ruta es despachada.
+    _hoja.MarcarDespachada(DateTimeOffset.UtcNow);
+    _retiro.DespacharAlComercio();
 
-        Assert.Equal(
-            EstadoRetiro.EntregadoAlComercio,
-            _retiro.Estado);
+    // El repartidor entrega el retiro al comercio.
+    await _handler.EntregarAlComercioAsync(
+        _retiro.Id,
+        CancellationToken.None);
 
-        Assert.False(Assert.Single(_hoja.Paradas).Activa);
-        Assert.Equal(1, _unidad.Guardados);
-    }
+    Assert.Equal(
+        EstadoRetiro.EntregadoAlComercio,
+        _retiro.Estado);
+
+    Assert.False(Assert.Single(_hoja.Paradas).Activa);
+    Assert.Equal(1, _unidad.Guardados);
+}
+
 
     [Fact]
     public async Task HojaSinDespachar_RechazaEntrega()

@@ -147,32 +147,36 @@ public class HojaDeRutaTests
         return (envio, reglas);
     }
 
-    private static Retiro CrearRetiroEnDeposito(Guid operadorId)
-    {
-        var ahora = DateTimeOffset.UtcNow;
+    
+private static Retiro CrearRetiroEnDeposito(Guid operadorId)
+{
+    var ahora = DateTimeOffset.UtcNow;
 
-        var retiro = Retiro.Crear(
-            operadorId,
-            Guid.NewGuid(),
-            "Devolución del cliente",
-            new Direccion("Calle Origen", "100", "San José", "San José"),
-            new Direccion("Calle Comercio", "200", "San José", "San José"),
-            DateOnly.FromDateTime(ahora.Date),
-            new TimeOnly(9, 0),
-            new TimeOnly(17, 0),
-            [BultoRetiro.Crear("RET-001", 5m, 20, 20, 20)],
-            ahora);
+    var retiro = Retiro.Crear(
+        operadorId,
+        Guid.NewGuid(),
+        "Devolución del cliente",
+        new Direccion("Calle Origen", "100", "San José", "San José"),
+        new Direccion("Calle Comercio", "200", "San José", "San José"),
+        DateOnly.FromDateTime(ahora.Date),
+        new TimeOnly(9, 0),
+        new TimeOnly(17, 0),
+        [BultoRetiro.Crear("RET-001", 5m, 20, 20, 20)],
+        ahora);
 
-        retiro.AsignarARuta(Guid.NewGuid());
-        retiro.RegistrarRetiro(
-            ahora,
-            "foto-retiro",
-            "firma-retiro");
+    retiro.AsignarARuta(Guid.NewGuid());
+    retiro.Despachar();
 
-        retiro.RecibirEnDeposito();
+    retiro.RegistrarRetiro(
+        ahora,
+        "foto-retiro",
+        "firma-retiro");
 
-        return retiro;
-    }
+    retiro.RecibirEnDeposito();
+
+    return retiro;
+}
+
 
     [Fact]
     public void AgregarEnvioValido_CreaParada()
@@ -598,29 +602,38 @@ public class HojaDeRutaTests
         Assert.True(Assert.Single(ruta.Paradas).Activa);
     }
 
-    [Fact]
-    public void EntregaRetiroComercio_ConfirmadaLiberaParada()
-    {
-        var operadorId = Guid.NewGuid();
-        var ruta = CrearRuta(operadorId);
-        var retiro = CrearRetiroEnDeposito(operadorId);
-        var ahora = DateTimeOffset.UtcNow;
+    
+[Fact]
+public void EntregaRetiroComercio_ConfirmadaLiberaParada()
+{
+    var operadorId = Guid.NewGuid();
+    var ruta = CrearRuta(operadorId);
+    var retiro = CrearRetiroEnDeposito(operadorId);
+    var ahora = DateTimeOffset.UtcNow;
 
-        ruta.AgregarEntregaRetiroComercio(retiro);
-        ruta.MarcarDespachada(ahora);
+    ruta.AgregarEntregaRetiroComercio(retiro);
 
-        retiro.EntregarAlComercio();
+    // El retiro se asigna a la ruta de regreso al comercio.
+    retiro.AsignarARutaComercio();
 
-        ruta.FinalizarParadaEntregaRetiroComercio(
-            retiro,
-            ahora);
+    // Se despacha la ruta y el retiro comienza el traslado.
+    ruta.MarcarDespachada(ahora);
+    retiro.DespacharAlComercio();
 
-        Assert.Equal(
-            EstadoRetiro.EntregadoAlComercio,
-            retiro.Estado);
+    // Se confirma la entrega.
+    retiro.EntregarAlComercio();
 
-        Assert.False(Assert.Single(ruta.Paradas).Activa);
-    }   
+    ruta.FinalizarParadaEntregaRetiroComercio(
+        retiro,
+        ahora);
+
+    Assert.Equal(
+        EstadoRetiro.EntregadoAlComercio,
+        retiro.Estado);
+
+    Assert.False(Assert.Single(ruta.Paradas).Activa);
+}
+
 
     [Fact]
     public void DevolucionComercio_CreaParadaCorrecta()
@@ -789,29 +802,49 @@ public class HojaDeRutaTests
         Assert.Equal(EstadoHojaDeRuta.Despachada, ruta.Estado);
     }
 
-    [Fact]
-    public void Rendicion_PrimeroRindeElRepartidorYDespuesControlaElDeposito()
-    {
-        var operadorId = Guid.NewGuid();
-        var ruta = CrearRuta(operadorId);
-        var retiro = CrearRetiroEnDeposito(operadorId);
-        var ahora = DateTimeOffset.UtcNow;
+    
+[Fact]
+public void Rendicion_PrimeroRindeElRepartidorYDespuesControlaElDeposito()
+{
+    var operadorId = Guid.NewGuid();
+    var ruta = CrearRuta(operadorId);
+    var retiro = CrearRetiroEnDeposito(operadorId);
+    var ahora = DateTimeOffset.UtcNow;
 
-        ruta.AgregarEntregaRetiroComercio(retiro);
-        ruta.MarcarDespachada(ahora);
-        retiro.EntregarAlComercio();
-        ruta.FinalizarParadaEntregaRetiroComercio(retiro, ahora);
+    ruta.AgregarEntregaRetiroComercio(retiro);
 
-        // Primero rinde el repartidor (app): queda pendiente del control del depósito.
-        Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
-        ruta.DeclararRendicion();
-        Assert.Equal(EstadoHojaDeRuta.PendienteDeControl, ruta.Estado);
-        Assert.Throws<InvalidOperationException>(() => ruta.DeclararRendicion());
+    // El retiro queda asignado a la segunda ruta.
+    retiro.AsignarARutaComercio();
 
-        // Después controla el depósito (Backoffice) y la hoja se cierra.
-        ruta.MarcarRendida();
+    // Se despacha la ruta hacia el comercio.
+    ruta.MarcarDespachada(ahora);
+    retiro.DespacharAlComercio();
 
-        Assert.Equal(EstadoHojaDeRuta.Rendida, ruta.Estado);
-        Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
-    }
+    // El repartidor confirma la entrega al comercio.
+    retiro.EntregarAlComercio();
+    ruta.FinalizarParadaEntregaRetiroComercio(retiro, ahora);
+
+    // Primero rinde el repartidor desde la app.
+    Assert.Throws<InvalidOperationException>(() => ruta.MarcarRendida());
+
+    ruta.DeclararRendicion();
+
+    Assert.Equal(
+        EstadoHojaDeRuta.PendienteDeControl,
+        ruta.Estado);
+
+    Assert.Throws<InvalidOperationException>(() =>
+        ruta.DeclararRendicion());
+
+    // Después el depósito controla la rendición desde Backoffice.
+    ruta.MarcarRendida();
+
+    Assert.Equal(
+        EstadoHojaDeRuta.Rendida,
+        ruta.Estado);
+
+    Assert.Throws<InvalidOperationException>(() =>
+        ruta.MarcarRendida());
+}
+
 }

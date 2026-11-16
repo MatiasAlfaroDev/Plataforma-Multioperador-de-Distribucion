@@ -259,6 +259,15 @@ public class CuentasComercialesHandlersTests
     {
         public List<CuentaComercial> Lista { get; } = [];
 
+        public Task<CuentaComercial?> ObtenerPorComercioAsync(
+    Guid cuentaComercialId,
+    Guid comercioId,
+    CancellationToken ct) =>
+    Task.FromResult(
+        Lista.FirstOrDefault(c =>
+            c.Id == cuentaComercialId &&
+            c.ComercioId == comercioId));
+
         public Task<CuentaComercial?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(c => c.Id == id));
 

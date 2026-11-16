@@ -74,6 +74,7 @@ public sealed class RegistrarEventoRetiroHandlerTests
         _hoja.AgregarRetiro(_retiro);
         _retiro.AsignarARuta(_hoja.Id);
         _hoja.MarcarDespachada(Ahora.AddHours(-1));
+        _retiro.Despachar();
 
         _retiros.Lista.Add(_retiro);
         _hojas.Lista.Add(_hoja);
@@ -191,8 +192,8 @@ public sealed class RegistrarEventoRetiroHandlerTests
                 CancellationToken.None));
 
         Assert.Equal(
-            EstadoRetiro.AsignadoARuta,
-            _retiro.Estado);
+    EstadoRetiro.EnTransito,
+    _retiro.Estado);
 
         Assert.Empty(_eventos.Lista);
         Assert.Equal(0, _unidad.Guardados);
@@ -211,8 +212,8 @@ public sealed class RegistrarEventoRetiroHandlerTests
                 comando, CancellationToken.None));
 
         Assert.Equal(
-            EstadoRetiro.AsignadoARuta,
-            _retiro.Estado);
+    EstadoRetiro.EnTransito,
+    _retiro.Estado);
 
         Assert.Contains(
             _hoja.Paradas,

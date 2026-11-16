@@ -133,8 +133,9 @@ public sealed class EventoRetiroMovilTests
     {
         // RF 38: NoRetirado → Solicitado → AsignadoARuta, con su propia máquina de estados.
         var retiro = CrearRetiro();
-        retiro.AsignarARuta(Guid.NewGuid());
-        retiro.RegistrarRetiroFallido();
+retiro.AsignarARuta(Guid.NewGuid());
+retiro.Despachar();
+retiro.RegistrarRetiroFallido();
 
         retiro.Reprogramar();
 
