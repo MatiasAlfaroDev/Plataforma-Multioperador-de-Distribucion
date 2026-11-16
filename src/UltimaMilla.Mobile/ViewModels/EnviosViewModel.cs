@@ -343,6 +343,11 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
             await EntregarRetiroAlComercioAsync(envio);
             return;
         }
+        if (envio.Modalidad == "DevolucionComercio")
+        {
+            await DevolverAlComercioAsync(envio);
+            return;
+        }
         
 
         // RF 32: se escanean los bultos que se entregan. Si quedan bultos sin entregar (entrega parcial),
@@ -404,6 +409,14 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     {
         if (!envio.PuedeRegistrar)
             return;
+
+                if (envio.Modalidad == "DevolucionComercio")
+        {
+            await _dialogos.AvisarAsync(
+                "Devolución al comercio",
+                "Esta parada corresponde a una devolución. Debés confirmar la recepción de los bultos en el comercio.");
+            return;
+        }
 
         if (envio.EsRetiro)
         {
@@ -520,6 +533,108 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         ReferenciaFirma = firma,
         ReferenciaFoto = foto,
         BultosEntregados = seleccion.Entregados.Select(b => b.Id).ToList(),
+        FechaHora = DateTimeOffset.UtcNow,
+        Latitud = ubicacion.Value.Latitud,
+        Longitud = ubicacion.Value.Longitud
+    });
+}
+
+/// <summary>
+/// Confirma la devolución de un envío al comercio.
+/// Requiere escanear todos los bultos y registrar
+/// receptor, documento, firma, fotografía y ubicación.
+/// El evento se guarda localmente para permitir
+/// la sincronización cuando haya conexión.
+/// </summary>
+private async Task DevolverAlComercioAsync(EnvioRuta envio)
+{
+    const string titulo = "Devolución al comercio";
+
+    var bultos = await _ruta.ListarBultosAsync(envio.Id);
+
+    if (bultos.Count == 0)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "No hay bultos disponibles para escanear.");
+        return;
+    }
+
+    var seleccion = await _elegirBultos.ElegirAsync(
+        envio.ReferenciaExterna,
+        bultos,
+        esRetiro: true);
+
+    if (seleccion is null)
+        return;
+
+    if (seleccion.NoEntregados.Count > 0 ||
+        seleccion.Entregados.Count != bultos.Count)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "Debés escanear todos los bultos. No se permiten devoluciones parciales.");
+        return;
+    }
+
+    var receptor = await _dialogos.PedirTextoAsync(
+        titulo,
+        "¿Quién recibe los bultos en el comercio?");
+
+    if (string.IsNullOrWhiteSpace(receptor))
+        return;
+
+    var documento = await _dialogos.PedirTextoAsync(
+        titulo,
+        $"Documento de {receptor}:");
+
+    if (string.IsNullOrWhiteSpace(documento))
+        return;
+
+    var id = Guid.NewGuid();
+
+    var firma = await _firma.PedirFirmaAsync(id, receptor);
+
+    if (firma is null)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "La devolución necesita la firma de quien recibe.");
+        return;
+    }
+
+    var foto = await _captura.SacarFotoAsync(id);
+
+    if (foto is null)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "La devolución necesita una fotografía.");
+        return;
+    }
+
+    var ubicacion = await _captura.ObtenerUbicacionAsync();
+
+    if (ubicacion is null)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "No se pudo obtener la ubicación del dispositivo.");
+        return;
+    }
+
+    await RegistrarAsync(new EventoPendiente
+    {
+        Id = id,
+        EnvioId = envio.Id,
+        Tipo = "DevueltoAlComercio",
+        Receptor = receptor.Trim(),
+        DocumentoReceptor = documento.Trim(),
+        ReferenciaFirma = firma,
+        ReferenciaFoto = foto,
+        BultosDevueltos = seleccion.Entregados
+            .Select(b => b.Id)
+            .ToList(),
         FechaHora = DateTimeOffset.UtcNow,
         Latitud = ubicacion.Value.Latitud,
         Longitud = ubicacion.Value.Longitud

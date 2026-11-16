@@ -251,6 +251,50 @@
             </div>
         }
 
+        <!-- Devoluciones al comercio -->
+        <h3>Devoluciones al comercio</h3>
+        <p class="nota">
+            Envíos en devolución que deben regresar al comercio de origen.
+        </p>
+
+        @if (Model.Devoluciones.Count == 0)
+        {
+            <p class="nota">No hay devoluciones disponibles para asignar.</p>
+        }
+        else
+        {
+            <div class="tabla">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Referencia</th>
+                            <th>Localidad del comercio</th>
+                            <th>Estado</th>
+                            <th>Peso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var devolucion in Model.Devoluciones)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox"
+                                           name="Formulario.DevolucionesIds"
+                                           value="@devolucion.Id"
+                                           checked="@(Model.Formulario.DevolucionesIds.Contains(devolucion.Id))" />
+                                </td>
+                                <td class="codigo">@devolucion.ReferenciaExterna</td>
+                                <td>@devolucion.Localidad</td>
+                                <td>@devolucion.Estado</td>
+                                <td class="num">@devolucion.PesoKg kg</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
         @if (Model.RetiroHabilitado)
         {
         <h3>Retiros a domicilio</h3>
@@ -314,7 +358,7 @@
 
         <button type="submit"
                 class="btn-primario"
-                disabled="@(Model.Envios.Count + Model.Retiros.Count + Model.EntregasRetiros.Count == 0)">
+                disabled="@(Model.Envios.Count + Model.Retiros.Count + Model.EntregasRetiros.Count + Model.Devoluciones.Count == 0)">
             Crear y asignar hoja de ruta
         </button>
     </form>
@@ -527,7 +571,7 @@
     </p>
 
     <p class="nota">
-        Los envíos asignados pasarán al estado En tránsito.
+        Las entregas normales pasarán a En tránsito; las devoluciones conservarán su estado EnDevolucion hasta completar la devolución al comercio.
     </p>
 
     <div class="acciones-modal">

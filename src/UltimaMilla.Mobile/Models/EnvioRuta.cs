@@ -29,14 +29,29 @@ public sealed class EnvioRuta
     
     // Un registro rechazado por el servidor no cuenta: gana lo que dice el servidor.
     // La entrega parcial cuenta como parada resuelta (entregó algo); los bultos pendientes vuelven en otra ruta.
-    public bool EsEntregado => (ResultadoLocal is "Entregado" or "EntregadoParcialmente" or "Retirado") && !Rechazado;
+    public bool EsEntregado =>
+    (ResultadoLocal is
+        "Entregado" or
+        "EntregadoParcialmente" or
+        "Retirado" or
+        "EntregadoAlComercio" or
+        "DevueltoAlComercio") && !Rechazado;
     public bool EsNoEntregado => ResultadoLocal is "NoEntregado" or "NoRetirado" && !Rechazado;
 
     /// <summary>RF 40: parada de retiro en domicilio (se suben bultos).</summary>
     public bool EsRetiro => Modalidad == "Retiro";
+    public bool EsDevolucionComercio => Modalidad == "DevolucionComercio";
+    public bool MostrarBotonFallo => !EsDevolucionComercio;
 
-    public string TextoBotonExito => EsRetiro ? "Retirado" : "Entregado";
-    public string TextoBotonFallo => EsRetiro ? "No retirado" : "No entregado";
+    public string TextoBotonExito =>
+    EsDevolucionComercio ? "Confirmar devolución"
+    : EsRetiro ? "Retirado"
+    : "Entregado";
+
+    public string TextoBotonFallo =>
+    EsDevolucionComercio ? "No disponible"
+    : EsRetiro ? "No retirado"
+    : "No entregado";
 
     public string EstadoMostrado => ResultadoLocal switch
     {
@@ -45,6 +60,15 @@ public sealed class EnvioRuta
         "EntregadoParcialmente" => PendienteDeSincronizar ? "Entrega parcial · pendiente de sincronizar" : "Entrega parcial",
         "Retirado" => PendienteDeSincronizar ? "Retirado · pendiente de sincronizar" : "Retirado",
         "NoRetirado" => PendienteDeSincronizar ? "No retirado · pendiente de sincronizar" : "No retirado",
+        "EntregadoAlComercio" =>
+            PendienteDeSincronizar
+                ? "Entregado al comercio · pendiente de sincronizar"
+                : "Entregado al comercio",
+
+        "DevueltoAlComercio" =>
+            PendienteDeSincronizar
+                ? "Devuelto al comercio · pendiente de sincronizar"
+                : "Devuelto al comercio",
         _ => PendienteDeSincronizar ? "Entregado · pendiente de sincronizar" : "Entregado"
     };
 
@@ -55,11 +79,15 @@ public sealed class EnvioRuta
         Rechazado ? "Rechazado"
         : ResultadoLocal switch
         {
-            null => EsRetiro ? "Por retirar" : "Por entregar",
+            null => EsDevolucionComercio ? "Por devolver"
+            : EsRetiro ? "Por retirar"
+            : "Por entregar",
             "NoEntregado" => "No entregado",
             "EntregadoParcialmente" => "Entrega parcial",
             "Retirado" => "Retirado",
             "NoRetirado" => "No retirado",
+            "EntregadoAlComercio" => "Entregado al comercio",
+            "DevueltoAlComercio" => "Devuelto al comercio",
             _ => "Entregado"
         };
 

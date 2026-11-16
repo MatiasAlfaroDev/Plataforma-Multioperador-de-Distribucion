@@ -162,7 +162,10 @@ public class EnviosApi : IEnviosApi
         }
 
         // La prueba de entrega va tanto en la entrega completa como en la parcial.
-        var esEntrega = evento.Tipo is "Entregado" or "EntregadoParcialmente";
+        var requiereEvidencias = evento.Tipo is
+            "Entregado" or
+            "EntregadoParcialmente" or
+            "DevueltoAlComercio";
         var cuerpo = new
         {
             idEvento = evento.Id,
@@ -173,12 +176,13 @@ public class EnviosApi : IEnviosApi
             latitud = evento.Latitud,
             longitud = evento.Longitud,
             // La misma foto es prueba de entrega o evidencia del intento fallido, según el tipo.
-            referenciaFotografia = esEntrega ? evento.ReferenciaFoto : null,
-            documentoReceptor = esEntrega ? evento.DocumentoReceptor : null,
-            referenciaFirma = esEntrega ? evento.ReferenciaFirma : null,
-            evidenciaFallo = esEntrega ? null : evento.ReferenciaFoto,
+            referenciaFotografia = requiereEvidencias ? evento.ReferenciaFoto : null,
+            documentoReceptor = requiereEvidencias ? evento.DocumentoReceptor : null,
+            referenciaFirma = requiereEvidencias ? evento.ReferenciaFirma : null,
+            evidenciaFallo = requiereEvidencias ? null : evento.ReferenciaFoto,
             // Entrega parcial (RF 32): solo en ese tipo van las listas de bultos (el servidor rechaza las listas en los demás).
             bultosEntregados = evento.BultosEntregados,
+            bultosDevueltos = evento.BultosDevueltos,
             bultosNoEntregados = evento.BultosNoEntregados?.Select(b => new { bultoId = b.BultoId, motivo = b.Motivo, evidencia = b.Evidencia })
         };
 
@@ -192,8 +196,16 @@ public class EnviosApi : IEnviosApi
             using var respuesta = await _http.PostAsJsonAsync(ruta, cuerpo, ct);
 
             // 2xx = guardado. 409 = el servidor ya tenía ese idEvento: también es éxito (idempotencia).
-            if (respuesta.IsSuccessStatusCode || respuesta.StatusCode == HttpStatusCode.Conflict)
+            if (respuesta.IsSuccessStatusCode)
                 return (ResultadoEnvio.Aceptado, null);
+
+            if (respuesta.StatusCode == HttpStatusCode.Conflict)
+            {
+                return (
+                    ResultadoEnvio.Rechazado,
+                    await LeerMotivoAsync(respuesta, ct)
+                );
+            }
 
             return (ResultadoEnvio.Rechazado, await LeerMotivoAsync(respuesta, ct));
         }

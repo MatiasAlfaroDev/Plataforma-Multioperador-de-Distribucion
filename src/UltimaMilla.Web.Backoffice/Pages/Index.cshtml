@@ -361,14 +361,24 @@ else
                                 </a>
                             }
 
+                            
                             else if (e.Estado == "AsignadoARuta")
                             {
                                 <span class="accion-estado nota">Asignado a ruta</span>
+                            }
+                            else if (e.Estado == "EnDevolucion")
+                            {
+                                <a asp-page="/HojasDeRuta"
+                                asp-route-devolucionId="@e.Id"
+                                class="accion-asignar btn-secundario py-1.5 text-sm">
+                                    Asignar devolución a ruta
+                                </a>
                             }
                             else
                             {
                                 <span class="nota">Sin acciones</span>
                             }
+
                         </td>
                     </tr>
                 }
