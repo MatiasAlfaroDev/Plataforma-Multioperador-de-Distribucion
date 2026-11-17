@@ -37,6 +37,162 @@
         @mensajeError
     </div>
 }
+<section class="mb-4">
+    <h2>
+        Reprogramaciones pendientes
+        (@Model.SolicitudesPendientes.Count)
+    </h2>
+
+    @if (Model.SolicitudesPendientes.Count == 0)
+    {
+        <p class="nota">
+            No hay solicitudes de reprogramación pendientes.
+        </p>
+    }
+    else
+    {
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Envío</th>
+                        <th>Fecha de solicitud</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var solicitud in Model.SolicitudesPendientes)
+                    {
+                        var envio = Model.Envios.FirstOrDefault(
+                            e => e.Id == solicitud.EnvioId);
+
+                        <tr>
+                            <td>
+                                @(envio?.ReferenciaExterna
+                                    ?? solicitud.EnvioId.ToString())
+                            </td>
+
+                            <td>
+                                @solicitud.SolicitadaEn.ToString("dd/MM/yyyy")
+                            </td>
+
+                            <td>
+                                <span class="chip chip-alerta">
+                                    @solicitud.Estado
+                                </span>
+                            </td>
+
+                            <td>
+                                <form method="post"
+                                    asp-page-handler="AceptarReprogramacion"
+                                    class="inline">
+
+                                    @Html.AntiForgeryToken()
+
+                                    <input type="hidden"
+                                        name="solicitudId"
+                                        value="@solicitud.Id" />
+
+                                    <td>
+                                        <button type="button"
+                                                class="abrir-aceptacion primario py-1.5 text-sm"
+                                                data-solicitud-id="@solicitud.Id"
+                                                data-referencia="@(envio?.ReferenciaExterna ?? solicitud.EnvioId.ToString())">
+                                            Aceptar
+                                        </button>
+                                    </td>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<dialog id="modalAceptarReprogramacion"
+        class="modal-recepcion w-[min(32rem,calc(100vw-2rem))] m-auto">
+
+    <form method="post"
+          asp-page-handler="AceptarReprogramacion">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden"
+               name="solicitudId"
+               id="aceptarSolicitudId" />
+
+        <div class="modal-encabezado flex items-center justify-between">
+            <h2>Confirmar reprogramación</h2>
+
+            <button type="button"
+                    id="cerrarAceptarReprogramacion"
+                    class="cerrar-modal">
+                ×
+            </button>
+        </div>
+
+        <div class="modal-info mt-4 grid gap-2 rounded-xl bg-hundido px-4 py-3 text-sm">
+            <p>
+                <strong>Envío:</strong>
+                <span id="aceptarReferencia"></span>
+            </p>
+
+            <p>
+                ¿Confirmás que querés aceptar esta reprogramación?
+            </p>
+
+            <p class="nota">
+                El envío pasará a Reprogramado y podrá
+                asignarse a una nueva ruta.
+            </p>
+        </div>
+
+        <div class="modal-acciones acciones justify-end mt-4">
+            <button type="button"
+                    id="cancelarAceptarReprogramacion"
+                    class="boton-cancelar">
+                Cancelar
+            </button>
+
+            <button type="submit" class="primario">
+                Aceptar reprogramación
+            </button>
+        </div>
+    </form>
+</dialog>
+
+<script>
+    (() => {
+        const modal = document.getElementById(
+            "modalAceptarReprogramacion"
+        );
+
+        document.querySelectorAll(".abrir-aceptacion")
+            .forEach(boton => {
+                boton.addEventListener("click", () => {
+                    document.getElementById(
+                        "aceptarSolicitudId"
+                    ).value = boton.dataset.solicitudId;
+
+                    document.getElementById(
+                        "aceptarReferencia"
+                    ).textContent = boton.dataset.referencia;
+
+                    modal.showModal();
+                });
+            });
+
+        document.getElementById("cerrarAceptarReprogramacion")
+            .addEventListener("click", () => modal.close());
+
+        document.getElementById("cancelarAceptarReprogramacion")
+            .addEventListener("click", () => modal.close());
+    })();
+</script>
 
 @if (Model.Retiros.Count > 0)
 {
@@ -342,7 +498,16 @@ else
                                 </button>
                             }
                             else if (e.Estado == "EnDeposito" &&
-                                    e.IntentosRealizados > 0)
+                                    Model.SolicitudesPendientes.Any(s => s.EnvioId == e.Id))
+                            {
+                                <span class="chip chip-alerta">
+                                    Solicitud pendiente
+                                </span>
+                            }
+                            else if (e.Estado == "EnDeposito" &&
+                                e.IntentosRealizados > 0 &&
+                                !Model.SolicitudesPendientes.Any(
+                                    s => s.EnvioId == e.Id))
                             {
                                 <button type="button"
                                         class="abrir-reprogramacion primario py-1.5 text-sm"

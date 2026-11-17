@@ -91,6 +91,7 @@ using Microsoft.AspNetCore.SignalR;
 using Serilog;
 using Serilog.Events;
 using System.Security.Claims;
+using UltimaMilla.Application.Envios.Queries.ConsultarDisponibilidadReprogramacionPublica;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -230,8 +231,15 @@ builder.Services.AddScoped<ITenantContext>(
 
 builder.Services.AddScoped<IOperadorActivo>(
     sp => sp.GetRequiredService<HttpTenantContext>());
+
+builder.Services.AddScoped<IContextoSeguimientoPublico>(
+    sp => sp.GetRequiredService<HttpTenantContext>());
+
+builder.Services.AddScoped<ConsultarDisponibilidadReprogramacionPublicaHandler>();
 // Caché distribuida con Redis
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
+
+builder.Services.AddScoped<LimiteReprogramacionPublica>();
 
 var app = builder.Build();
 
@@ -348,6 +356,89 @@ api.MapGet("/seguimiento/{token}", async (
             null, null, null, null,
             [],
             Tipo: "Retiro"));
+})
+.AllowAnonymous();
+
+api.MapPost("/seguimiento/{token}/reprogramacion", async (
+    string token,
+    IContextoSeguimientoPublico contextoPublico,
+    IEnvioRepository envios,
+    SolicitarReprogramacionHandler handler,
+    LimiteReprogramacionPublica limite,
+    CancellationToken ct) =>
+{
+    var operadorId = await contextoPublico
+        .ValidarTokenYSeleccionarOperadorAsync(token, ct);
+
+    if (!operadorId.HasValue)
+        return Results.NotFound();
+
+    var tokenBytes = Convert.FromHexString(token);
+
+    var tokenHash = Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(tokenBytes));
+
+    if (await limite.ExcedidoAsync(tokenHash))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status429TooManyRequests,
+            title: "Demasiadas solicitudes.",
+            detail: "Esperá un momento antes de volver a intentar.");
+    }
+
+    var envio = await envios.ObtenerPorTokenSeguimientoAsync(
+        tokenHash, ct);
+
+    if (envio is null || envio.OperadorId != operadorId.Value)
+        return Results.NotFound();
+
+    try
+    {
+        await handler.Handle(
+            new SolicitarReprogramacionCommand(envio.Id),
+            ct);
+
+        return Results.Ok(new
+        {
+            mensaje = "Tu solicitud de reprogramación fue registrada correctamente."
+        });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = ex.Message
+        });
+    }
+})
+.AllowAnonymous();
+
+api.MapGet("/seguimiento/{token}/reprogramacion/disponibilidad", async (
+    string token,
+    IContextoSeguimientoPublico contextoPublico,
+    IEnvioRepository envios,
+    ConsultarDisponibilidadReprogramacionPublicaHandler handler,
+    CancellationToken ct) =>
+{
+    var operadorId = await contextoPublico
+        .ValidarTokenYSeleccionarOperadorAsync(token, ct);
+
+    if (!operadorId.HasValue)
+        return Results.NotFound();
+
+    var tokenHash = Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(
+            Convert.FromHexString(token)));
+
+    var envio = await envios.ObtenerPorTokenSeguimientoAsync(
+        tokenHash, ct);
+
+    if (envio is null || envio.OperadorId != operadorId.Value)
+        return Results.NotFound();
+
+    var disponibilidad = await handler.Handle(envio.Id, ct);
+
+    return Results.Ok(disponibilidad);
 })
 .AllowAnonymous();
 

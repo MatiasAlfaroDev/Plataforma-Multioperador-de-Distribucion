@@ -100,6 +100,22 @@ public sealed class EnviosApiClient(HttpClient http)
             ct) ?? [];
     }
 
+    public async Task<IReadOnlyList<SolicitudReprogramacionItem>>
+    ListarSolicitudesReprogramacionPendientesAsync(
+        CancellationToken ct = default)
+{
+    using var respuesta = await http.GetAsync(
+        "api/solicitudes-reprogramacion/pendientes",
+        ct);
+
+    respuesta.EnsureSuccessStatusCode();
+
+    return await respuesta.Content
+        .ReadFromJsonAsync<List<SolicitudReprogramacionItem>>(
+            cancellationToken: ct)
+        ?? [];
+}
+
 
     public async Task<IReadOnlyList<EnvioItem>> ListarEnviosAsync(
         CancellationToken ct = default)
@@ -529,3 +545,9 @@ public sealed record DetalleBultoRetiroItem(
     int AnchoCm,
     int ProfundidadCm,
     decimal VolumenMetrosCubicos);
+
+    public sealed record SolicitudReprogramacionItem(
+    Guid Id,
+    Guid EnvioId,
+    DateTimeOffset SolicitadaEn,
+    string Estado);
