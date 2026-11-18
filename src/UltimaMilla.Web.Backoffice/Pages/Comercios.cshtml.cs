@@ -34,18 +34,7 @@ public sealed class ComerciosModel(VinculacionesApiClient api) : PageModel
             "reactivar el comercio",
             ct);
 
-    public Task<IActionResult> OnPostDireccionAsync(
-        Guid id,
-        string calle,
-        string numero,
-        string localidad,
-        string departamento,
-        CancellationToken ct) =>
-        EjecutarAsync(
-            () => api.ModificarDireccionAsync(id, calle, numero, localidad, departamento, ct),
-            "Dirección de recepción actualizada.",
-            "modificar la dirección",
-            ct);
+
 
     private async Task<IActionResult> EjecutarAsync(
         Func<Task> accion,

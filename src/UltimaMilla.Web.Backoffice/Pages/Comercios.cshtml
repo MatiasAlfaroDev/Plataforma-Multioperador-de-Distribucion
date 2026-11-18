@@ -1,3 +1,4 @@
+
 @page
 @model UltimaMilla.Web.Backoffice.Pages.ComerciosModel
 
@@ -8,7 +9,7 @@
 <div class="encabezado">
     <div>
         <h1>Comercios</h1>
-        <p>Consultá, dá de baja o reactivá los comercios vinculados a tu operador y modificá su dirección de recepción.</p>
+        <p>Consultá, da de baja o reactivá los comercios vinculados a tu operador.</p>
     </div>
 </div>
 
@@ -35,7 +36,6 @@ else
                     <th>Comercio</th>
                     <th>RUT</th>
                     <th>Estado</th>
-                    <th>Dirección de recepción</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -51,49 +51,28 @@ else
                         <td>@c.Rut</td>
                         <td>@estado</td>
                         <td>
-                            @if (string.IsNullOrWhiteSpace(c.Calle))
+                            @if (c.Estado == "Confirmada")
                             {
-                                <span>Sin configurar</span>
-                            }
-                            else
-                            {
-                                <span>@c.Calle @c.Numero, @c.Localidad, @c.Departamento</span>
-                            }
-                        </td>
-                        <td>
-                            @if (c.Estado == "Confirmada" && c.Activa)
-                            {
-                                <form method="post" asp-page-handler="Baja" class="inline">
+                                var esBaja = c.Activa;
+                                var accion = esBaja ? "Baja" : "Reactivar";
+
+                                <form method="post"
+                                      asp-page-handler="@accion"
+                                      class="inline formulario-comercio">
                                     @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@c.CuentaId" />
-                                    <button type="submit"
-                                            class="peligro"
-                                            onclick="return confirm('¿Dar de baja a este comercio? No podrá crear envíos ni retiros nuevos.');">
-                                        Dar de baja
+
+                                    <input type="hidden"
+                                           name="id"
+                                           value="@c.CuentaId" />
+
+                                    <button type="button"
+                                            class="@(esBaja ? "peligro" : "primario")"
+                                            data-accion="@(esBaja ? "baja" : "reactivar")"
+                                            data-comercio="@c.Nombre">
+                                        @(esBaja ? "Dar de baja" : "Reactivar")
                                     </button>
                                 </form>
                             }
-                            else if (c.Estado == "Confirmada")
-                            {
-                                <form method="post" asp-page-handler="Reactivar" class="inline">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@c.CuentaId" />
-                                    <button type="submit" class="primario">Reactivar</button>
-                                </form>
-                            }
-
-                            <details>
-                                <summary>Modificar dirección</summary>
-                                <form method="post" asp-page-handler="Direccion">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@c.CuentaId" />
-                                    <label>Calle <input name="calle" value="@c.Calle" required /></label>
-                                    <label>Número <input name="numero" value="@c.Numero" /></label>
-                                    <label>Localidad <input name="localidad" value="@c.Localidad" required /></label>
-                                    <label>Departamento <input name="departamento" value="@c.Departamento" required /></label>
-                                    <button type="submit" class="primario">Guardar</button>
-                                </form>
-                            </details>
                         </td>
                     </tr>
                 }
@@ -101,3 +80,172 @@ else
         </table>
     </div>
 }
+
+<div id="modalComercio"
+     class="modal-comercio"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="modalComercioTitulo"
+     aria-describedby="modalComercioDescripcion"
+     hidden>
+
+    <div class="modal-comercio-contenido">
+        <h2 id="modalComercioTitulo"></h2>
+
+        <p id="modalComercioDescripcion"></p>
+
+        <div class="modal-comercio-acciones">
+            <button type="button"
+                    id="cancelarComercio"
+                    class="modal-cancelar">
+                Cancelar
+            </button>
+
+            <button type="button"
+                    id="confirmarComercio"
+                    class="modal-confirmar">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal-comercio[hidden] {
+        display: none !important;
+    }
+
+    .modal-comercio {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.55);
+    }
+
+    .modal-comercio-contenido {
+        background: #fff;
+        color: #242424;
+        border-radius: 14px;
+        padding: 28px;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-comercio-contenido h2 {
+        margin: 0 0 16px;
+        font-size: 22px;
+    }
+
+    .modal-comercio-contenido p {
+        line-height: 1.6;
+        margin-bottom: 25px;
+    }
+
+    .modal-comercio-acciones {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .modal-cancelar,
+    .modal-confirmar {
+        padding: 11px 18px;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .modal-cancelar {
+        background: #e8e8e8;
+        color: #333;
+    }
+
+    .modal-confirmar {
+        background: #c62828;
+        color: #fff;
+    }
+
+    .modal-confirmar.reactivar {
+        background: #2e7d32;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const modal = document.getElementById("modalComercio");
+        const titulo = document.getElementById("modalComercioTitulo");
+        const descripcion = document.getElementById("modalComercioDescripcion");
+        const confirmar = document.getElementById("confirmarComercio");
+        const cancelar = document.getElementById("cancelarComercio");
+
+        let formularioActual = null;
+        let botonAnterior = null;
+
+        function cerrarModal() {
+            modal.hidden = true;
+            formularioActual = null;
+            botonAnterior?.focus();
+        }
+
+        document.querySelectorAll(".formulario-comercio button")
+            .forEach(boton => {
+                boton.addEventListener("click", () => {
+                    formularioActual = boton.closest("form");
+                    botonAnterior = boton;
+
+                    const accion = boton.dataset.accion;
+                    const comercio = boton.dataset.comercio;
+
+                    if (accion === "baja") {
+                        titulo.textContent = "Dar de baja comercio";
+                        descripcion.textContent =
+                            `¿Querés dar de baja a "${comercio}"? ` +
+                            "No podrá crear nuevos envíos ni retiros. " +
+                            "Las operaciones en curso no se modificarán.";
+
+                        confirmar.textContent = "Dar de baja";
+                        confirmar.classList.remove("reactivar");
+                    } else {
+                        titulo.textContent = "Reactivar comercio";
+                        descripcion.textContent =
+                            `¿Querés reactivar a "${comercio}"? ` +
+                            "Podrá volver a realizar nuevas operaciones.";
+
+                        confirmar.textContent = "Reactivar";
+                        confirmar.classList.add("reactivar");
+                    }
+
+                    modal.hidden = false;
+                    cancelar.focus();
+                });
+            });
+
+        cancelar.addEventListener("click", cerrarModal);
+
+        confirmar.addEventListener("click", () => {
+            if (!formularioActual) return;
+
+            const formulario = formularioActual;
+            confirmar.disabled = true;
+            formulario.requestSubmit();
+        });
+
+        modal.addEventListener("click", evento => {
+            if (evento.target === modal) {
+                cerrarModal();
+            }
+        });
+
+        document.addEventListener("keydown", evento => {
+            if (evento.key === "Escape" && !modal.hidden) {
+                cerrarModal();
+            }
+        });
+    });
+</script>
