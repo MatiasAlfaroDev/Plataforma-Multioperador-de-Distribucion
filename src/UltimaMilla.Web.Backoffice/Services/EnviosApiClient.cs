@@ -100,6 +100,22 @@ public sealed class EnviosApiClient(HttpClient http)
             ct) ?? [];
     }
 
+    public async Task<IReadOnlyList<SolicitudReprogramacionItem>>
+    ListarSolicitudesReprogramacionPendientesAsync(
+        CancellationToken ct = default)
+{
+    using var respuesta = await http.GetAsync(
+        "api/solicitudes-reprogramacion/pendientes",
+        ct);
+
+    respuesta.EnsureSuccessStatusCode();
+
+    return await respuesta.Content
+        .ReadFromJsonAsync<List<SolicitudReprogramacionItem>>(
+            cancellationToken: ct)
+        ?? [];
+}
+
 
     public async Task<IReadOnlyList<EnvioItem>> ListarEnviosAsync(
         CancellationToken ct = default)
@@ -257,6 +273,99 @@ public sealed class EnviosApiClient(HttpClient http)
     }
 
 
+    public async Task DeclararExtravioAsync(
+        Guid envioId,
+        string justificacion,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/extravio",
+            new { Justificacion = justificacion, Responsable = responsable },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
+    public async Task RegistrarReaparicionAsync(
+        Guid envioId,
+        IReadOnlyList<string> identificaciones,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/reaparicion",
+            new
+            {
+                IdentificacionesEscaneadas = identificaciones,
+                Responsable = responsable
+            },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
+    public async Task DeclararExtravioBultoAsync(
+        Guid envioId,
+        string identificacion,
+        string justificacion,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/bultos/{Uri.EscapeDataString(identificacion)}/extravio",
+            new { Justificacion = justificacion, Responsable = responsable },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
+    public async Task RegistrarReaparicionBultoAsync(
+        Guid envioId,
+        string identificacion,
+        string responsable,
+        CancellationToken ct = default)
+    {
+        using var respuesta = await PostProtegidoAsync(
+            $"api/envios/{envioId}/bultos/{Uri.EscapeDataString(identificacion)}/reaparicion",
+            new { Responsable = responsable },
+            ct);
+
+        await VerificarAccionAsync(respuesta, ct);
+    }
+
+    // Si la API rechaza la acción, deja el motivo en el mensaje de la excepción.
+    private static async Task VerificarAccionAsync(
+        HttpResponseMessage respuesta,
+        CancellationToken ct)
+    {
+        if (respuesta.IsSuccessStatusCode)
+            return;
+
+        var cuerpo = await respuesta.Content.ReadAsStringAsync(ct);
+        string? motivo = null;
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(cuerpo);
+            if (doc.RootElement.TryGetProperty("detail", out var d) &&
+                d.ValueKind == System.Text.Json.JsonValueKind.String)
+                motivo = d.GetString();
+            else if (doc.RootElement.TryGetProperty("title", out var t) &&
+                t.ValueKind == System.Text.Json.JsonValueKind.String)
+                motivo = t.GetString();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // El cuerpo no es JSON: se usa el mensaje genérico.
+        }
+
+        throw new HttpRequestException(
+            motivo ?? $"La API rechazó la operación (HTTP {(int)respuesta.StatusCode}).",
+            null,
+            respuesta.StatusCode);
+    }
+
     // RF 41: el tablero de operación incorpora los retiros a domicilio.
     public async Task<IReadOnlyList<RetiroTableroItem>> ListarRetirosAsync(CancellationToken ct = default) =>
         await ListarRetirosAsync(null, null, null, ct);
@@ -288,16 +397,6 @@ public sealed class EnviosApiClient(HttpClient http)
     /// <summary>accion: recibir-deposito, entregar-comercio o reprogramar.</summary>
     public Task GestionarRetiroAsync(Guid retiroId, string accion, CancellationToken ct = default) =>
         EnviarProtegidoAsync($"api/retiros/{retiroId}/{accion}", new { }, ct);
-
-    // Extravío (despacho) y reaparición en el depósito, escaneando todos los bultos (informe, sección 4.1).
-    public Task DeclararExtravioAsync(Guid envioId, string justificacion, string responsable, CancellationToken ct = default) =>
-        EnviarProtegidoAsync($"api/envios/{envioId}/extravio",
-            new { Justificacion = justificacion, Responsable = responsable }, ct);
-
-    public Task RegistrarReaparicionAsync(
-        Guid envioId, IReadOnlyList<string> identificaciones, string responsable, CancellationToken ct = default) =>
-        EnviarProtegidoAsync($"api/envios/{envioId}/reaparicion",
-            new { IdentificacionesEscaneadas = identificaciones, Responsable = responsable }, ct);
 
     /// <summary>POST con token antifalsificación; si la API lo rechaza, lanza con su detalle.</summary>
     private async Task EnviarProtegidoAsync(string ruta, object datos, CancellationToken ct)
@@ -472,3 +571,9 @@ public sealed record DetalleBultoRetiroItem(
     int AnchoCm,
     int ProfundidadCm,
     decimal VolumenMetrosCubicos);
+
+public sealed record SolicitudReprogramacionItem(
+    Guid Id,
+    Guid EnvioId,
+    DateTimeOffset SolicitadaEn,
+    string Estado);

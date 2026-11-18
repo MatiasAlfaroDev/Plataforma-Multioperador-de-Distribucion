@@ -196,16 +196,8 @@ public class EnviosApi : IEnviosApi
             using var respuesta = await _http.PostAsJsonAsync(ruta, cuerpo, ct);
 
             // 2xx = guardado. 409 = el servidor ya tenía ese idEvento: también es éxito (idempotencia).
-            if (respuesta.IsSuccessStatusCode)
-                return (ResultadoEnvio.Aceptado, null);
-
-            if (respuesta.StatusCode == HttpStatusCode.Conflict)
-            {
-                return (
-                    ResultadoEnvio.Rechazado,
-                    await LeerMotivoAsync(respuesta, ct)
-                );
-            }
+            if (respuesta.IsSuccessStatusCode || respuesta.StatusCode == HttpStatusCode.Conflict)
+            return (ResultadoEnvio.Aceptado, null);
 
             return (ResultadoEnvio.Rechazado, await LeerMotivoAsync(respuesta, ct));
         }

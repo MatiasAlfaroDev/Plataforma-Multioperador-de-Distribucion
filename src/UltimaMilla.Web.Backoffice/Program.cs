@@ -60,7 +60,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddRazorPages(options =>
 {
     // Letra 3.3: la configuración es del administrador; la planificación, del despachador.
-    foreach (var pagina in new[] { "/Zonas", "/EditarZona", "/Tarifas", "/ReglasOperativas", "/SolicitudesComerciales", "/Personal" })
+    foreach (var pagina in new[] { "/Zonas", "/EditarZona", "/Tarifas", "/ReglasOperativas", "/SolicitudesComerciales", "/Personal", "/Vehiculos" })
         options.Conventions.AuthorizePage(pagina, "AdministradorOperador");
     foreach (var pagina in new[] { "/Tablero", "/HojasDeRuta", "/Avisos", "/Reportes" })
         options.Conventions.AuthorizePage(pagina, "Despacho");
@@ -145,6 +145,12 @@ builder.Services.AddHttpClient<BanderasApiClient>(c =>
     .AddHttpMessageHandler<CookieAutenticacionHandler>();
 
 builder.Services.AddHttpClient<PersonalApiClient>(c =>
+    c.BaseAddress = new Uri(
+        builder.Configuration["Api:BaseUrl"]
+        ?? "http://localhost:5080/"))
+    .AddHttpMessageHandler<CookieAutenticacionHandler>();
+
+builder.Services.AddHttpClient<VehiculosApiClient>(c =>
     c.BaseAddress = new Uri(
         builder.Configuration["Api:BaseUrl"]
         ?? "http://localhost:5080/"))

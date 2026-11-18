@@ -1,3 +1,5 @@
+
+using System.Net;
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
 using UltimaMilla.Application.Abstractions;
@@ -5,20 +7,49 @@ using UltimaMilla.Application.Abstractions;
 namespace UltimaMilla.Infrastructure.Correo;
 
 /// <summary>
-/// SMTP de la biblioteca estándar. En el compose apunta a Mailpit, que captura los correos
-/// y los muestra en mail.localhost:8000.
+/// Envío de correos mediante SMTP autenticado.
+/// Configurado para Gmail con STARTTLS.
 /// </summary>
-/// <remarks>ponytail: sin reintentos propios; los hace la ConsumerDefinition de MassTransit.</remarks>
-public sealed class SmtpEnviadorCorreo(IConfiguration configuration) : IEnviadorCorreo
+public sealed class SmtpEnviadorCorreo(IConfiguration configuration)
+    : IEnviadorCorreo
 {
-    public async Task EnviarAsync(string para, string asunto, string cuerpoHtml, CancellationToken ct)
+    public async Task EnviarAsync(
+        string para,
+        string asunto,
+        string cuerpoHtml,
+        CancellationToken ct)
     {
-        using var cliente = new SmtpClient(
-            configuration["Correo:Host"] ?? "localhost",
-            int.TryParse(configuration["Correo:Puerto"], out var puerto) ? puerto : 1025);
+        var host = configuration["Correo:Host"]
+            ?? throw new InvalidOperationException(
+                "No se configuró el servidor SMTP.");
+
+        var puerto = int.TryParse(
+            configuration["Correo:Puerto"], out var valor)
+            ? valor
+            : 587;
+
+        var usuario = configuration["Correo:Usuario"]
+            ?? throw new InvalidOperationException(
+                "No se configuró el usuario SMTP.");
+
+        var password = configuration["Correo:Password"]
+            ?? throw new InvalidOperationException(
+                "No se configuró la contraseña SMTP.");
+
+        var remitente = configuration["Correo:Remitente"]
+            ?? usuario;
+
+        using var cliente = new SmtpClient(host, puerto)
+        {
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(usuario, password),
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            Timeout = 30000
+        };
 
         using var mensaje = new MailMessage(
-            configuration["Correo:Remitente"] ?? "seguimiento@ultimamilla.local",
+            remitente,
             para,
             asunto,
             cuerpoHtml)

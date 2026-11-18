@@ -46,8 +46,9 @@ public sealed class RegistrarReaparicionHandler(
             throw new InvalidOperationException(
                 "Solo puede registrarse la reaparición de un envío extraviado.");
 
-        // Verificamos todos los bultos físicos recuperados.
+        // Pueden reaparecer todos o solo algunos de los bultos extraviados.
         var esperados = envio.Bultos
+            .Where(b => b.Estado == EstadoBulto.Extraviado)
             .Select(b => b.Identificacion)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -69,10 +70,10 @@ public sealed class RegistrarReaparicionHandler(
         var recibidos = escaneados
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (!esperados.SetEquals(recibidos))
+        if (!recibidos.IsSubsetOf(esperados))
         {
             throw new InvalidOperationException(
-                "Los bultos escaneados no coinciden con los declarados en el envío.");
+                "Algún bulto escaneado no está extraviado en este envío.");
         }
 
         if (envio.VersionReglasOperativasId is not Guid versionId)
@@ -91,7 +92,8 @@ public sealed class RegistrarReaparicionHandler(
             reglas,
             reloj.GetUtcNow(),
             "Deposito",
-            command.Responsable.Trim());
+            command.Responsable.Trim(),
+            identificacionesReaparecidas: escaneados);
 
         await unitOfWork.GuardarCambiosAsync(ct);
     }

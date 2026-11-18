@@ -90,6 +90,45 @@
                 }
             </div>
         </div>
+        @if (seguimiento.Tipo == "Envio")
+{
+    @if (solicitudEnviada)
+    {
+        <div class="alert alert-success mb-4" role="status">
+            Tu solicitud de reprogramación fue registrada correctamente.
+            El operador deberá revisarla.
+        </div>
+    }
+    else if (disponibilidad?.PuedeSolicitar == true)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5>¿Necesitás reprogramar la entrega?</h5>
+
+                <p class="text-muted">
+                    Podés solicitar un nuevo intento de entrega.
+                    El operador revisará tu solicitud.
+                </p>
+
+                <button type="button"
+                        class="btn btn-primary"
+                        disabled="@solicitandoReprogramacion"
+                        @onclick="SolicitarReprogramacion">
+                    @(solicitandoReprogramacion
+                        ? "Enviando solicitud..."
+                        : "Solicitar reprogramación")
+                </button>
+            </div>
+        </div>
+    }
+
+    @if (errorReprogramacion is not null)
+    {
+        <div class="alert alert-danger mb-4" role="alert">
+            @errorReprogramacion
+        </div>
+    }
+}
 
         <h4 class="mb-3">Historial del envío</h4>
 
@@ -128,6 +167,10 @@
     private SeguimientoPublicoDto? seguimiento;
     private bool cargando = true;
     private string? error;
+    private DisponibilidadReprogramacionPublicaDto? disponibilidad;
+    private bool solicitandoReprogramacion;
+    private bool solicitudEnviada;
+    private string? errorReprogramacion;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -138,6 +181,16 @@
         try
         {
             seguimiento = await SeguimientoApi.ConsultarAsync(Token);
+
+            disponibilidad = null;
+            solicitudEnviada = false;
+            errorReprogramacion = null;
+
+            if (seguimiento is not null && seguimiento.Tipo == "Envio")
+            {
+                disponibilidad = await SeguimientoApi
+                    .ConsultarDisponibilidadAsync(Token);
+            }
         }
         catch (HttpRequestException)
         {
@@ -148,4 +201,44 @@
             cargando = false;
         }
     }
+
+    private async Task SolicitarReprogramacion()
+{
+    if (solicitandoReprogramacion ||
+        disponibilidad?.PuedeSolicitar != true)
+        return;
+
+    solicitandoReprogramacion = true;
+    errorReprogramacion = null;
+
+    try
+    {
+        var resultado = await SeguimientoApi
+            .SolicitarReprogramacionAsync(Token);
+
+        if (resultado)
+        {
+            solicitudEnviada = true;
+            disponibilidad = new(false, "Solicitud pendiente.");
+        }
+        else
+        {
+            errorReprogramacion =
+                "No pudimos registrar la solicitud. " +
+                "Es posible que las condiciones del envío hayan cambiado.";
+
+            disponibilidad = await SeguimientoApi
+                .ConsultarDisponibilidadAsync(Token);
+        }
+    }
+    catch (HttpRequestException)
+    {
+        errorReprogramacion =
+            "Ocurrió un problema de conexión. Intentá nuevamente más tarde.";
+    }
+    finally
+    {
+        solicitandoReprogramacion = false;
+    }
+}
 }

@@ -10,6 +10,9 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
 
     public IReadOnlyList<RetiroTableroItem> Retiros { get; private set; } = [];
 
+    public IReadOnlyList<SolicitudReprogramacionItem> SolicitudesPendientes
+    { get; private set; } = [];
+
     public string? Error { get; private set; }
 
     public string OperadorNombre =>
@@ -27,6 +30,9 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         {
             Envios = await api.ListarEnviosAsync(ct);
             Retiros = await api.ListarRetirosAsync(ct);
+
+            SolicitudesPendientes =
+                await api.ListarSolicitudesReprogramacionPendientesAsync(ct);
         }
         catch (HttpRequestException ex)
         {
@@ -38,6 +44,42 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         {
             Error = "La sesión no está disponible. Iniciá sesión nuevamente.";
         }
+    }
+
+    public async Task<IActionResult> OnPostAceptarReprogramacionAsync(
+        Guid solicitudId,
+        CancellationToken ct)
+    {
+        if (solicitudId == Guid.Empty)
+            return BadRequest();
+
+        var responsable = User.Identity?.Name;
+
+        if (string.IsNullOrWhiteSpace(responsable))
+        {
+            TempData["MensajeError"] =
+                "No se pudo identificar al usuario responsable.";
+
+            return RedirectToPage();
+        }
+
+        try
+        {
+            await api.ConfirmarReprogramacionAsync(
+                solicitudId,
+                responsable,
+                ct);
+
+            TempData["MensajeExito"] =
+                "Reprogramación aceptada. El envío ya puede asignarse a una nueva ruta.";
+        }
+        catch (HttpRequestException ex)
+        {
+            TempData["MensajeError"] =
+                $"No se pudo aceptar la reprogramación: {ex.Message}";
+        }
+
+        return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostRecibirAsync(
