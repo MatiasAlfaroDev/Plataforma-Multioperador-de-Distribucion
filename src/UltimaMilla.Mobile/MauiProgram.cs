@@ -100,8 +100,6 @@ public static class MauiProgram
         // MVVM: cada página recibe su ViewModel por constructor.
         builder.Services.AddTransient<LoginViewModel>();
         builder.Services.AddTransient<LoginPage>();
-        builder.Services.AddTransient<SeleccionOperadorViewModel>();
-        builder.Services.AddTransient<SeleccionOperadorPage>();
         builder.Services.AddTransient<EnviosViewModel>();
         builder.Services.AddTransient<EnviosPage>();
         builder.Services.AddTransient<CargaVehiculoViewModel>();

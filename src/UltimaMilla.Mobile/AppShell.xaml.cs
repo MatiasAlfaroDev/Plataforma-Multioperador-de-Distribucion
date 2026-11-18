@@ -8,8 +8,7 @@ public partial class AppShell : Shell
     {
         InitializeComponent();
 
-        // Rutas a las que se navega con Shell.Current.GoToAsync("envios", ...).
-        Routing.RegisterRoute("envios", typeof(EnviosPage));
+        // Pantallas que se abren desde la ruta ("//ruta") con Shell.Current.GoToAsync("carga"), etc.
         Routing.RegisterRoute("carga", typeof(CargaVehiculoPage));
         Routing.RegisterRoute("rendicion", typeof(RendicionPage));
     }

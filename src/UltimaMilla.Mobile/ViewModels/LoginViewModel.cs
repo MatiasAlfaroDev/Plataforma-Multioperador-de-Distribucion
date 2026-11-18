@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using UltimaMilla.Mobile.Data;
 using UltimaMilla.Mobile.Services;
 
 namespace UltimaMilla.Mobile.ViewModels;
@@ -77,7 +78,11 @@ public partial class LoginViewModel : ObservableObject
             }
 
             Password = string.Empty;
-            await Shell.Current.GoToAsync("//operador/envios",
+
+            // Se recuerda el operador de la sesión para poder abrir la ruta guardada sin conexión.
+            OperadorGuardado.Guardar(operador);
+
+            await Shell.Current.GoToAsync("//ruta",
                 new Dictionary<string, object> { ["operador"] = operador });
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
@@ -107,6 +112,15 @@ public partial class LoginViewModel : ObservableObject
         if (confirmacion != ResultadoBiometria.Confirmado)
             return;
 
-        await Shell.Current.GoToAsync("//operador");
+        // Sin conexión no se elige operador: se abre la ruta del último operador con el que se inició sesión.
+        var operador = OperadorGuardado.Leer();
+        if (operador is null)
+        {
+            Error = "Para trabajar sin conexión tenés que haber iniciado sesión al menos una vez en este teléfono.";
+            return;
+        }
+
+        await Shell.Current.GoToAsync("//ruta",
+            new Dictionary<string, object> { ["operador"] = operador });
     }
 }

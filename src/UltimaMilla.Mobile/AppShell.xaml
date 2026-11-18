@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <Shell x:Class="UltimaMilla.Mobile.AppShell"
        xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
@@ -10,8 +10,10 @@
                   Route="login"
                   ContentTemplate="{DataTemplate pages:LoginPage}" />
 
-    <ShellContent Title="Operador"
-                  Route="operador"
-                  ContentTemplate="{DataTemplate pages:SeleccionOperadorPage}" />
+    <!-- La ruta del repartidor es raíz: el operador sale de la sesión (su membresía), no se elige en pantalla.
+         Así el botón "atrás" no lleva a una lista con los demás operadores de la plataforma (aislamiento, 6.5). -->
+    <ShellContent Title="Mi ruta"
+                  Route="ruta"
+                  ContentTemplate="{DataTemplate pages:EnviosPage}" />
 
 </Shell>
