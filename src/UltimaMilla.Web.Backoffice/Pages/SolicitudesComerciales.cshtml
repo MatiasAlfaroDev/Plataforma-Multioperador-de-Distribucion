@@ -130,15 +130,6 @@ else
                             </td>
                             <td>
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <details>
-                                        <summary><i class="ph ph-pencil-simple"></i> Modificar</summary>
-                                        <form method="post" asp-page-handler="Modificar" class="mt-2 flex flex-wrap items-center gap-2">
-                                            <input type="hidden" name="id" value="@cuenta.Id" />
-                                            <input aria-label="Nombre del comercio" name="nombre" value="@cuenta.ComercioNombre" required maxlength="200" />
-                                            <button type="submit" class="primario">Guardar</button>
-                                        </form>
-                                    </details>
-
                                     <form method="post" asp-page-handler="Estado" class="inline">
                                         <input type="hidden" name="id" value="@cuenta.Id" />
                                         <input type="hidden" name="activa" value="@((!cuenta.Activa).ToString().ToLowerInvariant())" />

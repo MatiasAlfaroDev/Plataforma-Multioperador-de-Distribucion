@@ -428,6 +428,43 @@ async guardarDireccionRecepcion(cuentaComercialId, direccion) {
     }
 },
 
+async modificarComercio(nombre) {
+    const respuestaToken = await fetch("/api/antiforgery/token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+    });
+
+    if (!respuestaToken.ok) {
+        throw new Error("No se pudo obtener el token de seguridad.");
+    }
+
+    const { token } = await respuestaToken.json();
+
+    const respuesta = await fetch("/api/comercio/datos", {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": token
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ nombre })
+    });
+
+    if (!respuesta.ok) {
+        let mensaje = "No se pudo guardar el nombre (HTTP " + respuesta.status + ").";
+
+        try {
+            const error = await respuesta.json();
+            mensaje = error.mensaje ?? error.title ?? mensaje;
+        } catch {
+            // Mantener el mensaje HTTP.
+        }
+
+        throw new Error(mensaje);
+    }
+},
+
 async listarEnvios() {
     const respuesta = await fetch("/api/envios", {
         method: "GET",

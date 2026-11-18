@@ -40,9 +40,6 @@ public sealed class VinculacionesApiClient(HttpClient http)
             "api/cuentas-comerciales", ct) ?? [];
     }
 
-    public Task ModificarComercioAsync(Guid cuentaId, string nombre, CancellationToken ct = default) =>
-        EnviarAsync(HttpMethod.Put, $"api/vinculaciones/{cuentaId}/comercio", new { Nombre = nombre }, ct);
-
     public Task CambiarEstadoAsync(Guid cuentaId, bool activa, CancellationToken ct = default) =>
         EnviarAsync(HttpMethod.Put, $"api/vinculaciones/{cuentaId}/estado", new { Activa = activa }, ct);
 

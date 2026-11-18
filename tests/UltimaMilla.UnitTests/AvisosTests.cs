@@ -341,6 +341,24 @@ public class AvisosTests
     }
 
     [Fact]
+    public async Task Una_cuenta_dada_de_baja_consulta_sus_avisos_pero_no_los_reenvia()
+    {
+        var entrega = Fallida(AgregarEntregaPendiente(), 1, Ahora);
+        var sesion = new SesionFalsa(null, Guid.NewGuid(), Perfiles.Comercio);
+        var cuentas = new CuentasDelComercio(new CuentaComercialDto(
+            _envio.CuentaComercialId, _envio.OperadorId, "Operador", Guid.NewGuid(), "Comercio",
+            false, EstadoCuentaComercial.Confirmada));
+
+        var lectura = await AlcanceAvisos.ResolverAsync(sesion, cuentas, CancellationToken.None, incluirDadasDeBaja: true);
+        Assert.Equal(_envio.OperadorId, lectura.OperadorDeCuenta(_envio.CuentaComercialId));
+
+        await Assert.ThrowsAsync<NoEncontradoException>(() =>
+            new ReenviarAvisoHandler(_entregas, cuentas, _publicador, _unidad, sesion, new OperadorActivoFalso())
+                .Handle(new ReenviarAvisoCommand(entrega.Id), CancellationToken.None));
+        Assert.Equal(EstadoEntregaAviso.Fallida, entrega.Estado);
+    }
+
+    [Fact]
     public async Task El_operador_reenvia_sin_cambiar_de_operador()
     {
         var entrega = Fallida(AgregarEntregaPendiente(), 1, Ahora);

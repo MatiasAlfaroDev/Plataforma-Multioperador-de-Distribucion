@@ -13,7 +13,7 @@ public sealed class ListarSuscripcionesHandler(
 {
     public async Task<IReadOnlyList<SuscripcionAvisoDto>> Handle(ListarSuscripcionesQuery query, CancellationToken ct)
     {
-        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct);
+        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct, incluirDadasDeBaja: true);
         return (await suscripciones.ListarAsync(alcance.Cuentas?.Keys.ToList(), ct))
             .Select(SuscripcionAvisoDto.Desde)
             .ToList();

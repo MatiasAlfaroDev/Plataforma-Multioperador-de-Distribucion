@@ -238,26 +238,8 @@ public static class VinculacionesComercialesEndpoints
         }
     });
 
-        // RF 1: modificación y baja lógica de un comercio ya aceptado, por el mismo actor que acepta
+        // RF 1: baja lógica y reactivación de un comercio aceptado, por el mismo actor que acepta
         // las solicitudes. Los errores los traduce ManejadorDeErrores.
-        grupo.MapPut("/{id:guid}/comercio", async (
-            Guid id,
-            ModificarComercioRequest request,
-            ModificarComercioHandler handler,
-            HttpContext context,
-            IAntiforgery antiforgery,
-            CancellationToken ct) =>
-        {
-            if (!await antiforgery.IsRequestValidAsync(context))
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Token de seguridad inválido.");
-
-            await handler.Handle(new ModificarComercioCommand(id, request.Nombre), ct);
-            return Results.NoContent();
-        })
-        .RequireAuthorization(p => p.RequireRole(Perfiles.Configuracion));
-
         grupo.MapPut("/{id:guid}/estado", async (
             Guid id,
             CambiarEstadoCuentaComercialRequest request,
@@ -275,6 +257,26 @@ public static class VinculacionesComercialesEndpoints
             return Results.NoContent();
         })
         .RequireAuthorization(p => p.RequireRole(Perfiles.Configuracion));
+
+        // RF 1: el administrador del comercio modifica su propio comercio (el de la sesión).
+        // El operador no puede: el comercio es global y lo ven todos sus operadores.
+        app.MapGroup("/api/comercio")
+            .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorComercio))
+            .MapPut("/datos", async (
+                ModificarComercioRequest request,
+                ModificarComercioHandler handler,
+                HttpContext context,
+                IAntiforgery antiforgery,
+                CancellationToken ct) =>
+            {
+                if (!await antiforgery.IsRequestValidAsync(context))
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status400BadRequest,
+                        title: "Token de seguridad inválido.");
+
+                await handler.Handle(new ModificarComercioCommand(request.Nombre), ct);
+                return Results.NoContent();
+            });
 
         return app;
     }

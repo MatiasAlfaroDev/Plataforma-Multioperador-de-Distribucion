@@ -29,6 +29,25 @@ else
         <p class="aviso ok" role="status">@mensaje</p>
     }
 
+    <AuthorizeView Policy="AdministradorComercio" Context="admin">
+        <div class="tarjeta">
+            <h3>Datos del comercio</h3>
+            <form @onsubmit="GuardarNombreAsync" @onsubmit:preventDefault>
+                <div class="campos">
+                    <div>
+                        <label for="nombre-comercio">Nombre</label>
+                        <input id="nombre-comercio" @bind="nombreComercio" required maxlength="200" />
+                    </div>
+                </div>
+                <div class="acciones">
+                    <button type="submit" class="primario" disabled="@enviando">
+                        <i class="ph ph-floppy-disk"></i>Guardar nombre
+                    </button>
+                </div>
+            </form>
+        </div>
+    </AuthorizeView>
+
     @if (operadores.Count == 0 && error is null)
     {
         <p>No hay operadores disponibles.</p>
@@ -159,6 +178,9 @@ else
 
             cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
                 "autenticacionPortal.obtenerCuentasComerciales") ?? new();
+
+            // ponytail: el nombre sale de las cuentas; sin cuentas el campo arranca vacío.
+            nombreComercio = cuentas.FirstOrDefault()?.ComercioNombre ?? "";
         }
         catch (JSException ex)
         {
@@ -206,6 +228,35 @@ else
             formularios.Remove(operadorId);
             mensaje = "Dirección de recepción actualizada.";
 
+            cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
+                "autenticacionPortal.obtenerCuentasComerciales");
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+
+    // RF 1: el comercio es global; solo su administrador cambia el nombre.
+    private string nombreComercio = "";
+
+    private async Task GuardarNombreAsync()
+    {
+        if (enviando)
+            return;
+
+        enviando = true;
+        error = null;
+        mensaje = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync("autenticacionPortal.modificarComercio", nombreComercio);
+            mensaje = "Nombre del comercio actualizado.";
             cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
                 "autenticacionPortal.obtenerCuentasComerciales");
         }

@@ -6,8 +6,6 @@ public sealed class ModificarComercioValidator : AbstractValidator<ModificarCome
 {
     public ModificarComercioValidator()
     {
-        RuleFor(c => c.CuentaComercialId).NotEmpty();
-
         RuleFor(c => c.Nombre)
             .NotEmpty().WithMessage("El nombre del comercio es obligatorio.")
             .MaximumLength(200);

@@ -12,7 +12,7 @@ public sealed class SolicitudesComercialesModel(
 {
     public IReadOnlyList<SolicitudComercialItem> Solicitudes { get; private set; } = [];
 
-    // RF 1: comercios ya aceptados, para modificarlos o darlos de baja.
+    // RF 1: comercios ya aceptados, para darlos de baja o reactivarlos.
     public IReadOnlyList<CuentaComercialItem> Aceptados { get; private set; } = [];
 
     public string? Error { get; private set; }
@@ -66,25 +66,6 @@ public sealed class SolicitudesComercialesModel(
             InvalidOperationException)
         {
             Error = $"No se pudo rechazar la solicitud: {ex.Message}";
-            await CargarSolicitudesAsync(ct);
-            return Page();
-        }
-    }
-
-    public async Task<IActionResult> OnPostModificarAsync(
-        Guid id,
-        string nombre,
-        CancellationToken ct)
-    {
-        try
-        {
-            await api.ModificarComercioAsync(id, nombre, ct);
-            TempData["Mensaje"] = "Comercio modificado correctamente.";
-            return RedirectToPage();
-        }
-        catch (HttpRequestException ex)
-        {
-            Error = $"No se pudo modificar el comercio: {ex.Message}";
             await CargarSolicitudesAsync(ct);
             return Page();
         }

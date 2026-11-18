@@ -310,22 +310,21 @@ public class CuentasComercialesHandlersTests
                 new CambiarEstadoCuentaComercialCommand(solicitud.Id, Activa: false), CancellationToken.None));
     }
 
-    // ----- Modificar comercio (RF 1) -----
+    // ----- Modificar comercio (RF 1): solo su propio administrador -----
 
     private readonly ComerciosEnMemoria _comercios = new();
 
     private ModificarComercioHandler Modificar(ITenantContext sesion) =>
-        new(_cuentas, _comercios, _unidad, sesion, new ModificarComercioValidator());
+        new(_comercios, _unidad, sesion, new ModificarComercioValidator());
 
     [Fact]
-    public async Task Modificar_cambia_el_nombre_y_conserva_el_rut()
+    public async Task El_administrador_del_comercio_cambia_su_nombre_y_conserva_el_rut()
     {
-        var cuenta = Aceptada();
         var comercio = Comercio.Crear(ComercioId, "211234560018", "Tienda");
         _comercios.Lista.Add(comercio);
 
-        await Modificar(AdminOperador()).Handle(
-            new ModificarComercioCommand(cuenta.Id, " Tienda Norte "), CancellationToken.None);
+        await Modificar(AdminComercio()).Handle(
+            new ModificarComercioCommand(" Tienda Norte "), CancellationToken.None);
 
         Assert.Equal("Tienda Norte", comercio.Nombre);
         Assert.Equal("211234560018", comercio.Rut);
@@ -333,22 +332,30 @@ public class CuentasComercialesHandlersTests
     }
 
     [Fact]
-    public async Task Modificar_valida_actor_nombre_y_estado_de_la_cuenta()
+    public async Task Ni_el_operador_ni_un_usuario_comun_modifican_el_comercio()
     {
-        var aceptada = Aceptada();
-        var pendiente = CuentaComercial.Solicitar(Guid.NewGuid(), OperadorId, Guid.NewGuid());
-        _cuentas.Lista.Add(pendiente);
-        _comercios.Lista.Add(Comercio.Crear(ComercioId, "211234560018", "Tienda"));
-        var despachador = new SesionFalsa(OperadorId, null, Perfiles.Despachador, autenticado: true);
+        var comercio = Comercio.Crear(ComercioId, "211234560018", "Tienda");
+        _comercios.Lista.Add(comercio);
+        var usuarioComun = new SesionFalsa(null, ComercioId, Perfiles.Comercio, autenticado: true);
+        var comando = new ModificarComercioCommand("Otro");
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            Modificar(despachador).Handle(new ModificarComercioCommand(aceptada.Id, "Otro"), CancellationToken.None));
+            Modificar(AdminOperador()).Handle(comando, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Modificar(usuarioComun).Handle(comando, CancellationToken.None));
+        Assert.Equal("Tienda", comercio.Nombre);
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Modificar_el_comercio_valida_nombre_y_existencia()
+    {
+        _comercios.Lista.Add(Comercio.Crear(ComercioId, "211234560018", "Tienda"));
+
         await Assert.ThrowsAsync<ValidationException>(() =>
-            Modificar(AdminOperador()).Handle(new ModificarComercioCommand(aceptada.Id, " "), CancellationToken.None));
+            Modificar(AdminComercio()).Handle(new ModificarComercioCommand(" "), CancellationToken.None));
         await Assert.ThrowsAsync<NoEncontradoException>(() =>
-            Modificar(AdminOperador(Guid.NewGuid())).Handle(new ModificarComercioCommand(aceptada.Id, "Otro"), CancellationToken.None));
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            Modificar(AdminOperador()).Handle(new ModificarComercioCommand(pendiente.Id, "Otro"), CancellationToken.None));
+            Modificar(AdminComercio(Guid.NewGuid())).Handle(new ModificarComercioCommand("Otro"), CancellationToken.None));
         Assert.Equal(0, _unidad.Guardados);
     }
 
