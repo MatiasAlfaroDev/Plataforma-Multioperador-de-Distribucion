@@ -40,12 +40,33 @@ public static class Formato
         "AsignadoARuta" => "Asignado a ruta",
         "EnTransito" => "En tránsito",
         "Entregado" => "Entregado",
+        "EntregadoParcialmente" => "Entregado parcialmente",
         "NoEntregado" => "No entregado",
         "Reprogramado" => "Reprogramado",
         "EnDevolucion" => "En devolución",
         "Devuelto" => "Devuelto",
         "Extraviado" => "Extraviado",
         _ => estado
+    };
+
+    /// <summary>Chip del estado del envío, con los mismos colores que el Portal.</summary>
+    public static string ClaseEstado(string estado) => estado switch
+    {
+        "Entregado" or "Devuelto" => "chip chip-exito",
+        "AsignadoARuta" or "EnTransito" => "chip chip-acento",
+        "NoEntregado" or "Reprogramado" or "EntregadoParcialmente" => "chip chip-alerta",
+        "EnDevolucion" or "Extraviado" => "chip chip-peligro",
+        _ => "chip"
+    };
+
+    /// <summary>Chip del estado del retiro, con los mismos colores que el Portal.</summary>
+    public static string ClaseEstadoRetiro(string estado) => estado switch
+    {
+        "EntregadoAlComercio" or "Retirado" => "chip chip-exito",
+        "AsignadoARuta" or "EnTransito" or "AsignadoARutaComercio" or "EnTransitoComercio" or "EnDeposito" => "chip chip-acento",
+        "NoRetirado" => "chip chip-alerta",
+        "Cancelado" => "chip chip-peligro",
+        _ => "chip"
     };
 
     public static string EstadoRetiro(string estado) => estado switch

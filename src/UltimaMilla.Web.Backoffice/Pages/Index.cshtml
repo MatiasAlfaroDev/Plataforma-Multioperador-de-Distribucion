@@ -12,71 +12,156 @@
         e => e.Estado == "EnDeposito" && e.IntentosRealizados > 0);
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Envíos</h1>
-        <p>Operador: <strong>@Model.OperadorNombre</strong></p>
-    </div>
+<div class="pagina">
+    @if (Model.Error is not null)
+    {
+        <p class="aviso error" role="alert">@Model.Error</p>
+    }
+
+    @if (Model.SolicitudesPendientes.Count > 0)
+    {
+        <section class="tarjeta">
+            <h2 class="titulo-tarjeta">Reprogramaciones pendientes <span class="chip chip-alerta">@Model.SolicitudesPendientes.Count</span></h2>
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Envío</th>
+                            <th>Solicitada</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var solicitud in Model.SolicitudesPendientes)
+                        {
+                            var referencia = Model.Envios.FirstOrDefault(e => e.Id == solicitud.EnvioId)?.ReferenciaExterna
+                                ?? solicitud.EnvioId.ToString();
+
+                            <tr>
+                                <td><b class="codigo">@referencia</b></td>
+                                <td>@Formato.Hora(solicitud.SolicitadaEn)</td>
+                                <td><span class="chip chip-alerta">@solicitud.Estado</span></td>
+                                <td class="text-right">
+                                    <button type="button" class="abrir-aceptacion primario btn-chico"
+                                            data-solicitud-id="@solicitud.Id" data-referencia="@referencia">
+                                        Aceptar
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+
+    <section class="tarjeta">
+        <div class="cabecera-tarjeta">
+            <h2 class="titulo-tarjeta">Envíos <span class="chip">@Model.Envios.Count</span></h2>
+            <span class="nota">@Model.OperadorNombre</span>
+        </div>
+
+        @if (Model.Retiros.Count > 0)
+        {
+            <p class="nota mb-4 flex flex-wrap items-center gap-2">
+                <i class="ph ph-house-line"></i>
+                Retiros a domicilio:
+                @string.Join(" · ", Model.Retiros.GroupBy(r => r.Estado).Select(g => $"{Formato.EstadoRetiro(g.Key)}: {g.Count()}"))
+                <a asp-page="/Retiros">Ver retiros</a>
+            </p>
+        }
+
+        @if (Model.Envios.Count == 0)
+        {
+            <p class="vacio">No hay envíos. Los comercios los dan de alta desde el Portal.</p>
+        }
+        else
+        {
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Envío</th>
+                            <th>Destinatario</th>
+                            <th>Carga</th>
+                            <th>Estado</th>
+                            <th class="num">Tarifa</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in Model.Envios)
+                        {
+                            <tr>
+                                <td>
+                                    <b class="codigo">@e.ReferenciaExterna</b>
+                                    <span class="linea2">@e.ComercioNombre · @Formato.Hora(e.FechaAlta)</span>
+                                </td>
+                                <td>
+                                    @e.DestinatarioNombre
+                                    <span class="linea2">@e.Direccion</span>
+                                </td>
+                                <td>
+                                    @(e.CantidadBultos == 1 ? "1 bulto" : $"{e.CantidadBultos} bultos") · @Formato.Numero(e.PesoTotalKg) kg
+                                    <span class="linea2">@Formato.Modalidad(e.Modalidad)</span>
+                                </td>
+                                <td><span class="@Formato.ClaseEstado(e.Estado)">@Formato.Estado(e.Estado)</span></td>
+                                <td class="num">@(e.TarifaCalculada is decimal tarifa ? Formato.Moneda(tarifa) : "Sin tarifa")</td>
+                                <td>
+                                    <div class="flex items-center justify-end gap-2">
+                                        @if (e.Estado == "Admitido")
+                                        {
+                                            <button type="button" class="abrir-recepcion primario btn-chico"
+                                                    data-envio-id="@e.Id" data-referencia="@e.ReferenciaExterna"
+                                                    data-operador="@e.OperadorNombre" data-bultos="@e.CantidadBultos">
+                                                Recibir en depósito
+                                            </button>
+                                        }
+                                        else if (e.Estado == "EnDeposito" && e.IntentosRealizados == 0)
+                                        {
+                                            <a asp-page="/HojasDeRuta" asp-route-envioId="@e.Id" class="accion-asignar btn-secundario btn-chico">Asignar a ruta</a>
+                                        }
+                                        else if (e.Estado == "EnDeposito" && Model.SolicitudesPendientes.Any(s => s.EnvioId == e.Id))
+                                        {
+                                            <span class="chip chip-alerta">Solicitud pendiente</span>
+                                        }
+                                        else if (e.Estado == "EnDeposito" && e.IntentosRealizados > 0)
+                                        {
+                                            <button type="button" class="abrir-reprogramacion primario btn-chico"
+                                                    data-envio-id="@e.Id" data-referencia="@e.ReferenciaExterna"
+                                                    data-intentos="@e.IntentosRealizados">
+                                                Reprogramar
+                                            </button>
+                                        }
+                                        else if (e.Estado == "Reprogramado")
+                                        {
+                                            <a asp-page="/HojasDeRuta" asp-route-envioId="@e.Id" class="accion-asignar btn-secundario btn-chico">Asignar a ruta</a>
+                                        }
+                                        else if (e.Estado == "EnDevolucion")
+                                        {
+                                            <a asp-page="/HojasDeRuta" asp-route-devolucionId="@e.Id" class="accion-asignar btn-secundario btn-chico">Asignar devolución</a>
+                                        }
+                                        else if (e.Estado == "Extraviado")
+                                        {
+                                            <a asp-page="/DetalleEnvio" asp-route-id="@e.Id" asp-fragment="reaparicion" class="accion-asignar btn-primario btn-chico">Registrar reaparición</a>
+                                        }
+                                        <a asp-page="/DetalleEnvio" asp-route-id="@e.Id" class="btn-secundario btn-chico" title="Ver detalle">
+                                            <i class="ph ph-caret-right"></i>Detalle
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 </div>
-
-@if (Model.Error is not null)
-{
-    <div class="aviso error" role="alert">
-        @Model.Error
-    </div>
-}
-
-@if (TempData["MensajeExito"] is string mensajeExito)
-{
-    <div class="aviso" role="status">@mensajeExito</div>
-}
-
-@if (TempData["MensajeError"] is string mensajeError)
-{
-    <div class="aviso error" role="alert">@mensajeError</div>
-}
 
 @if (Model.SolicitudesPendientes.Count > 0)
 {
-    <section class="mb-4">
-        <h2>Reprogramaciones pendientes (@Model.SolicitudesPendientes.Count)</h2>
-
-        <div class="tabla">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Envío</th>
-                        <th>Fecha de solicitud</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    @foreach (var solicitud in Model.SolicitudesPendientes)
-                    {
-                        var referencia = Model.Envios.FirstOrDefault(e => e.Id == solicitud.EnvioId)?.ReferenciaExterna
-                            ?? solicitud.EnvioId.ToString();
-
-                        <tr>
-                            <td class="codigo">@referencia</td>
-                            <td>@Formato.Hora(solicitud.SolicitadaEn)</td>
-                            <td><span class="chip chip-alerta">@solicitud.Estado</span></td>
-                            <td class="text-right">
-                                <button type="button"
-                                        class="abrir-aceptacion primario py-1.5 text-sm"
-                                        data-solicitud-id="@solicitud.Id"
-                                        data-referencia="@referencia">
-                                    Aceptar
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-
     <dialog id="modalAceptarReprogramacion"
             class="modal-recepcion w-[min(32rem,calc(100vw-2rem))] m-auto"
             aria-labelledby="tituloAceptarReprogramacion">
@@ -135,206 +220,6 @@
                 .addEventListener("click", () => modal.close());
         })();
     </script>
-}
-
-@if (Model.Retiros.Count > 0)
-{
-    <p class="nota flex flex-wrap items-center gap-2">
-        <i class="ph ph-hand-arrow-up"></i>
-        Retiros a domicilio:
-        @string.Join(" · ", Model.Retiros.GroupBy(r => r.Estado).Select(g => $"{Formato.EstadoRetiro(g.Key)}: {g.Count()}"))
-        <a asp-page="/Retiros">Ver retiros</a>
-    </p>
-}
-
-@if (Model.Envios.Count == 0)
-{
-    <p class="nota">
-        No hay envíos. Da de alta uno desde el Portal del comercio.
-    </p>
-}
-else
-{
-    <p class="nota">
-        @(Model.Envios.Count == 1
-            ? "1 envío"
-            : $"{Model.Envios.Count} envíos")
-    </p>
-
-    <div class="tabla">
-        <table>
-            <thead>
-                <tr>
-                    <th>Referencia</th>
-                    <th>Comercio</th>
-                    <th>Destinatario</th>
-                    <th>Dirección</th>
-                    <th class="num">Bultos</th>
-                    <th class="num">Peso (kg)</th>
-                    <th>Modalidad</th>
-                    <th>Estado</th>
-                    <th class="num">Tarifa</th>
-                    <th>Alta</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                @foreach (var e in Model.Envios)
-                {
-                    <tr>
-                        <td class="codigo">@e.ReferenciaExterna</td>
-                        <td>@e.ComercioNombre</td>
-                        <td>@e.DestinatarioNombre</td>
-                        <td>@e.Direccion</td>
-                        <td class="num">@e.CantidadBultos</td>
-                        <td class="num">@Formato.Numero(e.PesoTotalKg)</td>
-                        <td>@Formato.Modalidad(e.Modalidad)</td>
-                        <td>
-                            @switch (e.Estado)
-                            {
-                                case "Admitido":
-                                    <span class="chip chip-acento">Admitido</span>
-                                    break;
-
-                                case "EnDeposito":
-                                    <span class="chip chip-alerta">En depósito</span>
-                                    break;
-
-                                case "AsignadoARuta":
-                                    <span class="chip chip-exito">Asignado a ruta</span>
-                                    break;
-
-                                case "EnTransito":
-                                    <span class="chip chip-acento">En tránsito</span>
-                                    break;
-
-                                case "Entregado":
-                                    <span class="chip chip-exito">Entregado</span>
-                                    break;
-
-                                case "EntregadoParcialmente":
-                                    <span class="chip chip-alerta">Entregado parcialmente</span>
-                                    break;
-
-                                case "NoEntregado":
-                                    <span class="chip chip-alerta">No entregado</span>
-                                    break;
-
-                                case "Reprogramado":
-                                    <span class="chip chip-alerta">Reprogramado</span>
-                                    break;
-
-                                case "EnDevolucion":
-                                    <span class="chip chip-alerta">En devolución</span>
-                                    break;
-
-                                case "Devuelto":
-                                    <span class="chip chip-exito">Devuelto</span>
-                                    break;
-
-                                case "Extraviado":
-                                    <span class="chip chip-alerta">Extraviado</span>
-                                    break;
-
-                                default:
-                                    <span class="nota">@e.Estado</span>
-                                    break;
-                            }
-                        </td>
-                        <td class="num">
-                            @(e.TarifaCalculada is decimal tarifa
-                                ? Formato.Moneda(tarifa)
-                                : "Sin tarifa")
-                        </td>
-                        <td>@Formato.Hora(e.FechaAlta)</td>
-                        <td class="text-right">
-                        <a asp-page="/DetalleEnvio"
-                            asp-route-id="@e.Id"
-                            class="btn-secundario py-1.5 text-sm">
-                                Ver detalle
-                        </a>
-                            @if (e.Estado == "Admitido")
-                            {
-                                <button type="button"
-                                        class="abrir-recepcion primario py-1.5 text-sm"
-                                        data-envio-id="@e.Id"
-                                        data-referencia="@e.ReferenciaExterna"
-                                        data-operador="@e.OperadorNombre"
-                                        data-bultos="@e.CantidadBultos">
-                                    Recibir en depósito
-                                </button>
-                            }
-
-                            else if (e.Estado == "EnDeposito" &&
-                                    e.IntentosRealizados == 0)
-                            {
-                                <a asp-page="/HojasDeRuta"
-                                asp-route-envioId="@e.Id"
-                                class="accion-asignar btn-secundario py-1.5 text-sm">
-                                    Asignar a ruta
-                                </a>
-                            }
-                            else if (e.Estado == "EnDeposito" &&
-                                    Model.SolicitudesPendientes.Any(s => s.EnvioId == e.Id))
-                            {
-                                <span class="chip chip-alerta">
-                                    Solicitud pendiente
-                                </span>
-                            }
-                            else if (e.Estado == "EnDeposito" &&
-                                e.IntentosRealizados > 0 &&
-                                !Model.SolicitudesPendientes.Any(
-                                    s => s.EnvioId == e.Id))
-                            {
-                                <button type="button"
-                                        class="abrir-reprogramacion primario py-1.5 text-sm"
-                                        data-envio-id="@e.Id"
-                                        data-referencia="@e.ReferenciaExterna"
-                                        data-intentos="@e.IntentosRealizados">
-                                    Reprogramar
-                                </button>
-                            }
-                            else if (e.Estado == "Reprogramado")
-                            {
-                                <a asp-page="/HojasDeRuta"
-                                asp-route-envioId="@e.Id"
-                                class="accion-asignar btn-secundario py-1.5 text-sm">
-                                    Asignar a ruta
-                                </a>
-                            }
-
-                            else if (e.Estado == "AsignadoARuta")
-                            {
-                                <span class="accion-estado nota">Asignado a ruta</span>
-                            }
-                            else if (e.Estado == "EnDevolucion")
-                            {
-                                <a asp-page="/HojasDeRuta"
-                                asp-route-devolucionId="@e.Id"
-                                class="accion-asignar btn-secundario py-1.5 text-sm">
-                                    Asignar devolución a ruta
-                                </a>
-                            }
-                            else if (e.Estado == "Extraviado")
-                            {
-                                <a asp-page="/DetalleEnvio"
-                                   asp-route-id="@e.Id"
-                                   asp-fragment="reaparicion"
-                                   class="accion-asignar primario py-1.5 text-sm">
-                                    Registrar reaparición
-                                </a>
-                            }
-                            else
-                            {
-                                <span class="nota">Sin acciones</span>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
 }
 
 @if (hayRecepciones)
@@ -485,7 +370,7 @@ else
                 </h2>
                 <button type="button" id="cerrarReprogramacion"
                         class="cerrar-modal border-0 bg-transparent p-1 text-xl text-suave"
-                        aria-label="Cerrar">×</button>
+                        aria-label="Cerrar"><i class="ph ph-x"></i></button>
             </div>
 
             <div class="modal-info mt-4 grid gap-1 rounded-xl bg-hundido px-4 py-3 text-sm">

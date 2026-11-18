@@ -1,35 +1,96 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @using Microsoft.AspNetCore.Components.Authorization
+@inject Notificaciones Notificaciones
 
-<header class="sticky top-0 z-10 border-b border-borde bg-fondo/90 backdrop-blur">
-    <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3 md:px-8">
-        <a href="/" class="flex items-center gap-2.5 text-texto no-underline hover:no-underline">
-            <img src="logo.svg" alt="" class="size-8" />
-            <span class="font-display text-[17px] font-bold tracking-tight">Última Milla</span>
-            <span class="text-[13px] text-suave">Portal del comercio</span>
-        </a>
+<AuthorizeView Policy="ComercioPortal">
+    <Authorized>
+        <div class="shell @(colapsado ? "colapsado" : null)">
+            <aside class="lateral">
+                <div class="lateral-tope">
+                    <a href="/" class="marca"><img src="logo.svg" alt="" class="size-8" /><span class="txt flex flex-col leading-tight">Última Milla<span class="font-sans text-[12px] font-normal tracking-normal text-suave">Comercio</span></span></a>
+                    <button type="button" class="plegar" @onclick="() => colapsado = !colapsado"
+                            title="@(colapsado ? "Desplegar menú" : "Plegar menú")" aria-expanded="@(colapsado ? "false" : "true")">
+                        <i class="ph ph-sidebar-simple"></i>
+                    </button>
+                </div>
 
-        <AuthorizeView Policy="ComercioPortal">
-            <Authorized>
-                <nav class="-mx-3 flex flex-wrap gap-1">
-                    <NavLink href="/" Match="NavLinkMatch.All" class="nav-item"><i class="ph ph-package"></i>Nuevo envío</NavLink>
-                    <NavLink href="mis-envios" class="nav-item">
-    <i class="ph ph-list-checks"></i>Mis envíos
-</NavLink>
-                    <NavLink href="avisos" class="nav-item"><i class="ph ph-bell"></i>Avisos</NavLink>
-                    <NavLink href="mis-operadores" class="nav-item"><i class="ph ph-truck"></i>Mis operadores</NavLink>
-                    <NavLink href="mis-devoluciones" class="nav-item"><i class="ph ph-arrow-u-up-left"></i>Mis devoluciones</NavLink>
-                    <NavLink href="retiros" class="nav-item"><i class="ph ph-truck"></i>Retiros</NavLink>
-                    <NavLink href="cuenta-corriente" class="nav-item"><i class="ph ph-receipt"></i>Cuenta corriente</NavLink>
+                <p class="grupo">Envíos</p>
+                <nav>
+                    <NavLink href="/" Match="NavLinkMatch.All" class="nav-item" title="Nuevo envío"><i class="ph ph-plus-circle"></i><span class="txt">Nuevo envío</span></NavLink>
+                    <NavLink href="mis-envios" class="nav-item" title="Mis envíos"><i class="ph ph-package"></i><span class="txt">Mis envíos</span></NavLink>
+                    <NavLink href="mis-devoluciones" class="nav-item" title="Devoluciones"><i class="ph ph-arrow-u-up-left"></i><span class="txt">Devoluciones</span></NavLink>
+                </nav>
+
+                <hr />
+
+                <p class="grupo">Retiros a domicilio</p>
+                <nav>
+                    <NavLink href="retiros/nuevo" class="nav-item" title="Solicitar retiro"><i class="ph ph-calendar-plus"></i><span class="txt">Solicitar retiro</span></NavLink>
+                    <NavLink href="retiros" Match="NavLinkMatch.All" class="nav-item" title="Mis retiros"><i class="ph ph-house-line"></i><span class="txt">Mis retiros</span></NavLink>
+                </nav>
+
+                <hr />
+
+                <p class="grupo">Comercio</p>
+                <nav>
+                    <NavLink href="cuenta-corriente" class="nav-item" title="Cuenta corriente"><i class="ph ph-receipt"></i><span class="txt">Cuenta corriente</span></NavLink>
+                    <NavLink href="mis-operadores" class="nav-item" title="Mis operadores"><i class="ph ph-truck"></i><span class="txt">Mis operadores</span></NavLink>
+                    <NavLink href="avisos" class="nav-item" title="Avisos a tu sistema"><i class="ph ph-webhooks-logo"></i><span class="txt">Avisos a tu sistema</span></NavLink>
                     <AuthorizeView Policy="AdministradorComercio" Context="admin">
-                        <NavLink href="usuarios" class="nav-item"><i class="ph ph-users-three"></i>Usuarios</NavLink>
+                        <NavLink href="usuarios" class="nav-item" title="Usuarios"><i class="ph ph-users"></i><span class="txt">Usuarios</span></NavLink>
                     </AuthorizeView>
                 </nav>
-            </Authorized>
-        </AuthorizeView>
-    </div>
-</header>
 
-<main class="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-12">
-    @Body
-</main>
+                <div class="lateral-pie">
+                    <div class="usuario">
+                        <span class="avatar" title="@context.User.Identity?.Name">@Inicial(context.User.Identity?.Name)</span>
+                        <div class="txt min-w-0 flex-1">
+                            <b class="block truncate">@context.User.Identity?.Name</b>
+                            <small>@(context.User.HasClaim("perfil_comercio", "AdministradorComercio") ? "Administrador del comercio" : "Usuario del comercio")</small>
+                        </div>
+                    </div>
+                    <button type="button" class="nav-item" onclick="autenticacionPortal.cerrarSesion()" title="Cerrar sesión">
+                        <i class="ph ph-sign-out"></i><span class="txt">Cerrar sesión</span>
+                    </button>
+                </div>
+            </aside>
+
+            <main class="contenido">@Body</main>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <main class="acceso">
+            <a href="/" class="marca w-auto">
+                <img src="logo.svg" alt="" class="size-12" />
+                <span class="flex flex-col text-[22px] leading-tight">Última Milla<span class="font-sans text-[15px] font-normal tracking-normal text-suave">Comercio</span></span>
+            </a>
+            @Body
+        </main>
+    </NotAuthorized>
+</AuthorizeView>
+
+<div class="toasts" role="status" aria-live="polite">
+    @foreach (var n in Notificaciones.Lista)
+    {
+        <div class="toast @(n.Exito ? null : "toast-error")" @key="n.Id">
+            <i class="ph @(n.Exito ? "ph-check-circle" : "ph-warning-circle") text-xl"></i>
+            <div><b class="block">@n.Titulo</b>@n.Mensaje</div>
+            <button type="button" title="Cerrar" @onclick="() => Notificaciones.Cerrar(n.Id)"><i class="ph ph-x"></i></button>
+        </div>
+    }
+</div>
+
+@code {
+    // ponytail: el estado plegado no se guarda; al recargar vuelve desplegado. localStorage si molesta.
+    private bool colapsado;
+
+    protected override void OnInitialized() => Notificaciones.Cambio += Refrescar;
+
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+
+    private static string Inicial(string? nombre) =>
+        string.IsNullOrEmpty(nombre) ? "?" : char.ToUpperInvariant(nombre[0]).ToString();
+
+    public void Dispose() => Notificaciones.Cambio -= Refrescar;
+}

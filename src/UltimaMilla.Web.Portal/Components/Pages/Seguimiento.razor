@@ -6,195 +6,106 @@
 
 <PageTitle>Seguimiento de envío</PageTitle>
 
-<div class="container py-5" style="max-width: 850px;">
-
-    <h1 class="mb-2">Seguimiento de envío</h1>
-    <p class="text-muted mb-4">
-        Consultá el estado y los movimientos de tu paquete.
-    </p>
-
-    @if (cargando)
-    {
-        <div class="alert alert-info">
-            Consultando información del envío...
-        </div>
-    }
-    else if (error is not null)
-    {
-        <div class="alert alert-danger">
-            @error
-        </div>
-    }
-    else if (seguimiento is null)
-    {
-        <div class="alert alert-warning">
-            No encontramos un envío asociado a este enlace.
-        </div>
-    }
-    else
-    {
-
-@if (!string.IsNullOrWhiteSpace(seguimiento.OperadorNombre))
+@if (cargando)
 {
-    <div class="card shadow-sm mb-4"
-         style="border-top: 5px solid @ColorOperador;">
-
-        <div class="card-body d-flex align-items-center gap-3">
-
-            <div style="background-color: @ColorOperador;
-                        width: 52px;
-                        height: 52px;
-                        border-radius: 12px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: white;
-                        font-size: 25px;">
-                🚚
-            </div>
-
-            <div>
-                <h4 class="mb-1">
-                    @seguimiento.OperadorNombre
-                </h4>
-
-                <span class="text-muted">
-                    Operador responsable de tu envío
-                </span>
-            </div>
-
-        </div>
-    </div>
+    <p class="vacio text-center">Consultando el envío…</p>
 }
-
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-
-                <h5 class="card-title">
-                    @(seguimiento.Tipo == "Retiro" ? seguimiento.Referencia : $"Envío {seguimiento.Referencia}")
-                </h5>
-
-                <p>
-                    <strong>Estado actual:</strong>
-                    <span class="badge"
-                    style="background-color: @ColorOperador;">
-                    @seguimiento.Estado
-                </span>
-                </p>
-
-                @if (seguimiento.BultosTotales > 1 && seguimiento.BultosEntregados > 0)
-                {
-                    <p>
-                        <strong>Avance de la entrega:</strong>
-                        @seguimiento.BultosEntregados de @seguimiento.BultosTotales bultos entregados
-                    </p>
-                    <progress max="@seguimiento.BultosTotales" value="@seguimiento.BultosEntregados"
-                              aria-label="Bultos entregados" class="w-full"></progress>
-                }
-
-                <p>
-                    <strong>Fecha de creación:</strong>
-                    @seguimiento.FechaAlta.ToString("dd/MM/yyyy HH:mm")
-                </p>
-
-                @if (seguimiento.FechaEntregaComprometida.HasValue)
-                {
-                    <p>
-                        <strong>Fecha prevista de entrega:</strong>
-                        @seguimiento.FechaEntregaComprometida.Value.ToString("dd/MM/yyyy")
-                    </p>
-                }
-
-                @if (seguimiento.HoraEntregaDesde.HasValue &&
-                     seguimiento.HoraEntregaHasta.HasValue)
-                {
-                    <p>
-                        <strong>Horario previsto:</strong>
-                        @seguimiento.HoraEntregaDesde.Value.ToString("HH:mm")
-                        -
-                        @seguimiento.HoraEntregaHasta.Value.ToString("HH:mm")
-                    </p>
-                }
-
-                @if (seguimiento.FechaReprogramada.HasValue)
-                {
-                    <p>
-                        <strong>Fecha de reprogramación:</strong>
-                        @seguimiento.FechaReprogramada.Value.ToString("dd/MM/yyyy")
-                    </p>
-                }
-            </div>
-        </div>
-        @if (seguimiento.Tipo == "Envio")
+else if (error is not null)
 {
-    @if (solicitudEnviada)
-    {
-        <div class="alert alert-success mb-4" role="status">
-            Tu solicitud de reprogramación fue registrada correctamente.
-            El operador deberá revisarla.
+    <p class="aviso error" role="alert">@error</p>
+}
+else if (seguimiento is null)
+{
+    <p class="aviso" role="status">No encontramos un envío asociado a este enlace.</p>
+}
+else
+{
+    <section class="tarjeta border-t-4" style="border-top-color: @ColorOperador">
+        @if (!string.IsNullOrWhiteSpace(seguimiento.OperadorNombre))
+        {
+            <div class="mb-5 flex items-center gap-3">
+                <span class="grid size-11 shrink-0 place-items-center rounded-xl text-2xl text-white" style="background-color: @ColorOperador">
+                    <i class="ph ph-truck"></i>
+                </span>
+                <div>
+                    <b class="block">@seguimiento.OperadorNombre</b>
+                    <span class="nota">Operador responsable de tu envío</span>
+                </div>
+            </div>
+        }
+
+        <div class="cabecera-tarjeta">
+            <h1 class="titulo-tarjeta">@(seguimiento.Tipo == "Retiro" ? seguimiento.Referencia : $"Envío {seguimiento.Referencia}")</h1>
+            <span class="chip border-transparent text-white" style="background-color: @ColorOperador">@seguimiento.Estado</span>
         </div>
-    }
-    else if (disponibilidad?.PuedeSolicitar == true)
+
+        @if (seguimiento.BultosTotales > 1 && seguimiento.BultosEntregados > 0)
+        {
+            <p class="mb-1.5 text-sm">@seguimiento.BultosEntregados de @seguimiento.BultosTotales bultos entregados</p>
+            <progress max="@seguimiento.BultosTotales" value="@seguimiento.BultosEntregados"
+                      aria-label="Bultos entregados" class="mb-5 w-full" style="accent-color: @ColorOperador"></progress>
+        }
+
+        <dl class="datos">
+            <dt>Fecha de creación</dt><dd>@seguimiento.FechaAlta.ToString("dd/MM/yyyy HH:mm")</dd>
+            @if (seguimiento.FechaEntregaComprometida.HasValue)
+            {
+                <dt>Entrega prevista</dt><dd>@seguimiento.FechaEntregaComprometida.Value.ToString("dd/MM/yyyy")</dd>
+            }
+            @if (seguimiento.HoraEntregaDesde.HasValue && seguimiento.HoraEntregaHasta.HasValue)
+            {
+                <dt>Horario previsto</dt><dd>@seguimiento.HoraEntregaDesde.Value.ToString("HH:mm")–@seguimiento.HoraEntregaHasta.Value.ToString("HH:mm")</dd>
+            }
+            @if (seguimiento.FechaReprogramada.HasValue)
+            {
+                <dt>Reprogramado para</dt><dd>@seguimiento.FechaReprogramada.Value.ToString("dd/MM/yyyy")</dd>
+            }
+        </dl>
+    </section>
+
+    @if (seguimiento.Tipo == "Envio")
     {
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <h5>¿Necesitás reprogramar la entrega?</h5>
-
-                <p class="text-muted">
-                    Podés solicitar un nuevo intento de entrega.
-                    El operador revisará tu solicitud.
-                </p>
-
-                <button type="button"
-                        class="btn btn-primary"
-                        disabled="@solicitandoReprogramacion"
-                        @onclick="SolicitarReprogramacion">
-                    @(solicitandoReprogramacion
-                        ? "Enviando solicitud..."
-                        : "Solicitar reprogramación")
+        @if (solicitudEnviada)
+        {
+            <p class="aviso ok" role="status">Registramos tu pedido de reprogramación. El operador lo va a revisar.</p>
+        }
+        else if (disponibilidad?.PuedeSolicitar == true)
+        {
+            <section class="tarjeta">
+                <h2 class="titulo-tarjeta">¿Necesitás reprogramar la entrega?</h2>
+                <p class="nota mb-4">Podés pedir un nuevo intento de entrega. El operador revisa la solicitud.</p>
+                <button type="button" class="primario h-[44px]" disabled="@solicitandoReprogramacion" @onclick="SolicitarReprogramacion">
+                    @(solicitandoReprogramacion ? "Enviando solicitud…" : "Solicitar reprogramación")
                 </button>
-            </div>
-        </div>
+            </section>
+        }
+
+        @if (errorReprogramacion is not null)
+        {
+            <p class="aviso error" role="alert">@errorReprogramacion</p>
+        }
     }
 
-    @if (errorReprogramacion is not null)
-    {
-        <div class="alert alert-danger mb-4" role="alert">
-            @errorReprogramacion
-        </div>
-    }
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Historial</h2>
+        @if (seguimiento.Historial.Count == 0)
+        {
+            <p class="vacio">Todavía no hay movimientos registrados.</p>
+        }
+        else
+        {
+            <ol class="grid gap-4">
+                @foreach (var movimiento in seguimiento.Historial)
+                {
+                    <li class="border-l-[3px] pl-3" style="border-left-color: @ColorOperador">
+                        <b class="block">@movimiento.Estado</b>
+                        <span class="nota">@movimiento.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
 }
-
-        <h4 class="mb-3">Historial del envío</h4>
-
-        <div class="card shadow-sm">
-            <div class="card-body">
-
-                @if (seguimiento.Historial.Count == 0)
-                {
-                    <p class="text-muted">
-                        Todavía no hay movimientos registrados.
-                    </p>
-                }
-                else
-                {
-                    @foreach (var movimiento in seguimiento.Historial)
-                    {
-                        <div class="border-start border-3 ps-3 mb-4"
-     style="border-color: @ColorOperador !important;">
-                            <strong>@movimiento.Estado</strong>
-
-                            <div class="text-muted small">
-                                @movimiento.Fecha.ToString("dd/MM/yyyy HH:mm")
-                            </div>
-                        </div>
-                    }
-                }
-
-            </div>
-        </div>
-    }
-</div>
 
 @code {
     [Parameter]
@@ -249,7 +160,7 @@
                     color,
                     @"^#[0-9A-Fa-f]{6}$")
                 ? color
-                : "#0D6EFD";
+                : "#c2410c";
         }
     }
 

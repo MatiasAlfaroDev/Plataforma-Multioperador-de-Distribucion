@@ -6,71 +6,55 @@
     ViewData["Title"] = "Mensajes fallidos";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Mensajes fallidos</h1>
-        <p>Cuando un mensaje agota sus reintentos, MassTransit lo deja en la cola &lt;cola&gt;_error con el motivo del último error. Reintentar lo devuelve a su cola original; es seguro porque los consumidores son idempotentes. Las colas mezclan mensajes de todos los operadores: esta pantalla es solo del administrador de plataforma.</p>
-    </div>
-</div>
+<div class="pagina">
+    <partial name="_Toast" model="(Model.Reintentado, Model.Mensaje)" />
+    <partial name="_Toast" model="(false, Model.Error)" />
 
-@if (Model.Mensaje is not null)
-{
-    <p class="aviso @(Model.Reintentado ? "ok" : "error")" role="status">
-        @Model.Mensaje
-    </p>
-}
+    @if (Model.Colas.Count == 0)
+    {
+        <section class="tarjeta">
+            <h2 class="titulo-tarjeta">Mensajes fallidos</h2>
+            <p class="vacio">No hay mensajes fallidos.</p>
+        </section>
+    }
 
-@if (Model.Error is not null)
-{
-    <p class="error" role="alert">
-        @Model.Error
-    </p>
-}
-
-@if (Model.Colas.Count == 0)
-{
-    <p>No hay mensajes fallidos.</p>
-}
-else
-{
     @foreach (var c in Model.Colas)
     {
-        <h2>@c.Cola (@c.Cantidad)</h2>
-
-        <form method="post" asp-page-handler="Reintentar" asp-route-cola="@c.Cola">
-            <button type="submit" class="primario">Reintentar todos</button>
-        </form>
-
-        <div class="tabla">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Tipo de mensaje</th>
-                        <th>Error</th>
-                        <th>Cuerpo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var m in c.Muestra)
-                    {
-                        <tr>
-                            <td>@m.TipoMensaje</td>
-                            <td>@m.Error</td>
-                            <td>
-                                <details>
-                                    <summary>Ver</summary>
-                                    <pre>@m.Cuerpo</pre>
-                                </details>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-
-        @if (c.Muestra.Count < c.Cantidad)
-        {
-            <p class="nota">Se muestran los primeros @c.Muestra.Count.</p>
-        }
+        <section class="tarjeta">
+            <div class="cabecera-tarjeta">
+                <h2 class="titulo-tarjeta"><span class="codigo">@c.Cola</span> <span class="chip chip-peligro">@c.Cantidad</span></h2>
+                <form method="post" asp-page-handler="Reintentar" asp-route-cola="@c.Cola">
+                    <button type="submit" class="primario btn-chico"><i class="ph ph-arrow-clockwise"></i>Reintentar todos</button>
+                </form>
+            </div>
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr><th>Mensaje</th><th>Error</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in c.Muestra)
+                        {
+                            <tr>
+                                <td class="codigo">@m.TipoMensaje</td>
+                                <td>@m.Error</td>
+                                <td>
+                                    <details>
+                                        <summary class="text-[13px]">Ver cuerpo</summary>
+                                        <pre class="mt-2 max-w-[48ch] overflow-x-auto rounded-xl bg-hundido p-3 text-xs">@m.Cuerpo</pre>
+                                    </details>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (c.Muestra.Count < c.Cantidad)
+            {
+                <p class="nota mt-3">Se muestran los primeros @c.Muestra.Count.</p>
+            }
+        </section>
     }
-}
+
+    <p class="nota">Al agotar sus reintentos, MassTransit deja el mensaje en &lt;cola&gt;_error con el último error. Reintentar lo devuelve a su cola original; es seguro porque los consumidores son idempotentes. Las colas mezclan todos los operadores: por eso esta pantalla es solo del administrador de plataforma.</p>
+</div>

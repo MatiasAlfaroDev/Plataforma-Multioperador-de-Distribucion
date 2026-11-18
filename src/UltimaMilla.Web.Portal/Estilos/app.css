@@ -1,3 +1,4 @@
 @import "tailwindcss" source(none);
 @source "../Components";
 @import "../../estilos-web/tema.css";
+@import "../../estilos-web/componentes.css";

@@ -2,265 +2,366 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
 @attribute [Authorize]
-@inject EnviosApiClient Api
 @inject IJSRuntime JS
+@inject Notificaciones Notificaciones
 <PageTitle>Nuevo envío</PageTitle>
-
-<div class="encabezado">
-    <div>
-        <h1>Nuevo envío</h1>
-        <p>Registrá un nuevo envío para tu comercio.</p>
-    </div>
-</div>
 
 @if (errorDeCarga is not null)
 {
-    <p class="error">@errorDeCarga</p>
+    <p class="aviso error" role="alert">@errorDeCarga</p>
 }
 else if (cuentas is null)
 {
-    <p>Cargando…</p>
+    <p class="text-suave">Cargando…</p>
 }
 else
 {
-    <EditForm Model="modelo" OnValidSubmit="GuardarAsync" @ref="formulario">
+    var cuenta = CuentaElegida;
+
+    <EditForm EditContext="contexto" OnValidSubmit="GuardarAsync">
         <DataAnnotationsValidator />
-        
-        <fieldset>
-            <legend>Cuenta comercial</legend>
-            
-            <label for="cuenta">Comercio y operador</label>
-            <InputSelect id="cuenta" @bind-Value="modelo.CuentaComercialId" @bind-Value:after="CambiarCuentaAsync">
-                <option value="">Elegí una cuenta…</option>
-                @foreach (var c in cuentas)
-                {
-                    <option value="@c.Id">@c.ComercioNombre → @c.OperadorNombre</option>
-                }
-            </InputSelect>
-            <ValidationMessage For="() => modelo.CuentaComercialId" />
 
-            <label for="referencia">Referencia del pedido</label>
-            <InputText id="referencia" @bind-Value="modelo.ReferenciaExterna" />
-            <ValidationMessage For="() => modelo.ReferenciaExterna" />
-
-            <label for="modalidad">Modalidad</label>
-            <InputSelect id="modalidad" @bind-Value="modelo.Modalidad">
-                <option value="Estandar">Estándar</option>
-                <option value="Urgente">Urgente</option>
-            </InputSelect>
-        </fieldset>
-
-        <fieldset>
-            <legend>Destinatario</legend>
-            
-            <label for="nombre">Nombre</label>
-            <InputText id="nombre" @bind-Value="modelo.DestinatarioNombre" />
-            <ValidationMessage For="() => modelo.DestinatarioNombre" />
-
-            <label for="telefono">Teléfono (opcional)</label>
-            <InputText id="telefono" @bind-Value="modelo.DestinatarioTelefono" />
-
-            <label for="emailDestinatario">Correo (opcional, recibe el enlace de seguimiento)</label>
-            <InputText id="emailDestinatario" type="email" @bind-Value="modelo.DestinatarioEmail" />
-            <ValidationMessage For="() => modelo.DestinatarioEmail" />
-
-            <div class="campos">
-                <div>
-                    <label for="calle">Calle</label>
-                    <InputText id="calle" @bind-Value="modelo.Calle" />
-                    <ValidationMessage For="() => modelo.Calle" />
-                </div>
-                <div>
-                    <label for="numero">Número</label>
-                    <InputText id="numero" @bind-Value="modelo.Numero" />
-                </div>
-            </div>
-
-            <div class="campos">
-                <div>
-                    <label for="localidad">Localidad</label>
-                    <InputText id="localidad" @bind-Value="modelo.Localidad" />
-                    <ValidationMessage For="() => modelo.Localidad" />
-                </div>
-                <div>
-                    <label for="departamento">Departamento</label>
-                    <InputSelect id="departamento" @bind-Value="modelo.Departamento" disabled="@(departamentos is null)">
-                        <option value="">@(departamentos is null ? "Elegí primero la cuenta" : "Elegí un departamento")</option>
-                        @foreach (var d in departamentos ?? []) { <option value="@d">@d</option> }
-                    </InputSelect>
-                    @if (departamentos is { Count: 0 }) { <p class="nota">El operador de esta cuenta todavía no tiene zonas de cobertura, así que no puede recibir envíos.</p> }
-                    <ValidationMessage For="() => modelo.Departamento" />
-                </div>
-            </div>
-        </fieldset>
-
-        <fieldset>
-            <legend>Bultos</legend>
-
-            @for (var i = 0; i < modelo.Bultos.Count; i++)
-            {
-                var indice = i;
-                var bulto = modelo.Bultos[indice];
-
-                <div class="tarjeta">
-                    <h3>Bulto @(indice + 1)</h3>
-
-                    <div class="campos">
-                        <div>
-                            <label for="peso-@indice">Peso (kg)</label>
-                            <InputNumber id="@($"peso-{indice}")" @bind-Value="bulto.PesoKg" />
+        <div class="grid items-start gap-[24px] lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div class="grid gap-[24px]">
+                <section class="tarjeta">
+                    <h2 class="titulo-tarjeta"><span class="paso">1</span>Cuenta y pedido</h2>
+                    <div class="grid gap-4">
+                        <div class="campo">
+                            <label for="cuenta">Cuenta comercial</label>
+                            <InputSelect id="cuenta" @bind-Value="modelo.CuentaComercialId" @bind-Value:after="CambiarCuentaAsync">
+                                <option value="">Elegí una cuenta…</option>
+                                @foreach (var c in cuentas)
+                                {
+                                    <option value="@c.Id">@c.ComercioNombre → @c.OperadorNombre</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => modelo.CuentaComercialId" />
                         </div>
-
-                        <div>
-                            <label for="alto-@indice">Alto (cm)</label>
-                            <InputNumber id="@($"alto-{indice}")" @bind-Value="bulto.AltoCm" />
-                        </div>
-
-                        <div>
-                            <label for="ancho-@indice">Ancho (cm)</label>
-                            <InputNumber id="@($"ancho-{indice}")" @bind-Value="bulto.AnchoCm" />
-                        </div>
-
-                        <div>
-                            <label for="profundidad-@indice">Profundidad (cm)</label>
-                            <InputNumber id="@($"profundidad-{indice}")" @bind-Value="bulto.ProfundidadCm" />
+                        <div class="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                            <div class="campo">
+                                <label for="referencia">Referencia del pedido</label>
+                                <InputText id="referencia" @bind-Value="modelo.ReferenciaExterna" maxlength="64" />
+                                <ValidationMessage For="() => modelo.ReferenciaExterna" />
+                            </div>
+                            <div class="campo">
+                                <span class="etiqueta" id="modalidad">Modalidad</span>
+                                <InputRadioGroup @bind-Value="modelo.Modalidad">
+                                    <div class="segmento" role="radiogroup" aria-labelledby="modalidad">
+                                        <label><InputRadio Value="@("Estandar")" />Estándar</label>
+                                        <label><InputRadio Value="@("Urgente")" />Urgente</label>
+                                    </div>
+                                </InputRadioGroup>
+                            </div>
                         </div>
                     </div>
+                </section>
 
-                    @if (modelo.Bultos.Count > 1)
+                <section class="tarjeta">
+                    <h2 class="titulo-tarjeta"><span class="paso">2</span>Destinatario y dirección</h2>
+                    <div class="grid gap-4">
+                        <div class="campo">
+                            <label for="nombre">Nombre</label>
+                            <InputText id="nombre" @bind-Value="modelo.DestinatarioNombre" maxlength="200" autocomplete="off" />
+                            <ValidationMessage For="() => modelo.DestinatarioNombre" />
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="campo">
+                                <label for="telefono">Teléfono <span class="opcional">(opcional)</span></label>
+                                <InputText id="telefono" type="tel" @bind-Value="modelo.DestinatarioTelefono" maxlength="30" autocomplete="off" />
+                                <ValidationMessage For="() => modelo.DestinatarioTelefono" />
+                            </div>
+                            <div class="campo">
+                                <label for="correo">Correo <span class="opcional">(opcional, recibe el seguimiento)</span></label>
+                                <InputText id="correo" type="email" @bind-Value="modelo.DestinatarioEmail" maxlength="200" autocomplete="off" />
+                                <ValidationMessage For="() => modelo.DestinatarioEmail" />
+                            </div>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                            <div class="campo">
+                                <label for="calle">Calle</label>
+                                <InputText id="calle" @bind-Value="modelo.Calle" maxlength="200" />
+                                <ValidationMessage For="() => modelo.Calle" />
+                            </div>
+                            <div class="campo">
+                                <label for="numero">Número <span class="opcional">(opcional)</span></label>
+                                <InputText id="numero" @bind-Value="modelo.Numero" maxlength="20" />
+                                <ValidationMessage For="() => modelo.Numero" />
+                            </div>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="campo">
+                                <label for="localidad">Localidad</label>
+                                <InputText id="localidad" @bind-Value="modelo.Localidad" maxlength="100" />
+                                <ValidationMessage For="() => modelo.Localidad" />
+                            </div>
+                            <div class="campo">
+                                <label for="departamento">Departamento</label>
+                                <InputSelect id="departamento" @bind-Value="modelo.Departamento" disabled="@(departamentos is null)">
+                                    <option value="">@(departamentos is null ? "Elegí primero la cuenta" : "Elegí un departamento")</option>
+                                    @foreach (var d in departamentos ?? []) { <option value="@d">@d</option> }
+                                </InputSelect>
+                                @if (departamentos is { Count: 0 }) { <p class="nota">El operador de esta cuenta todavía no tiene zonas de cobertura, así que no puede recibir envíos.</p> }
+                                <ValidationMessage For="() => modelo.Departamento" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tarjeta">
+                    <h2 class="titulo-tarjeta"><span class="paso">3</span>Bultos</h2>
+                    <div class="fila-bulto pb-1.5" aria-hidden="true">
+                        <span></span><span class="etiqueta">Peso</span><span class="etiqueta">Alto</span><span class="etiqueta">Ancho</span><span class="etiqueta">Profundidad</span><span></span>
+                    </div>
+                    @for (var i = 0; i < modelo.Bultos.Count; i++)
                     {
-                        <button type="button"
-                                class="peligro"
-                                @onclick="() => EliminarBulto(indice)">
-                            Eliminar bulto
-                        </button>
+                        var indice = i;
+                        var bulto = modelo.Bultos[indice];
+                        <div class="fila-bulto border-b border-borde py-3" @key="bulto">
+                            <span class="numero-bulto">@(indice + 1)</span>
+                            <div class="campo">
+                                <div class="sufijo"><InputNumber @bind-Value="bulto.PesoKg" min="0.001" max="1000" aria-label="@($"Peso del bulto {indice + 1}, en kg")" ParsingErrorMessage="Ingresá un número." /><span>kg</span></div>
+                                <ValidationMessage For="() => bulto.PesoKg" />
+                            </div>
+                            <div class="campo">
+                                <div class="sufijo"><InputNumber @bind-Value="bulto.AltoCm" min="1" max="500" aria-label="@($"Alto del bulto {indice + 1}, en cm")" ParsingErrorMessage="Ingresá un número entero." /><span>cm</span></div>
+                                <ValidationMessage For="() => bulto.AltoCm" />
+                            </div>
+                            <div class="campo">
+                                <div class="sufijo"><InputNumber @bind-Value="bulto.AnchoCm" min="1" max="500" aria-label="@($"Ancho del bulto {indice + 1}, en cm")" ParsingErrorMessage="Ingresá un número entero." /><span>cm</span></div>
+                                <ValidationMessage For="() => bulto.AnchoCm" />
+                            </div>
+                            <div class="campo">
+                                <div class="sufijo"><InputNumber @bind-Value="bulto.ProfundidadCm" min="1" max="500" aria-label="@($"Profundidad del bulto {indice + 1}, en cm")" ParsingErrorMessage="Ingresá un número entero." /><span>cm</span></div>
+                                <ValidationMessage For="() => bulto.ProfundidadCm" />
+                            </div>
+                            <button type="button" class="quitar" title="Quitar bulto @(indice + 1)"
+                                    disabled="@(modelo.Bultos.Count == 1)" @onclick="() => EliminarBulto(indice)">
+                                <i class="ph ph-trash"></i>
+                            </button>
+                        </div>
                     }
-                </div>
-            }
+                    <button type="button" class="mt-4 w-full border-dashed text-suave" @onclick="AgregarBulto">
+                        <i class="ph ph-plus"></i>Agregar bulto
+                    </button>
+                </section>
 
-            <button type="button" @onclick="AgregarBulto">
-                Agregar bulto
-            </button>
+                @if (resultadoImportacion is not null)
+                {
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta">Resultado de la importación</h2>
+                        <p class="nota mb-4">
+                            @resultadoImportacion.TotalEnvios envíos · @resultadoImportacion.Creados creados ·
+                            @resultadoImportacion.YaExistentes ya existían · @resultadoImportacion.ConErrores con errores
+                        </p>
+                        <div class="tabla">
+                            <table>
+                                <thead><tr><th>Referencia</th><th>Fila inicial</th><th>Estado</th><th>Detalle</th></tr></thead>
+                                <tbody>
+                                    @foreach (var item in resultadoImportacion.Resultados)
+                                    {
+                                        <tr>
+                                            <td>@item.ReferenciaExterna</td>
+                                            <td class="num">@item.FilaInicial</td>
+                                            <td>@EstadoImportacionTexto(item.Estado)</td>
+                                            <td>@item.Mensaje</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                }
+            </div>
 
-            <ValidationSummary />
-        </fieldset>
+            <aside class="tarjeta lg:sticky lg:top-[24px]">
+                <h2 class="titulo-tarjeta">Resumen</h2>
+                <dl class="resumen">
+                    <dt>Operador</dt><dd>@(cuenta?.OperadorNombre ?? "—")</dd>
+                    <dt>Modalidad</dt><dd>@(modelo.Modalidad == "Urgente" ? "Urgente" : "Estándar")</dd>
+                    <dt>Destino</dt><dd>@(string.IsNullOrEmpty(modelo.Departamento) ? "—" : modelo.Departamento)</dd>
+                    <dt>Bultos</dt><dd>@modelo.Bultos.Count</dd>
+                </dl>
+                <p class="nota">Peso total</p>
+                <p class="cifra">@modelo.Bultos.Sum(b => b.PesoKg).ToString("0.###") kg</p>
 
-        <div class="acciones">
-            <button type="submit" class="primario" disabled="@guardando">@(guardando ? "Guardando…" : "Dar de alta")</button>
+                <ul class="secciones">
+                    @foreach (var s in Secciones())
+                    {
+                        <li class="@s.Estado">
+                            <i class="@(s.Estado switch { "ok" => "ph ph-check-circle", "mal" => "ph ph-x-circle", _ => "ph ph-circle" })"></i>
+                            <div>
+                                @s.Nombre
+                                @foreach (var m in s.Errores) { <span class="error-seccion">@m</span> }
+                            </div>
+                        </li>
+                    }
+                </ul>
+
+                <button type="submit" class="primario h-[44px] w-full" disabled="@guardando">
+                    <i class="ph ph-paper-plane-tilt"></i>@(guardando ? "Guardando…" : "Dar de alta")
+                </button>
+                <label class="btn-secundario mt-2.5 h-[44px] w-full justify-center @(importando ? "pointer-events-none opacity-60" : null)"
+                       title="Cada fila es un bulto; las filas con la misma referencia forman un envío. Usa la cuenta elegida arriba.">
+                    <i class="ph ph-file-csv"></i>@(importando ? "Importando…" : "Importar CSV")
+                    <input id="archivoCsv" type="file" accept=".csv,text/csv" class="sr-only" disabled="@importando" @onchange="ImportarCsvAsync" />
+                </label>
+            </aside>
         </div>
     </EditForm>
-    
-    <hr />
-    <section aria-labelledby="titulo-importacion">
-        <h2 id="titulo-importacion">Importar envíos por CSV</h2>
-
-        <p>
-            Cargá varios envíos utilizando la cuenta comercial
-            seleccionada arriba. Cada fila del archivo representa un bulto.
-        </p>
-
-        <p>
-            Los bultos con la misma referencia externa
-            se agrupan en un único envío.
-        </p>
-
-        <div>
-            <label for="archivoCsv">Archivo CSV</label>
-            <input id="archivoCsv"
-                   type="file"
-                   accept=".csv,text/csv"
-                   disabled="@importando" />
-        </div>
-
-        <div class="acciones">
-            <button type="button"
-                    class="primario"
-                    disabled="@importando"
-                    @onclick="ImportarCsvAsync">
-                @(importando ? "Importando..." : "Importar CSV")
-            </button>
-        </div>
-
-        @if (mensajeImportacion is not null)
-        {
-            <p class="aviso @(importacionExitosa ? "ok" : "error")"
-               role="status">
-                @mensajeImportacion
-            </p>
-        }
-
-        @if (resultadoImportacion is not null)
-        {
-            <h3>Resultado de la importación</h3>
-
-            <p>
-                Total: @resultadoImportacion.TotalEnvios |
-                Creados: @resultadoImportacion.Creados |
-                Ya existentes: @resultadoImportacion.YaExistentes |
-                Con errores: @resultadoImportacion.ConErrores
-            </p>
-
-            <div class="tabla">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Referencia</th>
-                            <th>Fila inicial</th>
-                            <th>Estado</th>
-                            <th>Detalle</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in resultadoImportacion.Resultados)
-                        {
-                            <tr>
-                                <td>@item.ReferenciaExterna</td>
-                                <td>@item.FilaInicial</td>
-                                <td>@EstadoImportacionTexto(item.Estado)</td>
-                                <td>@item.Mensaje</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </section>
-
-
-    @if (mensaje is not null)
-    {
-        <p class="aviso @(exito ? "ok" : "error")" role="status" aria-live="polite">@mensaje</p>
-    }
 }
 
 @code {
     private IReadOnlyList<CuentaComercialItem>? cuentas;
-    private NuevoEnvioModel modelo = new();
+    private NuevoEnvioModel modelo = null!;
+    private EditContext contexto = null!;
     private string? errorDeCarga;
-    private string? mensaje;
-    private bool exito;
     private bool guardando;
     private IReadOnlyList<string>? departamentos;
-    private EditForm? formulario;
     private bool importando;
-    private bool importacionExitosa;
-    private string? mensajeImportacion;
     private ResultadoImportacionPortal? resultadoImportacion;
     [SupplyParameterFromQuery(Name = "cuentaComercialId")]
     public Guid? CuentaComercialIdSeleccionada { get; set; }
+
+    private static readonly string[] CamposBulto =
+    [
+        nameof(NuevoBultoModel.PesoKg), nameof(NuevoBultoModel.AltoCm),
+        nameof(NuevoBultoModel.AnchoCm), nameof(NuevoBultoModel.ProfundidadCm)
+    ];
+
+    private CuentaComercialItem? CuentaElegida =>
+        cuentas?.FirstOrDefault(c => c.Id.ToString() == modelo.CuentaComercialId);
+
+    protected override void OnInitialized() => NuevoContexto(new NuevoEnvioModel());
+
+    private void NuevoContexto(NuevoEnvioModel nuevo)
+    {
+        modelo = nuevo;
+        contexto = ValidacionFormulario.Crear(modelo, () => modelo.Bultos, StateHasChanged);
+    }
+
+    private IEnumerable<SeccionResumen> Secciones()
+    {
+        yield return ValidacionFormulario.Seccion(contexto, "Cuenta y pedido",
+            [nameof(NuevoEnvioModel.CuentaComercialId), nameof(NuevoEnvioModel.ReferenciaExterna)],
+            modelo.CuentaComercialId, modelo.ReferenciaExterna);
+        yield return ValidacionFormulario.Seccion(contexto, "Destinatario",
+            [nameof(NuevoEnvioModel.DestinatarioNombre), nameof(NuevoEnvioModel.DestinatarioTelefono), nameof(NuevoEnvioModel.DestinatarioEmail)],
+            modelo.DestinatarioNombre);
+        yield return ValidacionFormulario.Seccion(contexto, "Dirección de entrega",
+            [nameof(NuevoEnvioModel.Calle), nameof(NuevoEnvioModel.Numero), nameof(NuevoEnvioModel.Localidad), nameof(NuevoEnvioModel.Departamento)],
+            modelo.Calle, modelo.Localidad, modelo.Departamento);
+        yield return ValidacionFormulario.SeccionBultos(contexto, modelo.Bultos, CamposBulto);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            cuentas = (await JS.InvokeAsync<List<CuentaComercialItem>>("autenticacionPortal.obtenerCuentasComerciales"))
+                .Where(c => c.Activa)
+                .ToList();
+
+            // Si viene una cuenta desde Mis operadores, la seleccionamos.
+            if (CuentaComercialIdSeleccionada.HasValue)
+            {
+                var cuenta = cuentas.FirstOrDefault(c => c.Id == CuentaComercialIdSeleccionada.Value);
+
+                if (cuenta is not null)
+                {
+                    modelo.CuentaComercialId = cuenta.Id.ToString();
+                    await CambiarCuentaAsync();
+                }
+                else
+                {
+                    errorDeCarga = "La cuenta comercial seleccionada no está disponible.";
+                }
+            }
+            // Si solamente tiene una cuenta activa, la seleccionamos automáticamente.
+            else if (cuentas.Count == 1)
+            {
+                modelo.CuentaComercialId = cuentas[0].Id.ToString();
+                await CambiarCuentaAsync();
+            }
+        }
+        catch (JSException)
+        {
+            errorDeCarga = "No se pudieron cargar las cuentas comerciales.";
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (guardando)
+            return;
+
+        guardando = true;
+
+        try
+        {
+            var datos = new
+            {
+                cuentaComercialId = Guid.Parse(modelo.CuentaComercialId),
+                referenciaExterna = modelo.ReferenciaExterna,
+                modalidad = modelo.Modalidad,
+                destinatarioNombre = modelo.DestinatarioNombre,
+                destinatarioTelefono = modelo.DestinatarioTelefono,
+                destinatarioEmail = modelo.DestinatarioEmail,
+                calle = modelo.Calle,
+                numero = modelo.Numero,
+                localidad = modelo.Localidad,
+                departamento = modelo.Departamento,
+                bultos = modelo.Bultos.Select(b => new
+                {
+                    pesoKg = b.PesoKg,
+                    altoCm = b.AltoCm,
+                    anchoCm = b.AnchoCm,
+                    profundidadCm = b.ProfundidadCm
+                }).ToArray()
+            };
+
+            var resultado = await JS.InvokeAsync<ResultadoAlta>("autenticacionPortal.crearEnvio", datos);
+
+            if (resultado.Exito)
+            {
+                Notificaciones.Exito("Envío creado", $"{modelo.ReferenciaExterna} para {modelo.DestinatarioNombre}.");
+                NuevoContexto(new NuevoEnvioModel
+                {
+                    CuentaComercialId = modelo.CuentaComercialId,
+                    Departamento = modelo.Departamento
+                });
+            }
+            else
+            {
+                Notificaciones.Error("No se pudo crear el envío", resultado.Mensaje);
+            }
+        }
+        catch (JSException)
+        {
+            Notificaciones.Error("No se pudo crear el envío", "No hay conexión con la API.");
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
 
     private async Task ImportarCsvAsync()
     {
         if (importando)
             return;
 
-        mensajeImportacion = null;
         resultadoImportacion = null;
-        importacionExitosa = false;
 
         if (!Guid.TryParse(modelo.CuentaComercialId, out var cuentaId))
         {
-            mensajeImportacion = "Seleccioná una cuenta comercial válida.";
+            Notificaciones.Error("No se pudo importar", "Elegí primero la cuenta comercial.");
             return;
         }
 
@@ -269,27 +370,63 @@ else
         try
         {
             var respuesta = await JS.InvokeAsync<RespuestaImportacionPortal>(
-                "autenticacionPortal.importarEnviosCsv",
-                cuentaId.ToString());
+                "autenticacionPortal.importarEnviosCsv", cuentaId.ToString());
 
-            importacionExitosa = respuesta.Exito;
-            mensajeImportacion = respuesta.Mensaje;
             resultadoImportacion = respuesta.Resultado;
 
-            if (resultadoImportacion is { ConErrores: > 0 })
-            {
-                mensajeImportacion =
-                    "Importación procesada. Algunos envíos tuvieron errores.";
-            }
+            if (!respuesta.Exito)
+                Notificaciones.Error("No se pudo importar", respuesta.Mensaje);
+            else if (resultadoImportacion is { ConErrores: > 0 })
+                Notificaciones.Error("Importación con errores",
+                    $"{resultadoImportacion.ConErrores} de {resultadoImportacion.TotalEnvios} envíos no se crearon. Mirá el detalle.");
+            else
+                Notificaciones.Exito("Importación lista",
+                    $"{resultadoImportacion?.Creados ?? 0} creados, {resultadoImportacion?.YaExistentes ?? 0} ya existían.");
         }
         catch (JSException)
         {
-            mensajeImportacion =
-                "No se pudo completar la importación. Revisá la conexión con la API.";
+            Notificaciones.Error("No se pudo importar", "No hay conexión con la API.");
         }
         finally
         {
             importando = false;
+        }
+    }
+
+    private void AgregarBulto() => modelo.Bultos.Add(new NuevoBultoModel());
+
+    private void EliminarBulto(int indice)
+    {
+        if (modelo.Bultos.Count > 1)
+            modelo.Bultos.RemoveAt(indice);
+    }
+
+    // El departamento sale de las zonas del operador de la cuenta: escrito a mano, un error de
+    // tipeo terminaba en "no existe tarifa vigente".
+    private async Task CambiarCuentaAsync()
+    {
+        modelo.Departamento = string.Empty;
+        departamentos = null;
+
+        var cuenta = CuentaElegida;
+
+        if (cuenta is null)
+            return;
+
+        try
+        {
+            var zonas = await JS.InvokeAsync<List<ZonaItem>>("autenticacionPortal.obtenerZonas", cuenta.OperadorId);
+
+            departamentos = zonas.Select(z => z.Departamento).Distinct().Order().ToList();
+
+            if (departamentos.Count == 1)
+                modelo.Departamento = departamentos[0];
+
+            contexto.NotifyFieldChanged(FieldIdentifier.Create(() => modelo.Departamento));
+        }
+        catch (JSException)
+        {
+            errorDeCarga = "No se pudieron cargar las zonas del operador.";
         }
     }
 
@@ -302,10 +439,7 @@ else
             _ => "Desconocido"
         };
 
-    private sealed record RespuestaImportacionPortal(
-        bool Exito,
-        string Mensaje,
-        ResultadoImportacionPortal? Resultado);
+    private sealed record RespuestaImportacionPortal(bool Exito, string Mensaje, ResultadoImportacionPortal? Resultado);
 
     private sealed record ResultadoImportacionPortal(
         int TotalEnvios,
@@ -320,156 +454,4 @@ else
         int Estado,
         Guid? EnvioId,
         string? Mensaje);
-
-
-   protected override async Task OnAfterRenderAsync(bool firstRender)
-{
-    if (!firstRender)
-        return;
-
-    try
-    {
-        cuentas = (await JS.InvokeAsync<List<CuentaComercialItem>>(
-            "autenticacionPortal.obtenerCuentasComerciales"))
-            .Where(c => c.Activa)
-            .ToList();
-
-        // Si viene una cuenta desde Mis operadores, la seleccionamos.
-        if (CuentaComercialIdSeleccionada.HasValue)
-        {
-            var cuenta = cuentas.FirstOrDefault(
-                c => c.Id == CuentaComercialIdSeleccionada.Value);
-
-            if (cuenta is not null)
-            {
-                modelo.CuentaComercialId = cuenta.Id.ToString();
-                await CambiarCuentaAsync();
-            }
-            else
-            {
-                errorDeCarga = "La cuenta comercial seleccionada no está disponible.";
-            }
-        }
-        // Si solamente tiene una cuenta activa, la seleccionamos automáticamente.
-        else if (cuentas.Count == 1)
-        {
-            modelo.CuentaComercialId = cuentas[0].Id.ToString();
-            await CambiarCuentaAsync();
-        }
-    }
-    catch (JSException)
-    {
-        errorDeCarga = "No se pudieron cargar las cuentas comerciales.";
-    }
-    finally
-    {
-        StateHasChanged();
-    }
-}
-
-   private async Task GuardarAsync()
-{
-    if (guardando)
-        return;
-
-    guardando = true;
-    mensaje = null;
-
-    try
-    {
-        var datos = new
-        {
-            cuentaComercialId = Guid.Parse(modelo.CuentaComercialId),
-            referenciaExterna = modelo.ReferenciaExterna,
-            modalidad = modelo.Modalidad,
-            destinatarioNombre = modelo.DestinatarioNombre,
-            destinatarioTelefono = modelo.DestinatarioTelefono,
-            destinatarioEmail = modelo.DestinatarioEmail,
-            calle = modelo.Calle,
-            numero = modelo.Numero,
-            localidad = modelo.Localidad,
-            departamento = modelo.Departamento,
-            bultos = modelo.Bultos.Select(b => new
-            {
-                pesoKg = b.PesoKg,
-                altoCm = b.AltoCm,
-                anchoCm = b.AnchoCm,
-                profundidadCm = b.ProfundidadCm
-            }).ToArray()
-        };
-
-        var resultado = await JS.InvokeAsync<ResultadoAlta>(
-            "autenticacionPortal.crearEnvio",
-            datos);
-
-        exito = resultado.Exito;
-        mensaje = resultado.Mensaje;
-
-        if (exito)
-        {
-            modelo = new NuevoEnvioModel
-            {
-                CuentaComercialId = modelo.CuentaComercialId,
-                Departamento = modelo.Departamento
-            };
-        }
-    }
-    catch (JSException)
-    {
-        exito = false;
-        mensaje = "No se pudo conectar con la API para crear el envío.";
-    }
-    finally
-    {
-        guardando = false;
-    }
-}
-    
-    private void AgregarBulto()
-    {
-        modelo.Bultos.Add(new NuevoBultoModel());
-    }
-
-    private void EliminarBulto(int indice)
-    {
-        if (modelo.Bultos.Count > 1)
-            modelo.Bultos.RemoveAt(indice);
-    }
-
-    // El departamento sale de las zonas del operador de la cuenta: escrito a mano, un error de
-    // tipeo terminaba en "no existe tarifa vigente".
-   private async Task CambiarCuentaAsync()
-{
-    modelo.Departamento = string.Empty;
-    departamentos = null;
-
-    var cuenta = cuentas?.FirstOrDefault(
-        c => c.Id.ToString() == modelo.CuentaComercialId);
-
-    if (cuenta is null)
-        return;
-
-    try
-    {
-        var zonas = await JS.InvokeAsync<List<ZonaItem>>(
-            "autenticacionPortal.obtenerZonas",
-            cuenta.OperadorId);
-
-        departamentos = zonas
-            .Select(z => z.Departamento)
-            .Distinct()
-            .Order()
-            .ToList();
-
-        if (departamentos.Count == 1)
-            modelo.Departamento = departamentos[0];
-
-        formulario?.EditContext?.NotifyFieldChanged(
-            FieldIdentifier.Create(() => modelo.Departamento));
-    }
-    catch (JSException)
-    {
-        errorDeCarga = "No se pudieron cargar las zonas del operador.";
-    }
-}
 }

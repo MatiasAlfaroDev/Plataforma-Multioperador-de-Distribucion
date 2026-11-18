@@ -5,131 +5,51 @@
     ViewData["Title"] = "Zonas de cobertura";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Zonas de cobertura</h1>
-        <p>Configurá las áreas de reparto, las franjas disponibles y los tiempos estimados de cada operador.</p>
-    </div>
+<div class="pagina">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <p class="aviso error" role="alert">@Model.Error</p>
+    }
+
+    @if (Model.OperadorIdSesion != Guid.Empty)
+    {
+        <section class="tarjeta">
+            <h2 class="titulo-tarjeta">Zonas de cobertura <span class="chip">@Model.Zonas.Count</span></h2>
+            @if (Model.Zonas.Count == 0)
+            {
+                <p class="vacio">Todavía no hay zonas activas.</p>
+            }
+            else
+            {
+                <div class="tabla tabla-holgada">
+                    <table>
+                        <thead>
+                            <tr><th>Zona</th><th>Departamento</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var zona in Model.Zonas)
+                            {
+                                <tr>
+                                    <td><b>@zona.Nombre</b></td>
+                                    <td>@zona.Departamento</td>
+                                    <td class="text-right"><a asp-page="/EditarZona" asp-route-id="@zona.Id" class="btn-secundario btn-chico"><i class="ph ph-pencil-simple"></i>Editar</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="tarjeta">
+            <h2 class="titulo-tarjeta">Nueva zona</h2>
+            <form method="post">
+                <div asp-validation-summary="ModelOnly" class="aviso error mb-4"></div>
+                <partial name="_CamposZona" for="Formulario" />
+                <div class="acciones">
+                    <button type="submit" class="primario"><i class="ph ph-plus"></i>Crear zona</button>
+                </div>
+            </form>
+        </section>
+    }
 </div>
-
-@if (TempData["Mensaje"] is string mensaje)
-{
-    <p class="aviso ok" role="status">@mensaje</p>
-}
-
-@if (!string.IsNullOrWhiteSpace(Model.Error))
-{
-    <p class="aviso error" role="alert">@Model.Error</p>
-}
-
-@if (Model.OperadorIdSesion != Guid.Empty)
-{
-    <section>
-        <h2>Zonas existentes</h2>
-
-        @if (Model.Zonas.Count == 0)
-        {
-            <p class="nota">
-                Este operador todavía no tiene zonas activas.
-            </p>
-        }
-        else
-        {
-            <div class="tabla">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Zona</th>
-                            <th>Departamento</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        @foreach (var zona in Model.Zonas)
-                        {
-                            <tr>
-                                <td>@zona.Nombre</td>
-                                <td>@zona.Departamento</td>
-                                <td><a asp-page="/EditarZona" asp-route-id="@zona.Id">Editar</a></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </section>
-
-    <section>
-        <h2>Crear zona</h2>
-
-        <form method="post">
-            <p class="nota">
-                Configurá las áreas de reparto, franjas disponibles y tiempos estimados de tu operador.
-            </p>
-                
-            <div asp-validation-summary="All"
-                 class="error"></div>
-
-            <div class="campos">
-                <div>
-                    <label asp-for="Formulario.Nombre">
-                        Nombre de la zona
-                    </label>
-                    <input asp-for="Formulario.Nombre"
-                           placeholder="Ej.: San José de Mayo" />
-                </div>
-
-                <div>
-                    <label asp-for="Formulario.Departamento">
-                        Departamento
-                    </label>
-                    <input asp-for="Formulario.Departamento"
-                           placeholder="Ej.: San José" />
-                </div>
-
-                <div>
-                    <label asp-for="Formulario.MinutosTraslado">
-                        Tiempo estimado entre paradas (minutos)
-                    </label>
-                    <input asp-for="Formulario.MinutosTraslado"
-                        type="number"
-                        min="1" />
-                </div>
-            </div>
-
-            <label asp-for="Formulario.Coberturas">
-                Localidades y sectores cubiertos
-            </label>
-
-            <textarea asp-for="Formulario.Coberturas"
-                      rows="5"
-                      placeholder="San José de Mayo&#10;Otra localidad&#10;Montevideo | Cordón"></textarea>
-
-            <p class="nota">
-                Escribí una cobertura por línea.
-                Para cubrir toda una localidad, escribí su nombre.
-                Para un sector, utilizá: Localidad | Sector.
-            </p>
-
-            <label asp-for="Formulario.Franjas">
-                Franjas horarias disponibles
-            </label>
-
-            <textarea asp-for="Formulario.Franjas"
-                      rows="4"
-                      placeholder="09:00-12:00&#10;14:00-18:00"></textarea>
-
-            <p class="nota">
-                Una franja por línea, con formato HH:mm-HH:mm.
-                Las franjas no pueden superponerse.
-            </p>
-
-            <div class="acciones">
-                <button type="submit" class="primario">
-                    Crear zona
-                </button>
-            </div>
-        </form>
-    </section>
-}

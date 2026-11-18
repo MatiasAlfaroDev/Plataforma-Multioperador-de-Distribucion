@@ -3,211 +3,134 @@
 @using Microsoft.JSInterop
 @attribute [Authorize(Policy = "ComercioPortal")]
 @inject IJSRuntime JS
+@inject Notificaciones Notificaciones
 
-<PageTitle>Retiros a domicilio - Última Milla</PageTitle>
+<PageTitle>Mis retiros - Última Milla</PageTitle>
 
-<div class="encabezado">
-    <div>
-        <h1>Retiros a domicilio</h1>
-        <p>Pedile al operador que retire bultos en el domicilio de tu comprador y los traiga a tu comercio.</p>
-    </div>
-</div>
-
-@if (!string.IsNullOrWhiteSpace(mensaje))
-{
-    <div class="aviso @(exito ? "ok" : "error")">
-        <i class="ph @(exito ? "ph-check-circle" : "ph-x-circle")"></i>
-        <span>@mensaje</span>
-    </div>
-}
-
-<h2>Mis retiros</h2>
-
-@if (cargando)
-{
-    <p>Cargando…</p>
-}
-else if (retiros.Count == 0)
-{
-    <p class="nota">Todavía no solicitaste retiros.</p>
-}
-else
-{
-    <div class="filtro">
-        <div>
-            <label for="filtroEstado">Estado</label>
-            <select id="filtroEstado" @bind="filtroEstado">
-                <option value="">Todos</option>
-                @foreach (var e in TextosEstado)
-                {
-                    <option value="@e.Key">@e.Value</option>
-                }
-            </select>
-        </div>
-        @if (nombresOperador.Count > 1)
-        {
-            <div>
-                <label for="filtroOperador">Operador</label>
-                <select id="filtroOperador" @bind="filtroOperador">
-                    <option value="@Guid.Empty">Todos</option>
-                    @foreach (var o in nombresOperador)
+<section class="tarjeta">
+    <div class="cabecera-tarjeta">
+        <h2 class="titulo-tarjeta">Mis retiros <span class="chip">@retiros.Count</span></h2>
+        <div class="flex flex-wrap items-center gap-3">
+            @if (retiros.Count > 0)
+            {
+                <select class="w-auto min-w-44" @bind="filtroEstado" aria-label="Filtrar por estado">
+                    <option value="">Todos los estados</option>
+                    @foreach (var e in TextosEstado)
                     {
-                        <option value="@o.Key">@o.Value</option>
+                        <option value="@e.Key">@e.Value</option>
                     }
                 </select>
-            </div>
-        }
+                @if (nombresOperador.Count > 1)
+                {
+                    <select class="w-auto min-w-44" @bind="filtroOperador" aria-label="Filtrar por operador">
+                        <option value="@Guid.Empty">Todos los operadores</option>
+                        @foreach (var o in nombresOperador)
+                        {
+                            <option value="@o.Key">@o.Value</option>
+                        }
+                    </select>
+                }
+            }
+            <a href="/retiros/nuevo" class="btn-primario btn-chico"><i class="ph ph-calendar-plus"></i>Solicitar retiro</a>
+        </div>
     </div>
 
-    <div class="tabla">
-        <table>
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Operador</th>
-                    <th>Domicilio</th>
-                    <th>Bultos</th>
-                    <th>Estado</th>
-                    <th>Tarifa</th>
-                    <th>Seguimiento</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (!RetirosFiltrados.Any())
-                {
-                    <tr><td colspan="7" class="nota">No hay retiros con esos filtros.</td></tr>
-                }
-                @foreach (var r in RetirosFiltrados)
-                {
+    @if (cargando)
+    {
+        <p class="vacio">Cargando…</p>
+    }
+    else if (retiros.Count == 0)
+    {
+        <p class="vacio">Todavía no solicitaste retiros.</p>
+    }
+    else
+    {
+        <div class="tabla tabla-holgada">
+            <table>
+                <thead>
                     <tr>
-                        <td>@r.FechaSolicitada.ToString("dd/MM/yyyy") @r.HoraDesde.ToString("HH:mm")–@r.HoraHasta.ToString("HH:mm")</td>
-                        <td>@nombresOperador.GetValueOrDefault(r.OperadorId, "-")</td>
-                        <td>@r.DomicilioRetiro.Calle @r.DomicilioRetiro.Numero, @r.DomicilioRetiro.Localidad</td>
-                        <td>@r.Bultos.Count</td>
-                        <td>
-                            @TextosEstado.GetValueOrDefault(r.Estado, r.Estado)
-                            @if (r.MotivoCancelacion is not null)
-                            {
-                                <br /><span class="nota">@r.MotivoCancelacion</span>
-                            }
-                            @if (r.Estado == "Solicitado")
-                            {
-                                @if (cancelando == r.Id)
-                                {
-                                    <form class="mt-2 flex flex-wrap items-center gap-1.5" @onsubmit="() => CancelarAsync(r.Id)" @onsubmit:preventDefault>
-                                        <input @bind="motivoCancelacion" maxlength="1000" required placeholder="Motivo" aria-label="Motivo de la cancelación" />
-                                        <button type="submit" class="peligro" disabled="@guardando">Confirmar</button>
-                                        <button type="button" @onclick="() => cancelando = null">Volver</button>
-                                    </form>
-                                }
-                                else
-                                {
-                                    <button type="button" class="mt-2" @onclick="() => { cancelando = r.Id; motivoCancelacion = string.Empty; }">
-                                        <i class="ph ph-x-circle"></i>Cancelar retiro
-                                    </button>
-                                }
-                            }
-                        </td>
-                        <td>@(r.TarifaCalculada?.ToString("C2") ?? "-")</td>
-                        <td>
-                            @if (enlaces.TryGetValue(r.Id, out var enlace))
-                            {
-                                <a href="@enlace" target="_blank">Abrir enlace</a>
-                            }
-                            else
-                            {
-                                <button @onclick="() => GenerarEnlaceAsync(r.Id)"><i class="ph ph-link"></i>Enlace para el comprador</button>
-                            }
-                        </td>
+                        <th>Retiro</th>
+                        <th>Domicilio</th>
+                        <th>Operador</th>
+                        <th>Estado</th>
+                        <th class="num">Tarifa</th>
+                        <th></th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-}
+                </thead>
+                <tbody>
+                    @if (!RetirosFiltrados.Any())
+                    {
+                        <tr><td colspan="6" class="vacio">No hay retiros con esos filtros.</td></tr>
+                    }
+                    @foreach (var r in RetirosFiltrados)
+                    {
+                        <tr @key="r.Id">
+                            <td>
+                                <b>@r.FechaSolicitada.ToString("dd/MM/yyyy")</b>
+                                <span class="linea2">@r.HoraDesde.ToString("HH:mm")–@r.HoraHasta.ToString("HH:mm") · @Bultos(r.Bultos.Count)</span>
+                            </td>
+                            <td>
+                                @r.DomicilioRetiro.Calle @r.DomicilioRetiro.Numero
+                                <span class="linea2">@r.DomicilioRetiro.Localidad, @r.DomicilioRetiro.Departamento</span>
+                            </td>
+                            <td>@nombresOperador.GetValueOrDefault(r.OperadorId, "-")</td>
+                            <td>
+                                <span class="@ClaseEstado(r.Estado)">@TextosEstado.GetValueOrDefault(r.Estado, r.Estado)</span>
+                                @if (r.MotivoCancelacion is not null)
+                                {
+                                    <span class="linea2">@r.MotivoCancelacion</span>
+                                }
+                            </td>
+                            <td class="num">@(r.TarifaCalculada?.ToString("C2") ?? "-")</td>
+                            <td>
+                                <div class="flex items-center justify-end gap-2">
+                                    @if (enlaces.TryGetValue(r.Id, out var enlace))
+                                    {
+                                        <a href="@enlace" target="_blank" class="btn-secundario btn-chico"><i class="ph ph-arrow-square-out"></i>Abrir enlace</a>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn-chico" title="Enlace de seguimiento para el comprador" @onclick="() => GenerarEnlaceAsync(r.Id)">
+                                            <i class="ph ph-link"></i>Enlace
+                                        </button>
+                                    }
+                                    @if (r.Estado == "Solicitado" && cancelando != r.Id)
+                                    {
+                                        <button type="button" class="peligro btn-chico" @onclick="() => { cancelando = r.Id; motivoCancelacion = string.Empty; }">
+                                            Cancelar
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
 
-<h2>Solicitar retiro</h2>
-
-@if (!cargando && cuentas.Count == 0)
-{
-    <p class="nota">Ninguno de tus operadores ofrece retiros a domicilio por ahora.</p>
-}
-
-<form @onsubmit="SolicitarAsync" @onsubmit:preventDefault>
-    <div class="campos">
-        <div>
-            <label for="cuenta">Operador</label>
-            <select id="cuenta" @bind="cuentaId" required>
-                @foreach (var c in cuentas)
-                {
-                    <option value="@c.Id">@c.OperadorNombre</option>
-                }
-            </select>
+                        @if (cancelando == r.Id)
+                        {
+                            <tr class="hover:bg-transparent">
+                                <td colspan="6" class="bg-hundido">
+                                    <form class="flex flex-wrap items-end gap-3" @onsubmit="() => CancelarAsync(r.Id)" @onsubmit:preventDefault>
+                                        <div class="campo min-w-64 flex-1">
+                                            <label for="motivo-cancelacion">Motivo de la cancelación</label>
+                                            <input id="motivo-cancelacion" @bind="motivoCancelacion" maxlength="1000" required />
+                                        </div>
+                                        <button type="submit" class="peligro h-[44px]" disabled="@guardando">Cancelar retiro</button>
+                                        <button type="button" class="h-[44px]" @onclick="() => cancelando = null">Volver</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
         </div>
-        <div>
-            <label for="motivo">Motivo</label>
-            <input id="motivo" @bind="motivo" placeholder="Cambio de talle" required />
-        </div>
-        <div>
-            <label for="fecha">Fecha</label>
-            <input id="fecha" type="date" @bind="fecha" required />
-        </div>
-        <div>
-            <label for="desde">Desde</label>
-            <input id="desde" type="time" @bind="horaDesde" required />
-        </div>
-        <div>
-            <label for="hasta">Hasta</label>
-            <input id="hasta" type="time" @bind="horaHasta" required />
-        </div>
-    </div>
+    }
+</section>
 
-    <fieldset>
-        <legend>Domicilio del comprador</legend>
-        <div class="campos">
-            <div><label for="calle">Calle</label><input id="calle" @bind="calle" required /></div>
-            <div><label for="numero">Número</label><input id="numero" @bind="numero" /></div>
-            <div><label for="localidad">Localidad</label><input id="localidad" @bind="localidad" required /></div>
-            <div><label for="departamento">Departamento</label><input id="departamento" @bind="departamento" required /></div>
-        </div>
-    </fieldset>
-
-    <fieldset>
-        <legend>Bultos</legend>
-        @foreach (var b in bultos)
-        {
-            <div class="campos">
-                <div><label>Identificación</label><input @bind="b.Identificacion" required /></div>
-                <div><label>Peso (kg)</label><input type="number" step="0.1" min="0.1" @bind="b.PesoKg" required /></div>
-                <div><label>Alto (cm)</label><input type="number" min="1" @bind="b.AltoCm" required /></div>
-                <div><label>Ancho (cm)</label><input type="number" min="1" @bind="b.AnchoCm" required /></div>
-                <div><label>Profundidad (cm)</label><input type="number" min="1" @bind="b.ProfundidadCm" required /></div>
-            </div>
-        }
-        <button type="button" @onclick="() => bultos.Add(new BultoFormulario())"><i class="ph ph-plus"></i>Agregar bulto</button>
-    </fieldset>
-
-    <p class="nota">El retiro llega a la dirección de recepción que configuraste para ese operador.</p>
-
-    <div class="acciones">
-        <button type="submit" class="primario" disabled="@guardando"><i class="ph ph-truck"></i>Solicitar retiro</button>
-    </div>
-</form>
 
 @code {
-    // La API serializa EstadoCuentaComercial como número: 1 = Confirmada.
-    private const int CuentaConfirmada = 1;
-
     private List<RetiroItem> retiros = [];
-    private List<CuentaItem> cuentas = [];
     private readonly Dictionary<Guid, string> enlaces = [];
-    private readonly List<BultoFormulario> bultos = [new()];
-    private Guid cuentaId;
-    private string motivo = "", calle = "", numero = "", localidad = "", departamento = "";
-    private DateOnly fecha = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
-    private TimeOnly horaDesde = new(9, 0), horaHasta = new(13, 0);
-    private bool cargando = true, guardando, exito;
-    private string? mensaje;
+    private bool cargando = true, guardando;
 
     // Filtros del listado: se aplican sobre lo ya cargado (son los retiros de un solo comercio).
     private string filtroEstado = "";
@@ -230,6 +153,17 @@ else
         ["Cancelado"] = "Cancelado"
     };
 
+    private static string ClaseEstado(string estado) => estado switch
+    {
+        "EntregadoAlComercio" or "Retirado" => "chip chip-exito",
+        "AsignadoARuta" or "EnTransito" or "AsignadoARutaComercio" or "EnTransitoComercio" or "EnDeposito" => "chip chip-acento",
+        "NoRetirado" => "chip chip-alerta",
+        "Cancelado" => "chip chip-peligro",
+        _ => "chip"
+    };
+
+    private static string Bultos(int cantidad) => cantidad == 1 ? "1 bulto" : $"{cantidad} bultos";
+
     private IEnumerable<RetiroItem> RetirosFiltrados => retiros
         .Where(r => filtroEstado == "" || r.Estado == filtroEstado)
         .Where(r => filtroOperador == Guid.Empty || r.OperadorId == filtroOperador);
@@ -246,65 +180,19 @@ else
         try
         {
             retiros = await JS.InvokeAsync<List<RetiroItem>>("retirosPortal.listar");
-            // Aclaración 3.2: solo los operadores que tienen habilitado el retiro a domicilio.
-            var banderas = await JS.InvokeAsync<Dictionary<Guid, Dictionary<string, bool>>>("retirosPortal.banderas");
             var todasLasCuentas = await JS.InvokeAsync<List<CuentaItem>>("autenticacionPortal.obtenerCuentasComerciales");
             nombresOperador = todasLasCuentas
                 .GroupBy(c => c.OperadorId)
                 .ToDictionary(g => g.Key, g => g.First().OperadorNombre);
-            cuentas = todasLasCuentas
-                .Where(c => c.Activa && c.Estado == CuentaConfirmada)
-                .Where(c => !banderas.TryGetValue(c.OperadorId, out var b) || b.GetValueOrDefault("retiro-domicilio", true))
-                .ToList();
-            if (cuentaId == Guid.Empty && cuentas.Count > 0)
-                cuentaId = cuentas[0].Id;
         }
         catch (JSException ex)
         {
-            exito = false;
-            mensaje = ex.Message;
+            Notificaciones.Error("No se pudieron cargar los retiros", ex.Message);
         }
         finally
         {
             cargando = false;
             StateHasChanged();
-        }
-    }
-
-    private async Task SolicitarAsync()
-    {
-        if (guardando)
-            return;
-
-        guardando = true;
-        try
-        {
-            var direccion = new { calle, numero, localidad, departamento };
-            var resultado = await JS.InvokeAsync<ResultadoOperacion>("retirosPortal.solicitar", new
-            {
-                cuentaComercialId = cuentaId,
-                motivo,
-                domicilioRetiro = direccion,
-                // Sin destino: la API usa la dirección de recepción del comercio para ese operador.
-                fecha = fecha.ToString("yyyy-MM-dd"),
-                horaDesde = horaDesde.ToString("HH:mm:ss"),
-                horaHasta = horaHasta.ToString("HH:mm:ss"),
-                bultos
-            });
-
-            exito = resultado.Exito;
-            mensaje = resultado.Mensaje;
-            if (exito)
-                await CargarAsync();
-        }
-        catch (JSException ex)
-        {
-            exito = false;
-            mensaje = ex.Message;
-        }
-        finally
-        {
-            guardando = false;
         }
     }
 
@@ -317,18 +205,20 @@ else
         try
         {
             var resultado = await JS.InvokeAsync<ResultadoOperacion>("retirosPortal.cancelar", id, motivoCancelacion);
-            exito = resultado.Exito;
-            mensaje = resultado.Mensaje;
-            if (exito)
+            if (resultado.Exito)
             {
+                Notificaciones.Exito("Retiro cancelado", resultado.Mensaje);
                 cancelando = null;
                 await CargarAsync();
+            }
+            else
+            {
+                Notificaciones.Error("No se pudo cancelar el retiro", resultado.Mensaje);
             }
         }
         catch (JSException ex)
         {
-            exito = false;
-            mensaje = ex.Message;
+            Notificaciones.Error("No se pudo cancelar el retiro", ex.Message);
         }
         finally
         {
@@ -344,18 +234,8 @@ else
         }
         catch (JSException ex)
         {
-            exito = false;
-            mensaje = ex.Message;
+            Notificaciones.Error("No se pudo generar el enlace", ex.Message);
         }
-    }
-
-    private sealed class BultoFormulario
-    {
-        public string Identificacion { get; set; } = "";
-        public decimal PesoKg { get; set; } = 1;
-        public int AltoCm { get; set; } = 20;
-        public int AnchoCm { get; set; } = 20;
-        public int ProfundidadCm { get; set; } = 20;
     }
 
     private sealed record DireccionItem(string Calle, string Numero, string Localidad, string Departamento);

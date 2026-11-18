@@ -1,0 +1,13 @@
+@* Página protegida sin permiso: sin sesión va al login; con sesión pero sin comercio elegido, a elegirlo. *@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navegacion
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> Estado { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var usuario = (await Estado).User;
+        Navegacion.NavigateTo(usuario.Identity?.IsAuthenticated == true ? "/seleccionar-comercio" : "/login", forceLoad: true);
+    }
+}

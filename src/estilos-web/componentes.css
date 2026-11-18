@@ -1,0 +1,151 @@
+/*
+  Componentes compartidos por Portal y Backoffice, encima de tema.css: layout con sidebar colapsable,
+  toasts, tarjetas, formularios, tablas y selects. Las clases que solo usa una página van en esa página.
+*/
+
+@layer base {
+  select, label:has(input[type=file]), label:has(input[type=radio]) { @apply cursor-pointer; }
+}
+
+/*
+  Selects: flecha propia en todos los navegadores. Donde existe appearance: base-select (Chrome 135+)
+  también se estiliza la lista desplegada; en el resto queda la lista nativa.
+*/
+select {
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath fill='none' stroke='%2371717a' stroke-linecap='round' stroke-linejoin='round' stroke-width='24' d='M208 96l-80 80-80-80'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 14px;
+}
+@supports (appearance: base-select) {
+  select, ::picker(select) { appearance: base-select; }
+  select::picker-icon { display: none; }
+  ::picker(select) {
+    margin-top: 6px;
+    padding: 4px;
+    border: 1px solid var(--c-borde);
+    border-radius: 12px;
+    background: var(--c-superficie);
+    color: var(--c-texto);
+    box-shadow: 0 12px 32px -12px rgb(9 9 11 / 0.25);
+  }
+  select option { padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+  select option:hover, select option:focus-visible { background: var(--c-hundido); outline: none; }
+  select option:checked { background: var(--c-acento-suave); color: var(--c-acento); font-weight: 500; }
+  select option::checkmark { display: none; }
+}
+
+@layer components {
+  /*
+    Sidebar colapsable: desplegado 256px, plegado (o en pantallas chicas) una columna de íconos de 72px.
+    Las medidas del layout van en px como en el mock aprobado: la raíz del tema es 15px y rem no da lo mismo.
+  */
+  .shell { @apply grid min-h-dvh grid-cols-[256px_minmax(0,1fr)] transition-[grid-template-columns] duration-200; }
+  .shell.colapsado { @apply grid-cols-[72px_minmax(0,1fr)]; }
+  .lateral { @apply sticky top-0 flex h-dvh flex-col gap-0.5 overflow-x-hidden overflow-y-auto border-r border-borde bg-superficie px-3 py-[24px]; }
+  .lateral-tope { @apply flex items-center justify-between gap-3 px-1.5 pb-4; }
+  .marca { @apply flex items-center gap-2.5 whitespace-nowrap font-display text-[17px] font-semibold tracking-tight text-texto no-underline hover:no-underline; }
+  .plegar { @apply border-transparent bg-transparent p-1.5 text-lg text-suave hover:text-texto; }
+  .lateral .grupo { @apply mt-4 mb-1.5 whitespace-nowrap px-3 text-[11.5px] font-semibold uppercase tracking-[0.07em] text-suave; }
+  .lateral nav { @apply flex flex-col gap-0.5; }
+  .lateral .nav-item { @apply whitespace-nowrap; }
+  .lateral .nav-item i { @apply shrink-0 text-lg; }
+  .lateral hr { @apply mx-2 mt-3 border-borde; }
+  .lateral button.nav-item { @apply w-full justify-start border-0 bg-transparent font-medium hover:bg-hundido active:scale-100; }
+  .lateral-pie { @apply mt-auto flex flex-col gap-2 border-t border-borde pt-4; }
+  .usuario { @apply flex items-center gap-2.5 px-1.5 text-[13.5px]; }
+  .colapsado .usuario { @apply flex-col; }
+  .usuario small { @apply block text-xs text-suave; }
+  .avatar { @apply grid size-8 shrink-0 place-items-center rounded-full bg-acento-suave text-[13px] font-semibold text-acento; }
+  .colapsado .lateral .txt, .colapsado .lateral .grupo { @apply hidden; }
+  .colapsado .lateral-tope { @apply flex-col; }
+  .colapsado .lateral .nav-item, .colapsado .usuario { @apply justify-center; }
+  .contenido { @apply w-full min-w-0 max-w-[1160px] p-[24px]; }
+  .contenido .tarjeta { @apply p-[24px]; }
+
+  @media (width < 48rem) {
+    .shell { @apply grid-cols-[4.5rem_minmax(0,1fr)]; }
+    .lateral .txt, .lateral .grupo, .plegar { @apply hidden; }
+    .lateral .nav-item, .lateral button.nav-item, .usuario { @apply justify-center; }
+    .usuario { @apply flex-col; }
+    .contenido { @apply p-4; }
+  }
+
+  /* Toasts: un solo color por tipo. */
+  .toasts { @apply fixed top-6 right-6 z-50 grid w-[min(22.5rem,calc(100vw-3rem))] gap-2.5; }
+  .toast { @apply flex items-start gap-3 rounded-xl bg-exito-suave px-3.5 py-3 text-sm text-exito shadow-lg shadow-zinc-950/15; }
+  .toast-error { @apply bg-peligro-suave text-peligro; }
+  .toast button { @apply ml-auto border-0 bg-transparent p-0 text-current opacity-70 hover:bg-transparent hover:opacity-100; }
+
+  /* Formularios en tarjetas */
+  .titulo-tarjeta { @apply mt-0 mb-5 flex items-center gap-2.5 font-display text-xl font-semibold tracking-[-0.02em]; }
+  .paso { @apply grid size-6 place-items-center rounded-full bg-acento-suave text-[13px] font-semibold text-acento; }
+  .campo { @apply flex min-w-0 flex-col gap-1.5; }
+  .campo label, .etiqueta { @apply m-0 block text-[13px] font-semibold; }
+  .opcional { @apply font-normal text-suave; }
+  .campo .validation-message { @apply text-[12.5px]; }
+  input.invalid, select.invalid,
+  .input-validation-error { @apply border-peligro ring-2 ring-peligro/15; }
+  .campo .field-validation-error { @apply text-[12.5px] text-peligro; }
+  /* Formularios sin EditForm: la validación nativa marca el campo recién cuando el usuario lo tocó. */
+  input:user-invalid, select:user-invalid { @apply border-peligro ring-2 ring-peligro/15; }
+
+  .segmento { @apply inline-grid w-fit grid-cols-2 rounded-xl border border-borde-fuerte bg-hundido p-[3px]; }
+  .segmento label { @apply m-0 rounded-[9px] px-[14px] py-[6px] text-center text-[14px] font-medium text-suave; }
+  .segmento label:has(:checked) { @apply bg-superficie text-texto shadow-sm; }
+  .segmento label:has(:focus-visible) { @apply outline-2 outline-offset-2 outline-acento; }
+  .segmento input { @apply sr-only; }
+
+  .buscador { @apply relative; }
+  .buscador i { @apply pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-suave; }
+  .buscador input { @apply pl-9; }
+  .sufijo { @apply relative; }
+  .sufijo input { @apply pr-10 text-right tabular-nums; }
+  .sufijo span { @apply pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[13px] text-suave; }
+
+  .fila-bulto { @apply grid grid-cols-[1.75rem_repeat(4,minmax(0,1fr))_2.25rem] items-start gap-3; }
+  .fila-bulto-retiro { @apply grid grid-cols-[1.75rem_minmax(0,1.4fr)_repeat(4,minmax(0,1fr))_2.25rem] items-start gap-3; }
+  .numero-bulto { @apply pt-2 font-display font-bold text-suave; }
+  .quitar { @apply border-transparent bg-transparent px-2 text-suave hover:bg-peligro-suave hover:text-peligro disabled:invisible; }
+
+  /* Páginas: una columna de tarjetas separadas por el mismo espaciado del layout. */
+  .pagina { @apply grid gap-[24px]; }
+  .cabecera-tarjeta { @apply mb-5 flex flex-wrap items-center justify-between gap-3; }
+  .cabecera-tarjeta .titulo-tarjeta { @apply mb-0; }
+  .subtitulo { @apply mt-6 mb-3 text-[15px] font-semibold; }
+  .btn-chico { @apply px-3 py-1.5 text-[13px]; }
+  .vacio { @apply text-suave; }
+  /* Las tablas van dentro de tarjetas: sin bordes verticales ni esquinas, solo las líneas horizontales. */
+  .tabla { @apply rounded-none border-x-0; }
+  /* Listados con celdas de dos líneas: dato principal arriba, contexto en gris abajo. */
+  .tabla-holgada td { @apply whitespace-normal py-3.5 align-middle; }
+  .tabla-holgada td:last-child { @apply whitespace-nowrap; }
+  .linea2 { @apply mt-0.5 block text-[13px] text-suave; }
+  .casillas { @apply grid gap-x-6 gap-y-2 sm:grid-cols-2; }
+  .casillas label { @apply m-0 flex cursor-pointer items-center gap-2 text-sm font-normal; }
+  /* Cifras separadas por líneas verticales, sin fondo; en pantallas chicas se apilan. */
+  .cifras { @apply grid divide-y divide-borde sm:auto-cols-fr sm:grid-flow-col sm:divide-x sm:divide-y-0; }
+  .cifras > div { @apply py-3 first:pt-0 last:pb-0 sm:px-6 sm:py-0 sm:first:pl-0 sm:last:pr-0; }
+  .cifras dt { @apply text-[13px] text-suave; }
+  .cifras dd { @apply mt-1 font-display text-2xl font-semibold tracking-[-0.02em] tabular-nums; }
+  .datos { @apply grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm; }
+  .datos dt { @apply text-suave; }
+
+  /* Pantallas de acceso (login, registro, seguimiento, elegir operador): columna centrada con la marca arriba. */
+  .acceso { @apply mx-auto flex min-h-dvh w-full max-w-[720px] flex-col items-center justify-center gap-[24px] px-4 py-10; }
+  .acceso > * { @apply w-full; }
+
+  /* Resumen */
+  .resumen { @apply mb-5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2.5 text-sm; }
+  .resumen dt { @apply text-suave; }
+  .resumen dd { @apply text-right font-medium; }
+  .cifra { @apply mb-5 font-display text-[34px] font-bold leading-tight tracking-[-0.03em]; }
+  .secciones { @apply mb-5 grid gap-2 text-[13.5px] text-suave; }
+  .secciones li { @apply flex items-start gap-2; }
+  .secciones i { @apply mt-0.5 shrink-0; }
+  .secciones .ok i { @apply text-exito; }
+  .secciones .mal { @apply text-peligro; }
+  .error-seccion { @apply block text-[12.5px]; }
+}

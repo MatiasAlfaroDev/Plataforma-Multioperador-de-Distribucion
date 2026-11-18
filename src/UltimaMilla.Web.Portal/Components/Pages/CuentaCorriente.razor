@@ -3,154 +3,136 @@
 @using Microsoft.JSInterop
 @attribute [Authorize(Policy = "ComercioPortal")]
 @inject IJSRuntime JS
+@inject Notificaciones Notificaciones
 
 <PageTitle>Cuenta corriente - Última Milla</PageTitle>
 
-<div class="encabezado">
-    <div>
-        <h1>Cuenta corriente y liquidaciones</h1>
-        <p>Lo que te cobra cada operador: cada envío y cada retiro carga en tu cuenta la tarifa calculada cuando lo diste de alta.</p>
-    </div>
-</div>
-
-<form class="filtro" @onsubmit="CargarAsync" @onsubmit:preventDefault>
-    <div>
-        <label for="desde">Desde</label>
-        <input id="desde" type="date" @bind="desde" required />
-    </div>
-    <div>
-        <label for="hasta">Hasta</label>
-        <input id="hasta" type="date" @bind="hasta" required />
-    </div>
-    <div>
-        <button type="submit" class="primario" disabled="@cargando"><i class="ph ph-magnifying-glass"></i>Consultar</button>
-    </div>
-</form>
-
-@if (!string.IsNullOrWhiteSpace(mensaje))
-{
-    <div class="aviso error">
-        <i class="ph ph-x-circle"></i>
-        <span>@mensaje</span>
-    </div>
-}
-
-@if (cargando)
-{
-    <p>Cargando…</p>
-}
-else if (datos is null || datos.Cuentas.Count == 0)
-{
-    <p class="nota">Todavía no trabajás con ningún operador: no hay cuenta corriente para mostrar.</p>
-}
-else
-{
-    @foreach (var cuenta in datos.Cuentas)
-    {
-        <div class="tarjeta">
-            <h2>@cuenta.Operador</h2>
-
-            <div class="tabla">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Saldo anterior al @datos.Desde.ToString("dd/MM/yyyy")</th>
-                            <th class="num">Cargos del período</th>
-                            <th class="num">Saldo al @datos.Hasta.ToString("dd/MM/yyyy")</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>@cuenta.SaldoAnterior.ToString("C2")</td>
-                            <td class="num">@cuenta.CargosDelPeriodo.ToString("C2")</td>
-                            <td class="num"><strong>@cuenta.SaldoFinal.ToString("C2")</strong></td>
-                        </tr>
-                    </tbody>
-                </table>
+<div class="pagina">
+    <section class="tarjeta">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="buscador w-full sm:w-72">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="search" placeholder="Buscar por referencia…" aria-label="Buscar movimientos por referencia"
+                       @bind="busqueda" @bind:event="oninput" />
             </div>
-
-            @if (cuenta.ServiciosSinTarifa > 0)
-            {
-                <p class="nota">@cuenta.ServiciosSinTarifa servicio(s) del período no tienen tarifa calculada y no suman importe.</p>
-            }
-
-            <h3>Liquidaciones mensuales</h3>
-            @if (cuenta.Liquidaciones.Count == 0)
-            {
-                <p class="nota">No hay servicios en el período.</p>
-            }
-            else
-            {
-                <div class="tabla">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Mes</th>
-                                <th class="num">Envíos</th>
-                                <th class="num">Retiros</th>
-                                <th class="num">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var l in cuenta.Liquidaciones)
-                            {
-                                <tr>
-                                    <td>@NombreMes(l.Mes) @l.Anio</td>
-                                    <td class="num">@l.Envios</td>
-                                    <td class="num">@l.Retiros</td>
-                                    <td class="num">@l.Total.ToString("C2")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+            <form class="flex flex-wrap items-end gap-4" @onsubmit="CargarAsync" @onsubmit:preventDefault>
+                <div class="campo">
+                    <label for="desde">Desde</label>
+                    <input id="desde" type="date" @bind="desde" required />
                 </div>
-            }
-
-            <h3>Movimientos</h3>
-            @if (cuenta.Movimientos.Count == 0)
-            {
-                <p class="nota">No hay movimientos en el período.</p>
-            }
-            else
-            {
-                <div class="tabla">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Servicio</th>
-                                <th>Referencia</th>
-                                <th>Estado</th>
-                                <th class="num">Importe</th>
-                                <th class="num">Saldo</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var m in cuenta.Movimientos)
-                            {
-                                <tr>
-                                    <td>@m.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
-                                    <td>@(m.Tipo == "Retiro" ? "Retiro" : "Envío")</td>
-                                    <td class="codigo">@m.Referencia</td>
-                                    <td>@TextoEstado(m.Estado)</td>
-                                    <td class="num">@(m.Importe?.ToString("C2") ?? "Sin tarifa")</td>
-                                    <td class="num">@m.SaldoAcumulado.ToString("C2")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                <div class="campo">
+                    <label for="hasta">Hasta</label>
+                    <input id="hasta" type="date" @bind="hasta" required />
                 </div>
-            }
+                <button type="submit" class="primario" disabled="@cargando"><i class="ph ph-magnifying-glass"></i>Consultar</button>
+            </form>
         </div>
+    </section>
+
+    @if (cargando)
+    {
+        <p class="vacio">Cargando…</p>
     }
-}
+    else if (datos is null || datos.Cuentas.Count == 0)
+    {
+        <p class="vacio">Todavía no trabajás con ningún operador: no hay cuenta corriente para mostrar.</p>
+    }
+    else
+    {
+        @foreach (var cuenta in datos.Cuentas)
+        {
+            <section class="tarjeta">
+                <h2 class="titulo-tarjeta">@cuenta.Operador</h2>
+
+                <dl class="cifras">
+                    <div><dt>Saldo anterior al @datos.Desde.ToString("dd/MM/yyyy")</dt><dd>@cuenta.SaldoAnterior.ToString("C2")</dd></div>
+                    <div><dt>Cargos del período</dt><dd>@cuenta.CargosDelPeriodo.ToString("C2")</dd></div>
+                    <div><dt>Saldo al @datos.Hasta.ToString("dd/MM/yyyy")</dt><dd>@cuenta.SaldoFinal.ToString("C2")</dd></div>
+                </dl>
+
+                @if (cuenta.ServiciosSinTarifa > 0)
+                {
+                    <p class="aviso mt-4">@cuenta.ServiciosSinTarifa servicio(s) del período no tienen tarifa calculada y no suman importe.</p>
+                }
+
+                <h3 class="subtitulo">Liquidaciones mensuales</h3>
+                @if (cuenta.Liquidaciones.Count == 0)
+                {
+                    <p class="vacio">No hay servicios en el período.</p>
+                }
+                else
+                {
+                    <div class="tabla">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Mes</th>
+                                    <th class="num">Envíos</th>
+                                    <th class="num">Retiros</th>
+                                    <th class="num">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var l in cuenta.Liquidaciones)
+                                {
+                                    <tr>
+                                        <td>@NombreMes(l.Mes) @l.Anio</td>
+                                        <td class="num">@l.Envios</td>
+                                        <td class="num">@l.Retiros</td>
+                                        <td class="num">@l.Total.ToString("C2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                <h3 class="subtitulo">Movimientos</h3>
+                @{ var movimientos = Filtrar(cuenta.Movimientos).ToList(); }
+                @if (movimientos.Count == 0)
+                {
+                    <p class="vacio">@(string.IsNullOrWhiteSpace(busqueda) ? "No hay movimientos en el período." : $"Ningún movimiento coincide con «{busqueda.Trim()}».")</p>
+                }
+                else
+                {
+                    <div class="tabla">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Servicio</th>
+                                    <th>Referencia</th>
+                                    <th>Estado</th>
+                                    <th class="num">Importe</th>
+                                    <th class="num">Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var m in movimientos)
+                                {
+                                    <tr>
+                                        <td>@m.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td>@(m.Tipo == "Retiro" ? "Retiro" : "Envío")</td>
+                                        <td class="codigo">@m.Referencia</td>
+                                        <td>@TextoEstado(m.Estado)</td>
+                                        <td class="num">@(m.Importe?.ToString("C2") ?? "Sin tarifa")</td>
+                                        <td class="num">@m.SaldoAcumulado.ToString("C2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        }
+    }
+</div>
 
 @code {
     private CuentaCorrienteItem? datos;
     private DateOnly desde = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-5);
     private DateOnly hasta = DateOnly.FromDateTime(DateTime.Today);
     private bool cargando = true;
-    private string? mensaje;
 
     private static readonly string[] Meses =
     [
@@ -177,6 +159,14 @@ else
         ["EntregadoAlComercio"] = "Entregado al comercio"
     };
 
+    // La búsqueda filtra los movimientos ya traídos: el período lo decide la consulta.
+    private string busqueda = "";
+
+    private IEnumerable<MovimientoItem> Filtrar(IEnumerable<MovimientoItem> movimientos) =>
+        string.IsNullOrWhiteSpace(busqueda)
+            ? movimientos
+            : movimientos.Where(m => m.Referencia.Contains(busqueda.Trim(), StringComparison.OrdinalIgnoreCase));
+
     private static string NombreMes(int mes) => mes is >= 1 and <= 12 ? Meses[mes - 1] : mes.ToString();
 
     private static string TextoEstado(string estado) => Estados.GetValueOrDefault(estado, estado);
@@ -191,12 +181,11 @@ else
     {
         if (hasta < desde)
         {
-            mensaje = "La fecha «hasta» no puede ser anterior a «desde».";
+            Notificaciones.Error("Período inválido", "La fecha «hasta» no puede ser anterior a «desde».");
             return;
         }
 
         cargando = true;
-        mensaje = null;
         StateHasChanged();
 
         try
@@ -209,7 +198,7 @@ else
         catch (JSException ex)
         {
             datos = null;
-            mensaje = ex.Message;
+            Notificaciones.Error("No se pudo cargar la cuenta corriente", ex.Message);
         }
         finally
         {

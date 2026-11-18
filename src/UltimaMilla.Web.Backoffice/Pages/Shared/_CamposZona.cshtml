@@ -1,0 +1,36 @@
+@* Campos de una zona, compartidos por Zonas (alta) y EditarZona. Se usa con <partial for="Formulario">, que conserva el prefijo de los nombres. *@
+@model UltimaMilla.Web.Backoffice.Pages.CrearZonaFormulario
+
+<div class="grid gap-4">
+    <div class="grid gap-4 sm:grid-cols-3">
+        <div class="campo">
+            <label asp-for="Nombre">Nombre de la zona</label>
+            <input asp-for="Nombre" placeholder="San José de Mayo" />
+            <span asp-validation-for="Nombre"></span>
+        </div>
+        <div class="campo">
+            <label asp-for="Departamento">Departamento</label>
+            <input asp-for="Departamento" placeholder="San José" />
+            <span asp-validation-for="Departamento"></span>
+        </div>
+        <div class="campo">
+            <label asp-for="MinutosTraslado">Minutos entre paradas</label>
+            <div class="sufijo"><input asp-for="MinutosTraslado" type="number" min="1" /><span>min</span></div>
+            <span asp-validation-for="MinutosTraslado"></span>
+        </div>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+        <div class="campo">
+            <label asp-for="Coberturas">Localidades y sectores</label>
+            <textarea asp-for="Coberturas" rows="5" placeholder="San José de Mayo&#10;Montevideo | Cordón"></textarea>
+            <span class="nota">Una por línea. Toda una localidad: su nombre. Un sector: Localidad | Sector.</span>
+            <span asp-validation-for="Coberturas"></span>
+        </div>
+        <div class="campo">
+            <label asp-for="Franjas">Franjas horarias</label>
+            <textarea asp-for="Franjas" rows="5" placeholder="09:00-12:00&#10;14:00-18:00"></textarea>
+            <span class="nota">Una por línea, HH:mm-HH:mm, sin superponerse.</span>
+            <span asp-validation-for="Franjas"></span>
+        </div>
+    </div>
+</div>

@@ -3,98 +3,89 @@
 @using Microsoft.JSInterop
 @attribute [Authorize(Policy = "AdministradorComercio")]
 @inject IJSRuntime JS
+@inject Notificaciones Notificaciones
 
 <PageTitle>Usuarios - Última Milla</PageTitle>
 
-<div class="encabezado">
-    <div>
-        <h1>Usuarios del comercio</h1>
-        <p>Las personas que cargan envíos y consultan la información de tu comercio.</p>
-    </div>
-</div>
+<div class="pagina">
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Usuarios del comercio</h2>
+        @if (usuarios.Count == 0)
+        {
+            <p class="vacio">Cargando usuarios…</p>
+        }
+        else
+        {
+            <div class="tabla">
+                <table>
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Perfil</th></tr></thead>
+                    <tbody>
+                        @foreach (var u in usuarios)
+                        {
+                            <tr>
+                                <td>@u.Nombre</td>
+                                <td>@u.Email</td>
+                                <td><span class="chip @(u.Perfil == "AdministradorComercio" ? "chip-acento" : null)">@(u.Perfil == "AdministradorComercio" ? "Administrador" : "Usuario")</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 
-@if (!string.IsNullOrWhiteSpace(error))
-{
-    <div class="aviso error"><i class="ph ph-x-circle"></i><span>@error</span></div>
-}
-@if (!string.IsNullOrWhiteSpace(mensaje))
-{
-    <div class="aviso ok"><i class="ph ph-check-circle"></i><span>@mensaje</span></div>
-}
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Dar de alta</h2>
+        <form @onsubmit="Alta" @onsubmit:preventDefault>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="campo">
+                    <label for="nombre">Nombre completo</label>
+                    <input id="nombre" @bind="nombre" autocomplete="off" required />
+                </div>
+                <div class="campo">
+                    <label for="email">Correo electrónico</label>
+                    <input id="email" type="email" @bind="email" autocomplete="off" required />
+                </div>
+                <div class="campo">
+                    <label for="password">Contraseña inicial <span class="opcional">(vacía si ya tiene cuenta)</span></label>
+                    <input id="password" type="password" autocomplete="new-password" @bind="password" />
+                </div>
+                <div class="campo">
+                    <label for="perfil">Perfil</label>
+                    <select id="perfil" @bind="perfil">
+                        <option value="Comercio">Usuario</option>
+                        <option value="AdministradorComercio">Administrador</option>
+                    </select>
+                </div>
+            </div>
+            <div class="acciones">
+                <button type="submit" class="primario h-[44px]" disabled="@procesando"><i class="ph ph-user-plus"></i>@(procesando ? "Dando de alta…" : "Dar de alta")</button>
+            </div>
+        </form>
+    </section>
 
-<div class="tarjeta">
-    @if (usuarios.Count == 0)
-    {
-        <p class="nota">Cargando usuarios...</p>
-    }
-    else
-    {
-        <div class="tabla">
-            <table>
-                <thead><tr><th>Nombre</th><th>Email</th><th>Perfil</th></tr></thead>
-                <tbody>
-                    @foreach (var u in usuarios)
-                    {
-                        <tr>
-                            <td>@u.Nombre</td>
-                            <td>@u.Email</td>
-                            <td>@(u.Perfil == "AdministradorComercio" ? "Administrador" : "Usuario")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-</div>
-
-<div class="tarjeta">
-    <h2>Dar de alta</h2>
-    <form @onsubmit="Alta" @onsubmit:preventDefault>
-        <div class="campos">
-            <div>
-                <label for="nombre">Nombre completo</label>
-                <input id="nombre" @bind="nombre" required />
-            </div>
-            <div>
-                <label for="email">Correo electrónico</label>
-                <input id="email" type="email" @bind="email" required />
-            </div>
-            <div>
-                <label for="password">Contraseña inicial</label>
-                <input id="password" type="password" autocomplete="new-password" @bind="password" />
-                <p class="nota">Se puede dejar vacía si la persona ya tiene cuenta.</p>
-            </div>
-            <div>
-                <label for="perfil">Perfil</label>
-                <select id="perfil" @bind="perfil">
-                    <option value="Comercio">Usuario</option>
-                    <option value="AdministradorComercio">Administrador</option>
-                </select>
-            </div>
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Integración por API</h2>
+        <p class="nota mb-4">
+            Tu sistema puede solicitar envíos y retiros llamando a <code>POST /api/envios</code> y <code>POST /api/retiros</code>
+            con el encabezado <code>X-Api-Key</code>. La clave actúa con tu usuario y se muestra una sola vez;
+            generar otra invalida la anterior.
+        </p>
+        <div class="grid gap-3">
+            @if (claveApi is not null)
+            {
+                <p class="rounded-xl border border-borde bg-hundido px-4 py-3"><span class="etiqueta mb-1">Clave de API</span><code class="break-all">@claveApi</code></p>
+            }
+            @if (clavePruebas is not null)
+            {
+                <p class="rounded-xl border border-borde bg-hundido px-4 py-3"><span class="etiqueta mb-1">Clave de pruebas</span><code class="break-all">@clavePruebas</code></p>
+            }
         </div>
         <div class="acciones">
-            <button type="submit" class="primario" disabled="@procesando"><i class="ph ph-user-plus"></i>Dar de alta</button>
+            <button type="button" @onclick="GenerarClaveAsync"><i class="ph ph-key"></i>Generar clave de API</button>
+            <button type="button" @onclick="ObtenerClavePruebasAsync"><i class="ph ph-flask"></i>Ver clave de pruebas</button>
         </div>
-    </form>
-</div>
-
-<div class="tarjeta">
-    <h2>Integración por API</h2>
-    <p class="nota">
-        Tu sistema puede solicitar envíos y retiros llamando a <code>POST /api/envios</code> y <code>POST /api/retiros</code>
-        con el encabezado <code>X-Api-Key</code>. La clave actúa con tu usuario y se muestra una sola vez;
-        generar otra invalida la anterior.
-    </p>
-    @if (claveApi is not null)
-    {
-        <p><code>@claveApi</code></p>
-    }
-    <button @onclick="GenerarClaveAsync"><i class="ph ph-key"></i>Generar clave de API</button>
-    @if (clavePruebas is not null)
-    {
-        <p>Clave de pruebas: <code>@clavePruebas</code></p>
-    }
-    <button @onclick="ObtenerClavePruebasAsync"><i class="ph ph-flask"></i>Ver clave de pruebas</button>
+    </section>
 </div>
 
 @code {
@@ -108,7 +99,7 @@
         }
         catch (JSException ex)
         {
-            error = ex.Message;
+            Notificaciones.Error("No se pudo generar la clave", ex.Message);
         }
     }
     private string? clavePruebas;
@@ -121,13 +112,12 @@
         }
         catch (JSException ex)
         {
-            error = ex.Message;
+            Notificaciones.Error("No se pudo obtener la clave de pruebas", ex.Message);
         }
     }
 
     private List<UsuarioDto> usuarios = new();
     private string nombre = "", email = "", password = "", perfil = "Comercio";
-    private string? error, mensaje;
     private bool procesando;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -144,7 +134,7 @@
         }
         catch (JSException ex)
         {
-            error = ex.Message;
+            Notificaciones.Error("No se pudieron cargar los usuarios", ex.Message);
         }
         StateHasChanged();
     }
@@ -152,7 +142,6 @@
     private async Task Alta()
     {
         procesando = true;
-        error = mensaje = null;
         try
         {
             await JS.InvokeVoidAsync("autenticacionPortal.altaUsuarioComercio", new
@@ -162,13 +151,13 @@
                 password = string.IsNullOrWhiteSpace(password) ? null : password,
                 perfil
             });
-            mensaje = $"{email} dado de alta.";
+            Notificaciones.Exito("Usuario dado de alta", email);
             nombre = email = password = "";
             await CargarAsync();
         }
         catch (JSException ex)
         {
-            error = ex.Message;
+            Notificaciones.Error("No se pudo dar de alta", ex.Message);
         }
         finally
         {

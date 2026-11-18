@@ -6,338 +6,237 @@
     ViewData["Title"] = "Detalle de envío";
 }
 
-<div class="encabezado">
-    <div>
-        <a asp-page="/Index">Volver a envíos</a>
-        <h1>Detalle de envío</h1>
-    </div>
+<div class="pagina">
+    <a asp-page="/Index" class="nota w-fit"><i class="ph ph-arrow-left"></i> Envíos</a>
+
+    @if (Model.Error is not null)
+    {
+        <p class="aviso error" role="alert">@Model.Error</p>
+    }
+
+    <partial name="_Toast" model="(false, Model.ErrorAccion)" />
+
+    @if (Model.Envio is { } envio)
+    {
+        var hayAcciones = envio.Estado is "NoEntregado" or "EntregadoParcialmente"
+            || Model.PuedeDeclararExtravio || Model.PuedeRegistrarReaparicion || envio.PuedeIniciarDevolucion;
+
+        <div class="grid items-start gap-[24px] @(hayAcciones ? "lg:grid-cols-[minmax(0,1fr)_320px]" : null)">
+            <div class="grid gap-[24px]">
+                <section class="tarjeta">
+                    <div class="cabecera-tarjeta">
+                        <h1 class="titulo-tarjeta"><span class="codigo">@envio.ReferenciaExterna</span></h1>
+                        <span class="@Formato.ClaseEstado(envio.Estado)">@Formato.Estado(envio.Estado)</span>
+                    </div>
+                    <dl class="datos">
+                        <dt>Destinatario</dt><dd>@envio.Destinatario</dd>
+                        <dt>Dirección</dt><dd>@envio.Direccion</dd>
+                        <dt>Modalidad</dt><dd>@Formato.Modalidad(envio.Modalidad)</dd>
+                        <dt>Alta</dt><dd>@Formato.Hora(envio.FechaAlta)</dd>
+                        <dt>Intentos de entrega</dt><dd>@envio.IntentosRealizados</dd>
+                    </dl>
+                </section>
+
+                <section class="tarjeta">
+                    <h2 class="titulo-tarjeta">Bultos <span class="chip">@envio.Bultos.Count</span></h2>
+                    <div class="tabla tabla-holgada">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Identificación</th>
+                                    <th>Estado</th>
+                                    <th>Medidas</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var bulto in envio.Bultos)
+                                {
+                                    <tr>
+                                        <td><b class="codigo">@bulto.Identificacion</b></td>
+                                        <td><span class="@(bulto.Estado switch { "Entregado" or "Devuelto" => "chip chip-exito", "EnDevolucion" or "Extraviado" => "chip chip-peligro", _ => "chip" })">@Formato.Estado(bulto.Estado)</span></td>
+                                        <td>
+                                            @Formato.Numero(bulto.PesoKg) kg
+                                            <span class="linea2">@bulto.AltoCm × @bulto.AnchoCm × @bulto.ProfundidadCm cm</span>
+                                        </td>
+                                        <td>
+                                            @if (envio.Estado is "EnDeposito" or "NoEntregado" or "EntregadoParcialmente" or "AsignadoARuta" or "EnTransito")
+                                            {
+                                                if (bulto.Estado == "Pendiente" && Model.PuedeGestionarDespacho)
+                                                {
+                                                    <details class="relative flex justify-end">
+                                                        <summary class="btn-secundario btn-chico ml-auto w-fit list-none [&::-webkit-details-marker]:hidden">Declarar extraviado</summary>
+                                                        <form method="post" asp-page-handler="ExtraviarBulto" asp-route-id="@envio.Id"
+                                                              class="absolute right-0 z-10 mt-2 grid w-72 gap-3 rounded-xl border border-borde bg-superficie p-4 text-left shadow-lg">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
+                                                            <div class="campo">
+                                                                <label for="justificacion-@bulto.Identificacion">Qué pasó y quién lo tenía</label>
+                                                                <input type="text" id="justificacion-@bulto.Identificacion" name="justificacion" maxlength="150" required />
+                                                            </div>
+                                                            <button type="submit" class="peligro">Declarar extraviado</button>
+                                                        </form>
+                                                    </details>
+                                                }
+                                                else if (bulto.Estado == "Extraviado" && Model.PuedeGestionarDeposito)
+                                                {
+                                                    <form method="post" asp-page-handler="ReaparecerBulto" asp-route-id="@envio.Id" class="text-right">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
+                                                        <button type="submit" class="primario btn-chico">Reaparecer</button>
+                                                    </form>
+                                                }
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                @if (Model.Discrepancias.Count > 0)
+                {
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta">Discrepancias de recepción</h2>
+                        <div class="tabla tabla-holgada">
+                            <table>
+                                <thead>
+                                    <tr><th>Fecha</th><th>Tipo</th><th>Bulto</th><th>Responsable</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var d in Model.Discrepancias)
+                                    {
+                                        <tr>
+                                            <td>@Formato.Hora(d.RegistradaEn)</td>
+                                            <td><span class="chip chip-alerta">@(d.Tipo == "BultoFaltante" ? "Bulto faltante" : "Bulto no declarado")</span></td>
+                                            <td class="codigo">@d.Identificacion</td>
+                                            <td>@d.Responsable</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                }
+
+                <section class="tarjeta">
+                    <h2 class="titulo-tarjeta">Historial</h2>
+                    @if (envio.Eventos.Count == 0)
+                    {
+                        <p class="vacio">Todavía no hay eventos registrados.</p>
+                    }
+                    else
+                    {
+                        <div class="tabla tabla-holgada">
+                            <table>
+                                <thead>
+                                    <tr><th>Fecha</th><th>Cambio</th><th>Responsable</th><th>Justificación</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var evento in envio.Eventos)
+                                    {
+                                        <tr>
+                                            <td>@Formato.Hora(evento.OcurridoEn)</td>
+                                            <td>
+                                                @Formato.Estado(evento.EstadoAnterior) <i class="ph ph-arrow-right text-suave"></i> <b>@Formato.Estado(evento.EstadoNuevo)</b>
+                                            </td>
+                                            <td>
+                                                @evento.Responsable
+                                                <span class="linea2">@evento.Origen</span>
+                                            </td>
+                                            <td>@(evento.Justificacion ?? "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </section>
+            </div>
+
+            @if (hayAcciones)
+            {
+                <aside class="grid gap-[24px] lg:sticky lg:top-[24px]">
+                    @if (envio.Estado is "NoEntregado" or "EntregadoParcialmente")
+                    {
+                        <section class="tarjeta">
+                            <h2 class="titulo-tarjeta">Retornar al depósito</h2>
+                            <form method="post" asp-page-handler="RetornarDeposito" asp-route-id="@envio.Id" class="grid gap-4">
+                                @Html.AntiForgeryToken()
+                                <p class="nota">Marcá los bultos pendientes que volvieron después del intento de entrega.</p>
+                                <div class="grid gap-2">
+                                    @foreach (var bulto in envio.Bultos.Where(b => b.Estado == "Pendiente"))
+                                    {
+                                        <label class="m-0 flex items-center gap-2 text-sm font-normal">
+                                            <input type="checkbox" name="identificaciones" value="@bulto.Identificacion" />
+                                            <span class="codigo">@bulto.Identificacion</span>
+                                        </label>
+                                    }
+                                </div>
+                                <div class="campo">
+                                    <label for="responsableRetorno">Responsable de recepción</label>
+                                    <input type="text" id="responsableRetorno" name="responsable" maxlength="150" required />
+                                </div>
+                                <button type="submit" class="primario w-full">Confirmar retorno</button>
+                            </form>
+                        </section>
+                    }
+
+                    @if (envio.PuedeIniciarDevolucion)
+                    {
+                        <section class="tarjeta">
+                            <h2 class="titulo-tarjeta">Iniciar devolución</h2>
+                            <form method="post" asp-page-handler="IniciarDevolucion" asp-route-id="@envio.Id" class="grid gap-4">
+                                @Html.AntiForgeryToken()
+                                <div class="campo">
+                                    <label for="responsableDevolucion">Responsable</label>
+                                    <input type="text" id="responsableDevolucion" name="responsable" required maxlength="150" />
+                                </div>
+                                <p class="nota">Solo se inicia si se cumplen las reglas operativas del envío.</p>
+                                <button type="submit" class="primario w-full">Iniciar devolución</button>
+                            </form>
+                        </section>
+                    }
+
+                    @if (Model.PuedeRegistrarReaparicion)
+                    {
+                        <section class="tarjeta" id="reaparicion">
+                            <h2 class="titulo-tarjeta">Registrar reaparición</h2>
+                            <form method="post" asp-page-handler="Reaparicion" asp-route-id="@envio.Id" class="grid gap-4">
+                                @Html.AntiForgeryToken()
+                                <p class="nota">Marcá los bultos encontrados. El envío vuelve al depósito y los que no aparecieron siguen extraviados.</p>
+                                <div class="grid gap-2">
+                                    @foreach (var bulto in envio.Bultos.Where(b => b.Estado == "Extraviado"))
+                                    {
+                                        <label class="m-0 flex items-center gap-2 text-sm font-normal">
+                                            <input type="checkbox" name="identificaciones" value="@bulto.Identificacion" />
+                                            <span class="codigo">@bulto.Identificacion</span>
+                                        </label>
+                                    }
+                                </div>
+                                <button type="submit" class="primario w-full"><i class="ph ph-arrow-counter-clockwise"></i>Registrar reaparición</button>
+                            </form>
+                        </section>
+                    }
+
+                    @if (Model.PuedeDeclararExtravio)
+                    {
+                        <section class="tarjeta">
+                            <h2 class="titulo-tarjeta">Declarar extraviado</h2>
+                            <form method="post" asp-page-handler="DeclararExtravio" asp-route-id="@envio.Id" class="grid gap-4">
+                                @Html.AntiForgeryToken()
+                                <p class="nota">El envío sale de la operación hasta que reaparezca. Queda a tu nombre con la justificación y libera su parada en la hoja de ruta.</p>
+                                <div class="campo">
+                                    <label for="justificacionExtravio">Justificación</label>
+                                    <textarea id="justificacionExtravio" name="justificacion" maxlength="1000" rows="3" required></textarea>
+                                </div>
+                                <button type="submit" class="peligro w-full"><i class="ph ph-warning"></i>Declarar extraviado</button>
+                            </form>
+                        </section>
+                    }
+                </aside>
+            }
+        </div>
+    }
 </div>
-
-@if (Model.Error is not null)
-{
-    <div class="aviso error" role="alert">
-        @Model.Error
-    </div>
-}
-
-@if (Model.Envio is { } envio)
-{
-    @if (Model.ErrorAccion is not null)
-    {
-        <div class="aviso error" role="alert">
-            @Model.ErrorAccion
-        </div>
-    }
-
-    <h2>Información general</h2>
-
-    <div class="tabla">
-        <table>
-            <tbody>
-                <tr>
-                    <th>Referencia</th>
-                    <td>@envio.ReferenciaExterna</td>
-                </tr>
-                <tr>
-                    <th>Estado</th>
-                    <td>@envio.Estado</td>
-                </tr>
-                <tr>
-                    <th>Destinatario</th>
-                    <td>@envio.Destinatario</td>
-                </tr>
-                <tr>
-                    <th>Dirección</th>
-                    <td>@envio.Direccion</td>
-                </tr>
-                <tr>
-                    <th>Modalidad</th>
-                    <td>@Formato.Modalidad(envio.Modalidad)</td>
-                </tr>
-                <tr>
-                    <th>Fecha de alta</th>
-                    <td>@Formato.Hora(envio.FechaAlta)</td>
-                </tr>
-                <tr>
-                    <th>Intentos de entrega</th>
-                    <td>@envio.IntentosRealizados</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <h2>Bultos</h2>
-
-    <div class="tabla">
-        <table>
-            <thead>
-                <tr>
-                    <th>Identificación</th>
-                    <th>Estado</th>
-                    <th>Peso (kg)</th>
-                    <th>Dimensiones (cm)</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var bulto in envio.Bultos)
-                {
-                    <tr>
-                        <td class="codigo">@bulto.Identificacion</td>
-                        <td>@bulto.Estado</td>
-                        <td>@Formato.Numero(bulto.PesoKg)</td>
-                        <td>
-                            @bulto.AltoCm ×
-                            @bulto.AnchoCm ×
-                            @bulto.ProfundidadCm
-                        </td>
-                        <td>
-                            @if (envio.Estado is "EnDeposito" or "NoEntregado" or "EntregadoParcialmente" or "AsignadoARuta" or "EnTransito")
-                            {
-                                if (bulto.Estado == "Pendiente" && Model.PuedeGestionarDespacho)
-                                {
-                                    <form method="post"
-                                          asp-page-handler="ExtraviarBulto"
-                                          asp-route-id="@envio.Id"
-                                          style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
-                                        <input type="text"
-                                               name="justificacion"
-                                               maxlength="150"
-                                               required
-                                               style="width:16rem; max-width:100%;"
-                                               placeholder="Qué pasó y quién lo tenía" />
-                                        <button type="submit" class="btn-secundario py-1.5 text-sm">
-                                            Declarar extraviado
-                                        </button>
-                                    </form>
-                                }
-                                else if (bulto.Estado == "Extraviado" && Model.PuedeGestionarDeposito)
-                                {
-                                    <form method="post"
-                                          asp-page-handler="ReaparecerBulto"
-                                          asp-route-id="@envio.Id">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
-                                        <button type="submit" class="primario py-1.5 text-sm">
-                                            Reaparecer
-                                        </button>
-                                    </form>
-                                }
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-
-    @if (envio.Estado is "NoEntregado" or "EntregadoParcialmente")
-{
-    <section class="mt-6">
-        <h2>Retornar al depósito</h2>
-
-        <p class="nota">
-            Registrá los bultos pendientes que regresaron
-            al depósito después del intento de entrega.
-        </p>
-
-        <form method="post"
-              asp-page-handler="RetornarDeposito"
-              asp-route-id="@envio.Id">
-
-            @Html.AntiForgeryToken()
-
-            <div class="modal-campo">
-                <label for="responsableRetorno">
-                    Responsable de recepción
-                </label>
-
-                <input type="text"
-                       id="responsableRetorno"
-                       name="responsable"
-                       maxlength="150"
-                       required />
-            </div>
-
-            <fieldset>
-                <legend>Bultos recibidos</legend>
-
-                @foreach (var bulto in envio.Bultos
-                    .Where(b => b.Estado == "Pendiente"))
-                {
-                    <label class="checkbox">
-                        <input type="checkbox"
-                               name="identificaciones"
-                               value="@bulto.Identificacion" />
-
-                        @bulto.Identificacion
-                    </label>
-                }
-            </fieldset>
-
-            <button type="submit" class="primario">
-                Confirmar retorno al depósito
-            </button>
-        </form>
-    </section>
-}
-    @if (Model.PuedeDeclararExtravio)
-    {
-        <section class="mt-6">
-            <h2>Declarar extraviado</h2>
-
-            <p class="nota">
-                El envío queda fuera de la operación hasta que reaparezca en el depósito.
-                Queda registrado a nombre de quien tiene la sesión, con su justificación, y
-                libera la parada de la hoja de ruta, si la tiene.
-            </p>
-
-            <form method="post" asp-page-handler="DeclararExtravio" asp-route-id="@envio.Id">
-                @Html.AntiForgeryToken()
-
-                <div class="modal-campo">
-                    <label for="justificacionExtravio">Justificación</label>
-                    <textarea id="justificacionExtravio" name="justificacion" maxlength="1000" rows="3" required></textarea>
-                </div>
-
-                <button type="submit" class="peligro">
-                    <i class="ph ph-warning"></i>Declarar extraviado
-                </button>
-            </form>
-        </section>
-    }
-
-    @if (Model.PuedeRegistrarReaparicion)
-    {
-        <section class="mt-6" id="reaparicion">
-            <h2>Registrar reaparición</h2>
-
-            <p class="nota">
-                Marcá los bultos encontrados en el depósito; al confirmar el envío vuelve
-                al depósito y los que no aparecieron siguen extraviados.
-            </p>
-
-            <form method="post" asp-page-handler="Reaparicion" asp-route-id="@envio.Id">
-                @Html.AntiForgeryToken()
-
-                <fieldset>
-                    <legend>Bultos encontrados</legend>
-
-                    @foreach (var bulto in envio.Bultos.Where(b => b.Estado == "Extraviado"))
-                    {
-                        <label class="checkbox">
-                            <input type="checkbox" name="identificaciones" value="@bulto.Identificacion" />
-                            @bulto.Identificacion
-                        </label>
-                    }
-                </fieldset>
-
-                <button type="submit" class="primario">
-                    <i class="ph ph-arrow-counter-clockwise"></i>Registrar reaparición
-                </button>
-            </form>
-        </section>
-    }
-
-    @if (Model.Discrepancias.Count > 0)
-    {
-        <h2>Discrepancias de recepción</h2>
-        <div class="tabla">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Tipo</th>
-                        <th>Bulto</th>
-                        <th>Responsable</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var d in Model.Discrepancias)
-                    {
-                        <tr>
-                            <td>@Formato.Hora(d.RegistradaEn)</td>
-                            <td>@(d.Tipo == "BultoFaltante" ? "Bulto faltante" : "Bulto no declarado")</td>
-                            <td>@d.Identificacion</td>
-                            <td>@d.Responsable</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-
-    <h2>Historial de eventos</h2>
-
-    @if (envio.Eventos.Count == 0)
-    {
-        <p class="nota">Todavía no hay eventos registrados.</p>
-    }
-    else
-    {
-        <div class="tabla">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Estado anterior</th>
-                        <th>Estado nuevo</th>
-                        <th>Responsable</th>
-                        <th>Origen</th>
-                        <th>Justificación</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var evento in envio.Eventos)
-                    {
-                        <tr>
-                            <td>@Formato.Hora(evento.OcurridoEn)</td>
-                            <td>@evento.EstadoAnterior</td>
-                            <td>@evento.EstadoNuevo</td>
-                            <td>@evento.Responsable</td>
-                            <td>@evento.Origen</td>
-                            <td>@(evento.Justificacion ?? "—")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-@if (envio.PuedeIniciarDevolucion)
-{
-    <section class="mt-6">
-        <h2>Acciones disponibles</h2>
-
-        <form method="post"
-              asp-page-handler="IniciarDevolucion"
-              asp-route-id="@envio.Id">
-
-            @Html.AntiForgeryToken()
-
-            <div class="modal-campo">
-                <label for="responsableDevolucion">
-                    Responsable
-                </label>
-
-                <input type="text"
-                       id="responsableDevolucion"
-                       name="responsable"
-                       required
-                       maxlength="150"
-                       placeholder="Nombre del responsable" />
-            </div>
-
-            <button type="submit" class="primario">
-                Iniciar devolución
-            </button>
-        </form>
-
-        <p class="nota">
-            La devolución solo se iniciará si se cumplen
-            las reglas operativas del envío.
-        </p>
-    </section>
-}
-}

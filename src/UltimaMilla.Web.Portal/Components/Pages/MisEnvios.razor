@@ -5,171 +5,105 @@
 @attribute [Authorize(Policy = "ComercioPortal")]
 @rendermode InteractiveServer
 @inject IJSRuntime JS
+@inject Notificaciones Notificaciones
 
 <PageTitle>Mis envíos - Última Milla</PageTitle>
 
-<div class="encabezado">
-    <div>
-        <h1>Mis envíos</h1>
-        <p>Consultá los envíos de tu comercio y su estado actual.</p>
-    </div>
-</div>
-
 @if (cargando)
 {
-    <p>Cargando envíos...</p>
+    <p class="vacio">Cargando envíos…</p>
 }
 else if (!string.IsNullOrWhiteSpace(error) && envios.Count == 0)
 {
-    <div class="aviso error" role="alert">@error</div>
-}
-else if (envios.Count == 0)
-{
-    <div class="tarjeta">
-        <p>Todavía no tenés envíos registrados.</p>
-    </div>
+    <p class="aviso error" role="alert">@error</p>
 }
 else
 {
-    @if (!string.IsNullOrWhiteSpace(error))
-    {
-        <div class="aviso error" role="alert">@error</div>
-    }
+    <section class="tarjeta">
+        <div class="cabecera-tarjeta">
+            <h2 class="titulo-tarjeta">Envíos <span class="chip">@envios.Count</span></h2>
+            <a href="/" class="btn-primario btn-chico"><i class="ph ph-plus-circle"></i>Nuevo envío</a>
+        </div>
 
-    <p class="mb-2 text-sm text-suave">
-        @envios.Count envíos
-    </p>
-
-    <div style="width:100%; overflow-x:auto; border:1px solid #e5e7eb; border-radius:16px; background:white;">
-        <table style="width:100%; min-width:1350px; border-collapse:collapse; font-size:14px; white-space:nowrap;">
-            <thead>
-                <tr style="border-bottom:1px solid #e5e7eb; text-align:left;">
-                    <th style="padding:14px;">Referencia</th>
-                    <th style="padding:14px;">Operador</th>
-                    <th style="padding:14px;">Destinatario</th>
-                    <th style="padding:14px;">Dirección</th>
-                    <th style="padding:14px;">Bultos</th>
-                    <th style="padding:14px;">Peso (kg)</th>
-                    <th style="padding:14px;">Modalidad</th>
-                    <th style="padding:14px;">Estado</th>
-                    <th style="padding:14px;">Acciones</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                @foreach (var envio in envios)
-                {
-                    <tr @key="envio.Id"
-                        style="border-bottom:1px solid #e5e7eb;">
-
-                        <td style="padding:14px; font-weight:600;">
-                            @envio.ReferenciaExterna
-                        </td>
-
-                        <td style="padding:14px;">
-                            @envio.OperadorNombre
-                        </td>
-
-                        <td style="padding:14px;">
-                            @envio.DestinatarioNombre
-                        </td>
-
-                        <td style="padding:14px;">
-                            @envio.Direccion
-                        </td>
-
-                        <td style="padding:14px;">
-                            @envio.CantidadBultos
-                        </td>
-
-                        <td style="padding:14px;">
-                            @envio.PesoTotalKg
-                        </td>
-
-                        <td style="padding:14px;">
-                            @FormatearModalidad(envio.Modalidad)
-                        </td>
-
-                        <td style="padding:14px;">
-                            <span class="@ClaseEstado(envio.Estado)">
-                                @FormatearEstado(envio.Estado)
-                            </span>
-                        </td>
-
-                        <td style="padding:14px;">
-                            <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
-
-                                <button type="button"
-                                        class="rounded-xl border border-borde px-3 py-2 hover:bg-fondo"
-                                        @onclick="() => VerDetalleAsync(envio.Id)">
-                                    Ver detalle
-                                </button>
-
-                                <button type="button"
-                                        class="rounded-xl border border-borde px-3 py-2 hover:bg-fondo"
-                                        @onclick="() => ImprimirEtiquetaAsync(envio)">
-                                    Imprimir etiqueta
-                                </button>
-
-                            </div>
-                        </td>
-                    </tr>
-
-                    @if (envioSeleccionado == envio.Id)
-                    {
+        @if (envios.Count == 0)
+        {
+            <p class="vacio">Todavía no tenés envíos registrados.</p>
+        }
+        else
+        {
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
                         <tr>
-                            <td colspan="9"
-                                style="padding:20px; background:#f9fafb; white-space:normal;">
-
-                                @if (cargandoDetalle)
-                                {
-                                    <p>Cargando detalle...</p>
-                                }
-                                else if (!string.IsNullOrWhiteSpace(errorDetalle))
-                                {
-                                    <div class="aviso error" role="alert">
-                                        @errorDetalle
-                                    </div>
-                                }
-                                else if (detalle is not null)
-                                {
-                                    <h3 class="mb-3 font-semibold">
-                                        Detalle del envío
-                                    </h3>
-
-                                    <p>
-                                        <strong>Referencia:</strong>
-                                        @detalle.ReferenciaExterna
-                                    </p>
-
-                                    <p>
-                                        <strong>Estado:</strong>
-                                        @FormatearEstado(detalle.Estado)
-                                    </p>
-
-                                    <h4 class="mt-4 font-semibold">Bultos</h4>
-
-                                    @foreach (var bulto in detalle.Bultos)
-                                    {
-                                        <p>
-                                            @bulto.Identificacion —
-                                            @bulto.Estado
-                                        </p>
-                                    }
-                                }
-
-                                <button type="button"
-                                        class="mt-4 rounded-xl border border-borde px-4 py-2"
-                                        @onclick="CerrarDetalle">
-                                    Cerrar
-                                </button>
-                            </td>
+                            <th>Envío</th>
+                            <th>Destinatario</th>
+                            <th>Carga</th>
+                            <th>Estado</th>
+                            <th></th>
                         </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
+                    </thead>
+                    <tbody>
+                        @foreach (var envio in envios)
+                        {
+                            <tr @key="envio.Id">
+                                <td>
+                                    <b class="codigo">@envio.ReferenciaExterna</b>
+                                    <span class="linea2">@envio.OperadorNombre · @envio.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy")</span>
+                                </td>
+                                <td>
+                                    @envio.DestinatarioNombre
+                                    <span class="linea2">@envio.Direccion</span>
+                                </td>
+                                <td>
+                                    @(envio.CantidadBultos == 1 ? "1 bulto" : $"{envio.CantidadBultos} bultos") · @envio.PesoTotalKg.ToString("0.###") kg
+                                    <span class="linea2">@FormatearModalidad(envio.Modalidad)</span>
+                                </td>
+                                <td><span class="@ClaseEstado(envio.Estado)">@FormatearEstado(envio.Estado)</span></td>
+                                <td>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button type="button" class="btn-chico"
+                                                aria-expanded="@(envioSeleccionado == envio.Id ? "true" : "false")"
+                                                @onclick="() => AlternarDetalleAsync(envio.Id)">
+                                            <i class="ph @(envioSeleccionado == envio.Id ? "ph-caret-up" : "ph-caret-down")"></i>Detalle
+                                        </button>
+                                        <button type="button" class="btn-chico" @onclick="() => ImprimirEtiquetaAsync(envio)">
+                                            <i class="ph ph-printer"></i>Etiqueta
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            @if (envioSeleccionado == envio.Id)
+                            {
+                                <tr class="hover:bg-transparent">
+                                    <td colspan="5" class="bg-hundido">
+                                        @if (cargandoDetalle)
+                                        {
+                                            <p class="vacio">Cargando detalle…</p>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(errorDetalle))
+                                        {
+                                            <p class="aviso error" role="alert">@errorDetalle</p>
+                                        }
+                                        else if (detalle is not null)
+                                        {
+                                            <p class="mb-2 text-[13px] font-semibold">Bultos</p>
+                                            <ul class="flex flex-wrap gap-2">
+                                                @foreach (var bulto in detalle.Bultos)
+                                                {
+                                                    <li class="chip"><span class="codigo">@bulto.Identificacion</span> · @FormatearEstado(bulto.Estado)</li>
+                                                }
+                                            </ul>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 }
 
 @code {
@@ -234,6 +168,15 @@ else
         }
     }
 
+    private Task AlternarDetalleAsync(Guid envioId)
+    {
+        if (envioSeleccionado != envioId)
+            return VerDetalleAsync(envioId);
+
+        CerrarDetalle();
+        return Task.CompletedTask;
+    }
+
     private void CerrarDetalle()
     {
         envioSeleccionado = null;
@@ -243,8 +186,6 @@ else
 
     private async Task ImprimirEtiquetaAsync(EnvioDto envio)
     {
-        error = null;
-
         try
         {
             var detalleEnvio = await JS.InvokeAsync<DetalleEnvioDto>(
@@ -253,7 +194,7 @@ else
 
             if (detalleEnvio.Bultos.Count == 0)
             {
-                error = "El envío no tiene bultos para imprimir.";
+                Notificaciones.Error("No se pudo imprimir la etiqueta", "El envío no tiene bultos.");
                 return;
             }
 
@@ -276,7 +217,7 @@ else
         }
         catch (JSException ex)
         {
-            error = $"No se pudo generar la etiqueta: {ex.Message}";
+            Notificaciones.Error("No se pudo imprimir la etiqueta", ex.Message);
         }
     }
 
@@ -290,6 +231,10 @@ else
         "EnDevolucion" => "En devolución",
         "Devuelto" => "Devuelto",
         "Pendiente" => "Pendiente",
+        "Admitido" => "Admitido",
+        "EnDeposito" => "En depósito",
+        "EntregadoParcialmente" => "Entregado parcialmente",
+        "Extraviado" => "Extraviado",
         _ => estado
     };
 
@@ -300,30 +245,14 @@ else
         _ => modalidad
     };
 
-    private static string ClaseEstado(string estado)
+    private static string ClaseEstado(string estado) => estado switch
     {
-        const string baseCss =
-            "inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ";
-
-        var color = estado switch
-        {
-            "Entregado" or "Devuelto" or "AsignadoARuta" =>
-                "bg-green-100 text-green-700",
-
-            "EnTransito" =>
-                "bg-orange-100 text-orange-700",
-
-            "Reprogramado" or "NoEntregado" =>
-                "bg-yellow-100 text-yellow-700",
-
-            "EnDevolucion" =>
-                "bg-red-100 text-red-700",
-
-            _ => "bg-gray-100 text-gray-700"
-        };
-
-        return baseCss + color;
-    }
+        "Entregado" or "Devuelto" => "chip chip-exito",
+        "EnTransito" or "AsignadoARuta" => "chip chip-acento",
+        "Reprogramado" or "NoEntregado" => "chip chip-alerta",
+        "EnDevolucion" or "Extraviado" => "chip chip-peligro",
+        _ => "chip"
+    };
 
     private sealed class EnvioDto
     {

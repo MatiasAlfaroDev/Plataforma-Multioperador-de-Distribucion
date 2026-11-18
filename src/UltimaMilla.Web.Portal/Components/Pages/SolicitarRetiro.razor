@@ -1,0 +1,307 @@
+@page "/retiros/nuevo"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "ComercioPortal")]
+@inject IJSRuntime JS
+@inject Notificaciones Notificaciones
+
+<PageTitle>Solicitar retiro - Última Milla</PageTitle>
+
+<EditForm EditContext="contexto" OnValidSubmit="SolicitarAsync">
+    <DataAnnotationsValidator />
+
+    <div class="grid items-start gap-[24px] lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div class="grid gap-[24px]">
+            <section class="tarjeta">
+                <h2 class="titulo-tarjeta"><span class="paso">1</span>Datos del retiro</h2>
+                @if (!cargando && cuentas.Count == 0)
+                {
+                    <p class="aviso mb-4">Ninguno de tus operadores ofrece retiros a domicilio por ahora.</p>
+                }
+                <div class="grid gap-4">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="campo">
+                            <label for="cuenta">Operador</label>
+                            <InputSelect id="cuenta" @bind-Value="modelo.CuentaComercialId">
+                                <option value="">Elegí un operador…</option>
+                                @foreach (var c in cuentas)
+                                {
+                                    <option value="@c.Id">@c.OperadorNombre</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => modelo.CuentaComercialId" />
+                        </div>
+                        <div class="campo">
+                            <label for="motivo">Motivo</label>
+                            <InputText id="motivo" @bind-Value="modelo.Motivo" placeholder="Cambio de talle" maxlength="500" />
+                            <ValidationMessage For="() => modelo.Motivo" />
+                        </div>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-3">
+                        <div class="campo">
+                            <label for="fecha">Fecha</label>
+                            <InputDate id="fecha" @bind-Value="modelo.Fecha" ParsingErrorMessage="Ingresá una fecha válida." />
+                            <ValidationMessage For="() => modelo.Fecha" />
+                        </div>
+                        <div class="campo">
+                            <label for="desde">Desde</label>
+                            <InputDate id="desde" Type="InputDateType.Time" @bind-Value="modelo.HoraDesde" ParsingErrorMessage="Ingresá una hora válida." />
+                            <ValidationMessage For="() => modelo.HoraDesde" />
+                        </div>
+                        <div class="campo">
+                            <label for="hasta">Hasta</label>
+                            <InputDate id="hasta" Type="InputDateType.Time" @bind-Value="modelo.HoraHasta" ParsingErrorMessage="Ingresá una hora válida." />
+                            <ValidationMessage For="() => modelo.HoraHasta" />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tarjeta">
+                <h2 class="titulo-tarjeta"><span class="paso">2</span>Domicilio del comprador</h2>
+                <div class="grid gap-4">
+                    <div class="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                        <div class="campo">
+                            <label for="calle">Calle</label>
+                            <InputText id="calle" @bind-Value="modelo.Calle" maxlength="200" />
+                            <ValidationMessage For="() => modelo.Calle" />
+                        </div>
+                        <div class="campo">
+                            <label for="numero">Número <span class="opcional">(opcional)</span></label>
+                            <InputText id="numero" @bind-Value="modelo.Numero" maxlength="20" />
+                            <ValidationMessage For="() => modelo.Numero" />
+                        </div>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="campo">
+                            <label for="localidad">Localidad</label>
+                            <InputText id="localidad" @bind-Value="modelo.Localidad" maxlength="100" />
+                            <ValidationMessage For="() => modelo.Localidad" />
+                        </div>
+                        <div class="campo">
+                            <label for="departamento">Departamento</label>
+                            <InputText id="departamento" @bind-Value="modelo.Departamento" maxlength="50" />
+                            <ValidationMessage For="() => modelo.Departamento" />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tarjeta">
+                <h2 class="titulo-tarjeta"><span class="paso">3</span>Bultos</h2>
+                <div class="fila-bulto-retiro pb-1.5" aria-hidden="true">
+                    <span></span><span class="etiqueta">Identificación</span><span class="etiqueta">Peso</span><span class="etiqueta">Alto</span><span class="etiqueta">Ancho</span><span class="etiqueta">Profundidad</span><span></span>
+                </div>
+                @for (var i = 0; i < modelo.Bultos.Count; i++)
+                {
+                    var indice = i;
+                    var bulto = modelo.Bultos[indice];
+                    <div class="fila-bulto-retiro border-b border-borde py-3" @key="bulto">
+                        <span class="numero-bulto">@(indice + 1)</span>
+                        <div class="campo">
+                            <InputText @bind-Value="bulto.Identificacion" maxlength="100" aria-label="@($"Identificación del bulto {indice + 1}")" />
+                            <ValidationMessage For="() => bulto.Identificacion" />
+                        </div>
+                        <div class="campo">
+                            <div class="sufijo"><InputNumber @bind-Value="bulto.PesoKg" min="0.001" max="1000" aria-label="@($"Peso del bulto {indice + 1}, en kg")" ParsingErrorMessage="Ingresá un número." /><span>kg</span></div>
+                            <ValidationMessage For="() => bulto.PesoKg" />
+                        </div>
+                        <div class="campo">
+                            <div class="sufijo"><InputNumber @bind-Value="bulto.AltoCm" min="1" max="500" aria-label="@($"Alto del bulto {indice + 1}, en cm")" ParsingErrorMessage="Ingresá un número entero." /><span>cm</span></div>
+                            <ValidationMessage For="() => bulto.AltoCm" />
+                        </div>
+                        <div class="campo">
+                            <div class="sufijo"><InputNumber @bind-Value="bulto.AnchoCm" min="1" max="500" aria-label="@($"Ancho del bulto {indice + 1}, en cm")" ParsingErrorMessage="Ingresá un número entero." /><span>cm</span></div>
+                            <ValidationMessage For="() => bulto.AnchoCm" />
+                        </div>
+                        <div class="campo">
+                            <div class="sufijo"><InputNumber @bind-Value="bulto.ProfundidadCm" min="1" max="500" aria-label="@($"Profundidad del bulto {indice + 1}, en cm")" ParsingErrorMessage="Ingresá un número entero." /><span>cm</span></div>
+                            <ValidationMessage For="() => bulto.ProfundidadCm" />
+                        </div>
+                        <button type="button" class="quitar" title="Quitar bulto @(indice + 1)"
+                                disabled="@(modelo.Bultos.Count == 1)" @onclick="() => modelo.Bultos.RemoveAt(indice)">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+                }
+                <button type="button" class="mt-4 w-full border-dashed text-suave" @onclick="() => modelo.Bultos.Add(new NuevoBultoRetiroModel())">
+                    <i class="ph ph-plus"></i>Agregar bulto
+                </button>
+            </section>
+        </div>
+
+        <aside class="tarjeta lg:sticky lg:top-[24px]">
+            <h2 class="titulo-tarjeta">Resumen</h2>
+            <dl class="resumen">
+                <dt>Operador</dt><dd>@(cuentas.FirstOrDefault(c => c.Id.ToString() == modelo.CuentaComercialId)?.OperadorNombre ?? "—")</dd>
+                <dt>Fecha</dt><dd>@modelo.Fecha.ToString("dd/MM/yyyy")</dd>
+                <dt>Franja</dt><dd>@modelo.HoraDesde.ToString("HH:mm")–@modelo.HoraHasta.ToString("HH:mm")</dd>
+                <dt>Bultos</dt><dd>@modelo.Bultos.Count</dd>
+            </dl>
+
+            <ul class="secciones">
+                @foreach (var s in Secciones())
+                {
+                    <li class="@s.Estado">
+                        <i class="@(s.Estado switch { "ok" => "ph ph-check-circle", "mal" => "ph ph-x-circle", _ => "ph ph-circle" })"></i>
+                        <div>
+                            @s.Nombre
+                            @foreach (var m in s.Errores) { <span class="error-seccion">@m</span> }
+                        </div>
+                    </li>
+                }
+            </ul>
+
+            <p class="nota mb-5">El retiro llega a la dirección de recepción que configuraste para ese operador.</p>
+            <button type="submit" class="primario h-[44px] w-full" disabled="@(guardando || cuentas.Count == 0)">
+                <i class="ph ph-truck"></i>@(guardando ? "Solicitando…" : "Solicitar retiro")
+            </button>
+        </aside>
+    </div>
+</EditForm>
+
+
+@code {
+    // La API serializa EstadoCuentaComercial como número: 1 = Confirmada.
+    private const int CuentaConfirmada = 1;
+
+    private List<CuentaItem> cuentas = [];
+    private NuevoRetiroModel modelo = null!;
+    private EditContext contexto = null!;
+    private bool cargando = true, guardando;
+
+    private static readonly string[] CamposBulto =
+    [
+        nameof(NuevoBultoRetiroModel.Identificacion), nameof(NuevoBultoRetiroModel.PesoKg),
+        nameof(NuevoBultoRetiroModel.AltoCm), nameof(NuevoBultoRetiroModel.AnchoCm), nameof(NuevoBultoRetiroModel.ProfundidadCm)
+    ];
+
+    protected override void OnInitialized() =>
+        NuevoContexto(new NuevoRetiroModel { Fecha = DateOnly.FromDateTime(DateTime.Today.AddDays(1)) });
+
+    private void NuevoContexto(NuevoRetiroModel nuevo)
+    {
+        modelo = nuevo;
+        contexto = ValidacionFormulario.Crear(modelo, () => modelo.Bultos, StateHasChanged, ValidarReglasDelRetiro);
+    }
+
+    // Lo que DataAnnotations no expresa: la franja y las identificaciones repetidas (CrearRetiroValidator).
+    private void ValidarReglasDelRetiro(ValidationMessageStore errores)
+    {
+        if (modelo.HoraDesde >= modelo.HoraHasta)
+            errores.Add(new FieldIdentifier(modelo, nameof(NuevoRetiroModel.HoraHasta)), "Tiene que ser posterior a «desde».");
+
+        var repetidos = modelo.Bultos
+            .Where(b => !string.IsNullOrWhiteSpace(b.Identificacion))
+            .GroupBy(b => b.Identificacion.Trim(), StringComparer.OrdinalIgnoreCase)
+            .SelectMany(g => g.Skip(1));
+        foreach (var bulto in repetidos)
+            errores.Add(new FieldIdentifier(bulto, nameof(NuevoBultoRetiroModel.Identificacion)), "Esa identificación ya está en otro bulto.");
+    }
+
+    private IEnumerable<SeccionResumen> Secciones()
+    {
+        yield return ValidacionFormulario.Seccion(contexto, "Datos del retiro",
+            [nameof(NuevoRetiroModel.CuentaComercialId), nameof(NuevoRetiroModel.Motivo), nameof(NuevoRetiroModel.Fecha),
+             nameof(NuevoRetiroModel.HoraDesde), nameof(NuevoRetiroModel.HoraHasta)],
+            modelo.CuentaComercialId, modelo.Motivo);
+        yield return ValidacionFormulario.Seccion(contexto, "Domicilio del comprador",
+            [nameof(NuevoRetiroModel.Calle), nameof(NuevoRetiroModel.Numero), nameof(NuevoRetiroModel.Localidad), nameof(NuevoRetiroModel.Departamento)],
+            modelo.Calle, modelo.Localidad, modelo.Departamento);
+        yield return ValidacionFormulario.SeccionBultos(contexto, modelo.Bultos, CamposBulto);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        cargando = true;
+        try
+        {
+            // Aclaración 3.2: solo los operadores que tienen habilitado el retiro a domicilio.
+            var banderas = await JS.InvokeAsync<Dictionary<Guid, Dictionary<string, bool>>>("retirosPortal.banderas");
+            var todasLasCuentas = await JS.InvokeAsync<List<CuentaItem>>("autenticacionPortal.obtenerCuentasComerciales");
+            cuentas = todasLasCuentas
+                .Where(c => c.Activa && c.Estado == CuentaConfirmada)
+                .Where(c => !banderas.TryGetValue(c.OperadorId, out var b) || b.GetValueOrDefault("retiro-domicilio", true))
+                .ToList();
+            if (modelo.CuentaComercialId == "" && cuentas.Count > 0)
+                modelo.CuentaComercialId = cuentas[0].Id.ToString();
+        }
+        catch (JSException ex)
+        {
+            Notificaciones.Error("No se pudieron cargar los operadores", ex.Message);
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SolicitarAsync()
+    {
+        if (guardando)
+            return;
+
+        guardando = true;
+        try
+        {
+            var resultado = await JS.InvokeAsync<ResultadoOperacion>("retirosPortal.solicitar", new
+            {
+                cuentaComercialId = Guid.Parse(modelo.CuentaComercialId),
+                motivo = modelo.Motivo,
+                domicilioRetiro = new
+                {
+                    calle = modelo.Calle,
+                    numero = modelo.Numero,
+                    localidad = modelo.Localidad,
+                    departamento = modelo.Departamento
+                },
+                // Sin destino: la API usa la dirección de recepción del comercio para ese operador.
+                fecha = modelo.Fecha.ToString("yyyy-MM-dd"),
+                horaDesde = modelo.HoraDesde.ToString("HH:mm:ss"),
+                horaHasta = modelo.HoraHasta.ToString("HH:mm:ss"),
+                bultos = modelo.Bultos.Select(b => new
+                {
+                    identificacion = b.Identificacion,
+                    pesoKg = b.PesoKg,
+                    altoCm = b.AltoCm,
+                    anchoCm = b.AnchoCm,
+                    profundidadCm = b.ProfundidadCm
+                }).ToArray()
+            });
+
+            if (resultado.Exito)
+            {
+                Notificaciones.Exito("Retiro solicitado", $"{modelo.Calle} {modelo.Numero}, {modelo.Fecha:dd/MM/yyyy}.");
+                NuevoContexto(new NuevoRetiroModel
+                {
+                    CuentaComercialId = modelo.CuentaComercialId,
+                    Fecha = modelo.Fecha,
+                    HoraDesde = modelo.HoraDesde,
+                    HoraHasta = modelo.HoraHasta
+                });
+            }
+            else
+            {
+                Notificaciones.Error("No se pudo solicitar el retiro", resultado.Mensaje);
+            }
+        }
+        catch (JSException ex)
+        {
+            Notificaciones.Error("No se pudo solicitar el retiro", ex.Message);
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private sealed record CuentaItem(Guid Id, Guid OperadorId, string OperadorNombre, bool Activa, int Estado);
+    private sealed record ResultadoOperacion(bool Exito, string Mensaje);
+}

@@ -5,80 +5,60 @@
     ViewData["Title"] = "Avisos a comercios";
 }
 
-<h1>Avisos a comercios</h1>
+<div class="pagina">
+    <partial name="_Toast" model="(Model.Reencolado, Model.Mensaje)" />
+    <partial name="_Toast" model="(false, Model.Error)" />
 
-<p class="nota">
-    Cada novedad de un envío se avisa al sistema del comercio suscripto.
-    El Worker reintenta 5 veces con espera creciente y, si sigue fallando,
-    el aviso queda Fallida y el mensaje en la cola entregar-aviso_error.
-    Desde acá se reintenta.
-</p>
+    <section class="tarjeta">
+        <div class="cabecera-tarjeta">
+            <h2 class="titulo-tarjeta">Avisos a comercios <span class="chip">@Model.Avisos.Count</span></h2>
+            <form method="get" class="flex items-center gap-3">
+                <select id="estado" name="estado" asp-for="Estado" class="w-auto min-w-44" aria-label="Filtrar por estado" onchange="this.form.requestSubmit()">
+                    <option value="">Todos los estados</option>
+                    <option value="Fallida">Fallida</option>
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Entregada">Entregada</option>
+                </select>
+                <noscript><button type="submit">Filtrar</button></noscript>
+            </form>
+        </div>
+        <p class="nota mb-4">El Worker reintenta 5 veces con espera creciente; si sigue fallando, el aviso queda Fallida y el mensaje en la cola entregar-aviso_error. Desde acá se reintenta.</p>
 
-@if (Model.Mensaje is not null)
-{
-    <p class="aviso @(Model.Reencolado ? "ok" : "error")" role="status">
-        @Model.Mensaje
-    </p>
-}
-
-@if (Model.Error is not null)
-{
-    <p class="error" role="alert">
-        @Model.Error
-    </p>
-}
-
-<form method="get" class="filtro">
-    <label for="estado">Estado</label>
-    <select id="estado" name="estado" asp-for="Estado">
-        <option value="">Todos</option>
-        <option value="Fallida">Fallida</option>
-        <option value="Pendiente">Pendiente</option>
-        <option value="Entregada">Entregada</option>
-    </select>
-    <button type="submit">Filtrar</button>
-</form>
-
-@if (Model.Avisos.Count == 0)
-{
-    <p>No hay avisos con ese estado.</p>
-}
-else
-{
-    <div class="tabla">
-        <table>
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Evento</th>
-                    <th>Clave del evento</th>
-                    <th>Estado</th>
-                    <th class="num">Intentos</th>
-                    <th>Último error</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var a in Model.Avisos)
-                {
-                    <tr>
-                        <td>@a.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
-                        <td>@a.TipoEvento</td>
-                        <td>@a.ClaveEvento</td>
-                        <td>@a.Estado</td>
-                        <td class="num">@a.Intentos</td>
-                        <td>@a.UltimoError</td>
-                        <td>
-                            @if (a.Estado == "Fallida")
-                            {
-                                <form method="post" asp-page-handler="Reenviar" asp-route-id="@a.Id" asp-route-estado="@Model.Estado">
-                                    <button type="submit" class="primario">Reintentar</button>
-                                </form>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-}
+        @if (Model.Avisos.Count == 0)
+        {
+            <p class="vacio">No hay avisos con ese estado.</p>
+        }
+        else
+        {
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr><th>Evento</th><th>Estado</th><th class="num">Intentos</th><th>Último error</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in Model.Avisos)
+                        {
+                            <tr>
+                                <td>
+                                    <b class="codigo">@a.TipoEvento</b>
+                                    <span class="linea2">@a.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm") · <span class="codigo">@a.ClaveEvento</span></span>
+                                </td>
+                                <td><span class="chip @(a.Estado switch { "Entregada" => "chip-exito", "Fallida" => "chip-peligro", _ => null })">@a.Estado</span></td>
+                                <td class="num">@a.Intentos</td>
+                                <td>@a.UltimoError</td>
+                                <td class="text-right">
+                                    @if (a.Estado == "Fallida")
+                                    {
+                                        <form method="post" asp-page-handler="Reenviar" asp-route-id="@a.Id" asp-route-estado="@Model.Estado">
+                                            <button type="submit" class="primario btn-chico"><i class="ph ph-arrow-clockwise"></i>Reintentar</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>

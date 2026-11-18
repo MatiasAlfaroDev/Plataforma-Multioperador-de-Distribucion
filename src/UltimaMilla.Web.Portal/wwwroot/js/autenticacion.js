@@ -87,6 +87,11 @@ async registrar(
         return await respuesta.json();
     },
 
+    async cerrarSesion() {
+        await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+        window.location.href = "/login";
+    },
+
     async seleccionarComercio(comercioId) {
         const respuesta = await fetch("/api/auth/seleccionar-comercio", {
             method: "POST",
@@ -243,7 +248,10 @@ async crearEnvio(datos) {
 },
 
 async importarEnviosCsv(cuentaComercialId) {
-    const archivo = document.getElementById("archivoCsv")?.files?.[0];
+    const input = document.getElementById("archivoCsv");
+    const archivo = input?.files?.[0];
+    // El Portal importa al elegir el archivo: se vacía para que elegir el mismo vuelva a disparar el cambio.
+    if (input) input.value = "";
 
     if (!cuentaComercialId) {
         return {

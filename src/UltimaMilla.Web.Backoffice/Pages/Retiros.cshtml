@@ -6,144 +6,150 @@
     ViewData["Title"] = "Retiros";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Retiros a domicilio</h1>
-        <p>Retiros solicitados por los comercios, con las acciones que habilita cada estado.</p>
-    </div>
-</div>
+<div class="pagina">
+    @if (Model.Error is not null)
+    {
+        <p class="aviso error" role="alert">@Model.Error</p>
+    }
 
-@if (Model.Error is not null)
-{
-    <div class="aviso error" role="alert">@Model.Error</div>
-}
+    <section class="tarjeta">
+        <div class="cabecera-tarjeta">
+            <h2 class="titulo-tarjeta">Retiros a domicilio <span class="chip">@Model.Retiros.Count</span></h2>
+            <form method="get" class="flex flex-wrap items-end gap-3">
+                <div class="campo">
+                    <label for="estado">Estado</label>
+                    <select id="estado" name="estado" class="w-auto min-w-44">
+                        <option value="">Todos</option>
+                        @foreach (var e in RetirosModel.Estados)
+                        {
+                            <option value="@e" selected="@(Model.Estado == e)">@Formato.EstadoRetiro(e)</option>
+                        }
+                    </select>
+                </div>
+                <div class="campo">
+                    <label for="desde">Desde</label>
+                    <input id="desde" name="desde" type="date" value="@Model.Desde?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="campo">
+                    <label for="hasta">Hasta</label>
+                    <input id="hasta" name="hasta" type="date" value="@Model.Hasta?.ToString("yyyy-MM-dd")" />
+                </div>
+                <button type="submit"><i class="ph ph-funnel"></i>Filtrar</button>
+                <a asp-page="/Retiros" class="btn-secundario border-transparent">Limpiar</a>
+            </form>
+        </div>
 
-@if (TempData["MensajeExito"] is string exito)
-{
-    <div class="aviso ok" role="status">@exito</div>
-}
-
-@if (TempData["MensajeError"] is string fallo)
-{
-    <div class="aviso error" role="alert">@fallo</div>
-}
-
-<form method="get" class="filtro">
-    <div>
-        <label for="estado">Estado</label>
-        <select id="estado" name="estado">
-            <option value="">Todos</option>
-            @foreach (var e in RetirosModel.Estados)
+        @if (Model.Retiros.Count == 0)
+        {
+            @if (Model.Error is null)
             {
-                <option value="@e" selected="@(Model.Estado == e)">@Formato.EstadoRetiro(e)</option>
+                <p class="vacio">No hay retiros con esos filtros.</p>
             }
-        </select>
-    </div>
-    <div>
-        <label for="desde">Desde</label>
-        <input id="desde" name="desde" type="date" value="@Model.Desde?.ToString("yyyy-MM-dd")" />
-    </div>
-    <div>
-        <label for="hasta">Hasta</label>
-        <input id="hasta" name="hasta" type="date" value="@Model.Hasta?.ToString("yyyy-MM-dd")" />
-    </div>
-    <button type="submit"><i class="ph ph-funnel"></i>Filtrar</button>
-    <a asp-page="/Retiros">Limpiar</a>
-</form>
+        }
+        else
+        {
+            <p class="nota mb-4">
+                @string.Join(" · ", Model.Retiros.GroupBy(r => r.Estado).Select(g => $"{Formato.EstadoRetiro(g.Key)}: {g.Count()}"))
+            </p>
 
-@if (Model.Retiros.Count == 0 && Model.Error is null)
-{
-    <p class="nota">No hay retiros con esos filtros.</p>
-}
-else if (Model.Retiros.Count > 0)
-{
-    <p class="nota">
-        @string.Join(" · ", Model.Retiros.GroupBy(r => r.Estado).Select(g => $"{Formato.EstadoRetiro(g.Key)}: {g.Count()}"))
-    </p>
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Retiro</th>
+                            <th>Domicilio de retiro</th>
+                            <th>Motivo</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.Retiros)
+                        {
+                            var accion = r.Estado switch
+                            {
+                                "Retirado" => ("recibir-deposito", "Recibir en depósito"),
+                                "EnDeposito" => ("entregar-comercio", "Entregar al comercio"),
+                                "NoRetirado" when Model.EsDespacho => ("reprogramar", "Reprogramar"),
+                                _ => default
+                            };
+                            <tr>
+                                <td>
+                                    <b>@r.FechaSolicitada.ToString("dd/MM/yyyy")</b>
+                                    <span class="linea2">@r.HoraDesde.ToString("HH:mm")–@r.HoraHasta.ToString("HH:mm") · @(r.Bultos.Count == 1 ? "1 bulto" : $"{r.Bultos.Count} bultos")</span>
+                                </td>
+                                <td>
+                                    @r.DomicilioRetiro.Calle @r.DomicilioRetiro.Numero
+                                    <span class="linea2">@r.DomicilioRetiro.Localidad</span>
+                                </td>
+                                <td>
+                                    <details>
+                                        <summary class="font-normal text-texto">@r.Motivo</summary>
+                                        <span class="linea2">Bultos: @string.Join(", ", r.Bultos.Select(b => b.Identificacion))</span>
+                                        @if (r.DomicilioDestino is { } destino)
+                                        {
+                                            <span class="linea2">Destino: @destino.Calle @destino.Numero, @destino.Localidad</span>
+                                        }
+                                        @if (r.HojaDeRutaId is Guid hojaId)
+                                        {
+                                            <span class="linea2">Hoja de ruta: <span class="codigo">@hojaId</span></span>
+                                        }
+                                    </details>
+                                </td>
+                                <td>
+                                    <span class="@Formato.ClaseEstadoRetiro(r.Estado)">@Formato.EstadoRetiro(r.Estado)</span>
+                                    @if (r.MotivoCancelacion is not null)
+                                    {
+                                        <span class="linea2">@r.MotivoCancelacion</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="flex flex-wrap items-center justify-end gap-2">
+                                        @if (accion != default)
+                                        {
+                                            <form method="post" asp-page-handler="Accion"
+                                                  asp-route-estado="@Model.Estado" asp-route-desde="@Model.Desde" asp-route-hasta="@Model.Hasta">
+                                                <input type="hidden" name="retiroId" value="@r.Id" />
+                                                <input type="hidden" name="accion" value="@accion.Item1" />
+                                                <button type="submit" class="primario btn-chico">@accion.Item2</button>
+                                            </form>
+                                        }
 
-    <div class="tabla">
-        <table>
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Franja</th>
-                    <th>Motivo</th>
-                    <th>Domicilio de retiro</th>
-                    <th class="num">Bultos</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var r in Model.Retiros)
-                {
-                    var accion = r.Estado switch
-                    {
-                        "Retirado" => ("recibir-deposito", "Recibir en depósito"),
-                        "EnDeposito" => ("entregar-comercio", "Entregar al comercio"),
-                        "NoRetirado" when Model.EsDespacho => ("reprogramar", "Reprogramar"),
-                        _ => default
-                    };
-                    <tr>
-                        <td>@r.FechaSolicitada.ToString("dd/MM/yyyy")</td>
-                        <td>@r.HoraDesde.ToString("HH:mm") a @r.HoraHasta.ToString("HH:mm")</td>
-                        <td>
-                            <details>
-                                <summary>@r.Motivo</summary>
-                                <p class="nota">Bultos: @string.Join(", ", r.Bultos.Select(b => b.Identificacion))</p>
-                                @if (r.DomicilioDestino is { } destino)
-                                {
-                                    <p class="nota">Destino: @destino.Calle @destino.Numero, @destino.Localidad</p>
-                                }
-                                @if (r.HojaDeRutaId is Guid hojaId)
-                                {
-                                    <p class="nota">Hoja de ruta: <span class="codigo">@hojaId</span></p>
-                                }
-                                @if (r.MotivoCancelacion is not null)
-                                {
-                                    <p class="nota">Motivo de la cancelación: @r.MotivoCancelacion</p>
-                                }
-                            </details>
-                        </td>
-                        <td>@r.DomicilioRetiro.Calle @r.DomicilioRetiro.Numero, @r.DomicilioRetiro.Localidad</td>
-                        <td class="num">@r.Bultos.Count</td>
-                        <td>@Formato.EstadoRetiro(r.Estado)</td>
-                        <td>
-                            <div class="flex flex-wrap items-center gap-2">
-                                @if (accion != default)
-                                {
-                                    <form method="post" asp-page-handler="Accion"
-                                          asp-route-estado="@Model.Estado" asp-route-desde="@Model.Desde" asp-route-hasta="@Model.Hasta">
-                                        <input type="hidden" name="retiroId" value="@r.Id" />
-                                        <input type="hidden" name="accion" value="@accion.Item1" />
-                                        <button type="submit">@accion.Item2</button>
-                                    </form>
-                                }
+                                        @if (Model.EsDespacho && r.Estado == "AsignadoARuta" && r.HojaDeRutaId is Guid hoja)
+                                        {
+                                            <form method="post" asp-page-handler="QuitarDeHoja"
+                                                  asp-route-estado="@Model.Estado" asp-route-desde="@Model.Desde" asp-route-hasta="@Model.Hasta">
+                                                <input type="hidden" name="retiroId" value="@r.Id" />
+                                                <input type="hidden" name="hojaId" value="@hoja" />
+                                                <button type="submit" class="btn-chico" title="Solo mientras la hoja está en preparación">Quitar de la hoja</button>
+                                            </form>
+                                        }
 
-                                @if (Model.EsDespacho && r.Estado == "AsignadoARuta" && r.HojaDeRutaId is Guid hoja)
-                                {
-                                    <form method="post" asp-page-handler="QuitarDeHoja"
-                                          asp-route-estado="@Model.Estado" asp-route-desde="@Model.Desde" asp-route-hasta="@Model.Hasta">
-                                        <input type="hidden" name="retiroId" value="@r.Id" />
-                                        <input type="hidden" name="hojaId" value="@hoja" />
-                                        <button type="submit" title="Solo mientras la hoja está en preparación">Quitar de la hoja</button>
-                                    </form>
-                                }
+                                        @if (Model.EsDespacho && r.Estado == "Solicitado")
+                                        {
+                                            <details class="relative">
+                                                <summary class="btn-secundario btn-chico list-none text-peligro [&::-webkit-details-marker]:hidden">Cancelar</summary>
+                                                <form method="post" asp-page-handler="Cancelar"
+                                                      class="absolute right-0 z-10 mt-2 grid w-72 gap-3 rounded-xl border border-borde bg-superficie p-4 shadow-lg"
+                                                      asp-route-estado="@Model.Estado" asp-route-desde="@Model.Desde" asp-route-hasta="@Model.Hasta">
+                                                    <input type="hidden" name="retiroId" value="@r.Id" />
+                                                    <div class="campo">
+                                                        <label for="motivo-@r.Id">Motivo de la cancelación</label>
+                                                        <input id="motivo-@r.Id" name="motivo" maxlength="1000" required />
+                                                    </div>
+                                                    <button type="submit" class="peligro">Cancelar retiro</button>
+                                                </form>
+                                            </details>
+                                        }
 
-                                @if (Model.EsDespacho && r.Estado == "Solicitado")
-                                {
-                                    <form method="post" asp-page-handler="Cancelar" class="flex flex-wrap items-center gap-2"
-                                          asp-route-estado="@Model.Estado" asp-route-desde="@Model.Desde" asp-route-hasta="@Model.Hasta">
-                                        <input type="hidden" name="retiroId" value="@r.Id" />
-                                        <input name="motivo" maxlength="1000" required placeholder="Motivo" aria-label="Motivo de la cancelación" />
-                                        <button type="submit" class="peligro">Cancelar</button>
-                                    </form>
-                                }
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-}
+                                        <a asp-page="/DetalleRetiro" asp-route-id="@r.Id" class="btn-secundario btn-chico"><i class="ph ph-caret-right"></i>Detalle</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>

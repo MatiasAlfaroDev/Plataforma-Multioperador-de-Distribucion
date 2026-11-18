@@ -6,175 +6,108 @@
     ViewData["Title"] = "Reglas operativas";
 }
 
-<p class="nota">
-    Configurá las condiciones de entrega y devolución
-    de tu operador logístico.
-</p>
-
-@if (TempData["Mensaje"] is string mensaje)
-{
-    <p class="aviso ok" role="status">@mensaje</p>
-}
-
-@if (Model.Error is not null)
-{
-    <p class="aviso error" role="alert">@Model.Error</p>
-}
-
-<div asp-validation-summary="All" class="error"></div>
-
-@if (Model.OperadorIdSesion != Guid.Empty &&
-     Model.PuedeMostrarFormulario)
-{
-    <h2>
-        @(Model.ReglasEncontradas
-            ? "Reglas operativas vigentes"
-            : "Configuración de reglas operativas")
-    </h2>
-
-    @if (Model.VigenciaDesde.HasValue)
+<div class="pagina">
+    @if (Model.Error is not null)
     {
-        <p class="nota">
-            Vigente desde el @Formato.Hora(Model.VigenciaDesde.Value)
-        </p>
+        <p class="aviso error" role="alert">@Model.Error</p>
     }
 
-    <form method="post" id="form-reglas">
-        <div class="campos">
-            <div>
-                <label asp-for="MaximoIntentosEntrega">
-                    Máximo de intentos de entrega
-                </label>
-                <input asp-for="MaximoIntentosEntrega"
-                       type="number" min="1" required />
-            </div>
+    @if (Model.OperadorIdSesion != Guid.Empty && Model.PuedeMostrarFormulario)
+    {
+        <form method="post" id="form-reglas">
+            <div class="grid items-start gap-[24px] lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div class="grid gap-[24px]">
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta"><span class="paso">1</span>Entregas y devoluciones</h2>
+                        <div class="grid gap-4 sm:grid-cols-3">
+                            <div class="campo">
+                                <label asp-for="MaximoIntentosEntrega">Máximo de intentos</label>
+                                <input asp-for="MaximoIntentosEntrega" type="number" min="1" required />
+                                <span asp-validation-for="MaximoIntentosEntrega"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="HorasMinimasEntreIntentos">Entre intentos</label>
+                                <div class="sufijo"><input asp-for="HorasMinimasEntreIntentos" type="number" min="0" required /><span>h</span></div>
+                                <span asp-validation-for="HorasMinimasEntreIntentos"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="DiasMaximosParaDevolucion">Plazo de devolución</label>
+                                <div class="sufijo"><input asp-for="DiasMaximosParaDevolucion" type="number" min="1" required /><span>días</span></div>
+                                <span asp-validation-for="DiasMaximosParaDevolucion"></span>
+                            </div>
+                        </div>
+                        <label class="mt-5 flex cursor-pointer items-center gap-2 text-sm font-normal">
+                            <input asp-for="RequierePruebaEntrega" type="checkbox" />
+                            La entrega requiere prueba (foto o firma)
+                        </label>
+                    </section>
 
-            <div>
-                <label asp-for="HorasMinimasEntreIntentos">
-                    Horas mínimas entre intentos
-                </label>
-                <input asp-for="HorasMinimasEntreIntentos"
-                       type="number" min="0" required />
-            </div>
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta"><span class="paso">2</span>Entrega parcial</h2>
+                        <div class="grid gap-4">
+                            <label class="m-0 flex cursor-pointer items-center gap-2 text-sm font-normal">
+                                <input asp-for="AdmiteEntregaParcial" type="checkbox" />
+                                Se admite entregar solo algunos bultos del envío
+                            </label>
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div class="campo">
+                                    <label asp-for="AccionBultosPendientes">Con los bultos pendientes</label>
+                                    <select asp-for="AccionBultosPendientes">
+                                        <option value="0">Nueva visita</option>
+                                        <option value="1">Devolver al comercio</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <label class="m-0 flex cursor-pointer items-center gap-2 text-sm font-normal">
+                                <input asp-for="NuevaVisitaConRecargo" type="checkbox" />
+                                La nueva visita tiene recargo
+                            </label>
+                        </div>
+                    </section>
 
-            <div>
-                <label asp-for="DiasMaximosParaDevolucion">
-                    Días máximos para devolución
-                </label>
-                <input asp-for="DiasMaximosParaDevolucion"
-                       type="number" min="1" required />
-            </div>
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta"><span class="paso">3</span>Motivos de no entrega</h2>
+                        <p class="nota mb-4">Los que elige el repartidor cuando no completa una entrega. Quitar un motivo no borra los registros históricos.</p>
+                        <div class="tabla tabla-holgada">
+                            <table>
+                                <thead>
+                                    <tr><th class="w-36">Código</th><th>Descripción</th><th>Requiere devolución</th><th></th></tr>
+                                </thead>
+                                <tbody id="lista-motivos">
+                                    @for (var i = 0; i < Model.Motivos.Count; i++)
+                                    {
+                                        <tr>
+                                            <td><input data-campo="Codigo" name="Motivos[@i].Codigo" value="@Model.Motivos[i].Codigo" maxlength="100" required aria-label="Código" /></td>
+                                            <td><input data-campo="Descripcion" name="Motivos[@i].Descripcion" value="@Model.Motivos[i].Descripcion" maxlength="300" required aria-label="Descripción" /></td>
+                                            <td>
+                                                <input data-campo="RequiereDevolucion" name="Motivos[@i].RequiereDevolucion" type="checkbox" value="true"
+                                                       checked="@Model.Motivos[i].RequiereDevolucion" aria-label="Requiere devolución" />
+                                                <input data-campo="RequiereDevolucion" name="Motivos[@i].RequiereDevolucion" type="hidden" value="false" />
+                                            </td>
+                                            <td class="text-right"><button type="button" class="quitar quitar-motivo" title="Quitar motivo"><i class="ph ph-trash"></i></button></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" id="agregar-motivo" class="mt-4 w-full border-dashed text-suave"><i class="ph ph-plus"></i>Agregar motivo</button>
+                    </section>
+                </div>
 
-            <div>
-                <label asp-for="RequierePruebaEntrega">
-                    Requiere prueba de entrega
-                </label>
-                <input asp-for="RequierePruebaEntrega"
-                       type="checkbox"
-                       style="width:auto" />
-            </div>
-        </div>
-
-        <h2>Entrega parcial</h2>
-
-        <div class="campos">
-            <div>
-                <label asp-for="AdmiteEntregaParcial">Admite entrega parcial de bultos</label>
-                <input asp-for="AdmiteEntregaParcial" type="checkbox" style="width:auto" />
-            </div>
-
-            <div>
-                <label asp-for="AccionBultosPendientes">Bultos pendientes</label>
-                <select asp-for="AccionBultosPendientes">
-                    <option value="0">Nueva visita</option>
-                    <option value="1">Devolver al comercio</option>
-                </select>
-            </div>
-
-            <div>
-                <label asp-for="NuevaVisitaConRecargo">La nueva visita tiene recargo</label>
-                <input asp-for="NuevaVisitaConRecargo" type="checkbox" style="width:auto" />
-            </div>
-        </div>
-
-        <h2>Motivos de no entrega</h2>
-
-        <p class="nota">
-            Administrá los motivos que podrá seleccionar el repartidor
-            cuando una entrega no se complete.
-            Los cambios se aplicarán al guardar la nueva versión.
-        </p>
-
-        <div class="tabla">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Código</th>
-                        <th>Descripción</th>
-                        <th>Requiere devolución</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-motivos">
-                    @for (var i = 0; i < Model.Motivos.Count; i++)
+                <aside class="tarjeta lg:sticky lg:top-[24px]">
+                    <h2 class="titulo-tarjeta">@(Model.ReglasEncontradas ? "Reglas vigentes" : "Reglas operativas")</h2>
+                    @if (Model.VigenciaDesde.HasValue)
                     {
-                        <tr>
-                            <td>
-                                <input data-campo="Codigo"
-                                       name="Motivos[@i].Codigo"
-                                       value="@Model.Motivos[i].Codigo"
-                                       maxlength="100"
-                                       required />
-                            </td>
-                            <td>
-                                <input data-campo="Descripcion"
-                                       name="Motivos[@i].Descripcion"
-                                       value="@Model.Motivos[i].Descripcion"
-                                       maxlength="300"
-                                       required />
-                            </td>
-                            <td>
-                                <input data-campo="RequiereDevolucion"
-                                       name="Motivos[@i].RequiereDevolucion"
-                                       type="checkbox"
-                                       value="true"
-                                       checked="@Model.Motivos[i].RequiereDevolucion"
-                                       style="width:auto" />
-                                <input data-campo="RequiereDevolucion"
-                                       name="Motivos[@i].RequiereDevolucion"
-                                       type="hidden"
-                                       value="false" />
-                            </td>
-                            <td>
-                                <button type="button"
-                                        class="quitar-motivo">
-                                    Quitar
-                                </button>
-                            </td>
-                        </tr>
+                        <p class="mb-4"><span class="chip chip-exito">Desde el @Formato.Hora(Model.VigenciaDesde.Value)</span></p>
                     }
-                </tbody>
-            </table>
-        </div>
-
-        <div class="acciones">
-            <button type="button" id="agregar-motivo">
-                + Agregar motivo
-            </button>
-        </div>
-
-        <p class="nota">
-            Podés editar los motivos directamente en la tabla.
-            Quitar un motivo no elimina los registros históricos.
-        </p>
-
-        <div class="acciones">
-            <button type="submit" class="primario">
-                Guardar nueva versión
-            </button>
-        </div>
-    </form>
-}
+                    <div asp-validation-summary="All" class="secciones text-peligro"></div>
+                    <p class="nota mb-5">Al guardar se crea una versión nueva; los envíos ya creados conservan la suya.</p>
+                    <button type="submit" class="primario h-[44px] w-full">Guardar nueva versión</button>
+                </aside>
+            </div>
+        </form>
+    }
+</div>
 
 <script>
     (() => {
@@ -200,32 +133,13 @@
             const fila = document.createElement("tr");
 
             fila.innerHTML = `
+                <td><input data-campo="Codigo" maxlength="100" placeholder="Código" required aria-label="Código" /></td>
+                <td><input data-campo="Descripcion" maxlength="300" placeholder="Descripción del motivo" required aria-label="Descripción" /></td>
                 <td>
-                    <input data-campo="Codigo"
-                           maxlength="100"
-                           placeholder="Código"
-                           required />
+                    <input data-campo="RequiereDevolucion" type="checkbox" value="true" aria-label="Requiere devolución" />
+                    <input data-campo="RequiereDevolucion" type="hidden" value="false" />
                 </td>
-                <td>
-                    <input data-campo="Descripcion"
-                           maxlength="300"
-                           placeholder="Descripción del motivo"
-                           required />
-                </td>
-                <td>
-                    <input data-campo="RequiereDevolucion"
-                           type="checkbox"
-                           value="true"
-                           style="width:auto" />
-                    <input data-campo="RequiereDevolucion"
-                           type="hidden"
-                           value="false" />
-                </td>
-                <td>
-                    <button type="button" class="quitar-motivo">
-                        Quitar
-                    </button>
-                </td>
+                <td class="text-right"><button type="button" class="quitar quitar-motivo" title="Quitar motivo"><i class="ph ph-trash"></i></button></td>
             `;
 
             lista.appendChild(fila);

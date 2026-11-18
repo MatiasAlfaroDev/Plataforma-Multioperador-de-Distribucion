@@ -14,628 +14,420 @@
             zonaUruguay).DateTime);
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Hojas de ruta</h1>
-        <p>Seleccioná los envíos, el repartidor y el vehículo. El sistema comprobará las restricciones y calculará el orden de las paradas.</p>
-    </div>
-</div>
+<partial name="_Toast" model="(false, Model.Error)" />
 
-@if (TempData["Exito"] is string exito)
+@if (Model.OperadorIdSesion != Guid.Empty)
 {
-    <div class="aviso ok">
-        @exito
-    </div>
-}
+    var franjas = Model.Franjas.Select(f => (Valor: $"{f.HoraDesde:HH:mm}|{f.HoraHasta:HH:mm}", Texto: $"{f.HoraDesde:HH:mm}–{f.HoraHasta:HH:mm}")).ToList();
 
-@if (!string.IsNullOrWhiteSpace(Model.Error))
-{
-    <div class="aviso error">
-        @Model.Error
-    </div>
-}
-
-<p class="nota">
-    Los datos corresponden al operador de tu sesión.
-</p>
-
-@if (Model.OperadorIdSesion != Guid.Empty){
-    <h2>Crear hoja de ruta</h2>
-
-    <form method="post">
-
-        <div asp-validation-summary="All"
-             class="error mb-3"></div>
-
-
-        <!-- Fecha de reparto -->
-        <div class="mb-3">
-            <label asp-for="Formulario.Fecha">
-                Fecha de reparto
-            </label>
-
-            <input asp-for="Formulario.Fecha"
-                   type="date"
-                   />
-
-            <small class="nota">
-                Día en que se realizará el reparto.
-            </small>
-        </div>
-
-        <!-- Hora de salida -->
-        <div class="mb-3">
-            <label asp-for="Formulario.HoraSalida">
-                Hora de salida
-            </label>
-
-            <input asp-for="Formulario.HoraSalida"
-                   type="time"
-                   />
-
-            <small class="nota">
-                Hora prevista de salida del repartidor.
-            </small>
-        </div>
-
-        <!-- Franja horaria -->
-        <div class="mb-3">
-            <label asp-for="Formulario.FranjaSeleccionada">
-                Franja horaria de entrega
-            </label>
-
-            <select asp-for="Formulario.FranjaSeleccionada"
-                   >
-
-                <option value="">
-                    Seleccionar franja
-                </option>
-
-                @foreach (var franja in Model.Franjas)
-                {
-                    var valor =
-                        $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
-
-                    <option value="@valor">
-                        @franja.HoraDesde.ToString("HH:mm")
-                        -
-                        @franja.HoraHasta.ToString("HH:mm")
-                    </option>
-                }
-            </select>
-
-            <span asp-validation-for="Formulario.FranjaSeleccionada"
-                  class="error"></span>
-
-            <small class="nota">
-                Se utilizará para validar los horarios
-                de los envíos seleccionados.
-            </small>
-        </div>
-
-        <!-- Repartidor -->
-        <div class="mb-3">
-            <label asp-for="Formulario.RepartidorId">
-                Repartidor
-            </label>
-
-            <select asp-for="Formulario.RepartidorId"
-                   >
-
-                <option value="">
-                    Seleccionar repartidor
-                </option>
-
-                @foreach (var repartidor in Model.Repartidores)
-                {
-                    <option value="@repartidor.Id">
-                        @repartidor.Nombre
-                    </option>
-                }
-            </select>
-        </div>
-
-        <!-- Vehículo -->
-        <div class="mb-3">
-            <label asp-for="Formulario.VehiculoId">
-                Vehículo
-            </label>
-
-            <select asp-for="Formulario.VehiculoId"
-                   >
-
-                <option value="">
-                    Seleccionar vehículo
-                </option>
-
-                @foreach (var vehiculo in Model.Vehiculos)
-                {
-                    <option value="@vehiculo.Id">
-                        @vehiculo.Matricula:
-                        @vehiculo.CapacidadPesoKg kg,
-                        @vehiculo.CapacidadVolumenM3 m³
-                    </option>
-                }
-            </select>
-        </div>
-
-        <!-- Máximo de paradas -->
-        <div class="mb-3">
-            <label asp-for="Formulario.MaximoParadas">
-                Máximo de paradas
-            </label>
-
-            <input asp-for="Formulario.MaximoParadas"
-                   type="number"
-                   min="1"
-                   max="200"
-                   />
-
-            <span asp-validation-for="Formulario.MaximoParadas"
-                  class="error"></span>
-        </div>
-
-        <!-- Selección de envíos -->
-        <h3>Envíos disponibles</h3>
-
-        <p class="nota">
-            Seleccioná los envíos que querés incluir
-            en esta hoja de ruta.
-        </p>
-
-        @if (Model.Envios.Count == 0)
-        {
-            <div class="aviso">
-                <i class="ph ph-info"></i>
-                <p>No hay envíos en depósito para este operador.</p>
-            </div>
-        }
-        else
-        {
-            <div class="tabla">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Seleccionar</th>
-                            <th>Referencia</th>
-                            <th>Localidad</th>
-                            <th>Peso</th>
-                            <th>Compromiso actual</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        @foreach (var envio in Model.Envios)
-                        {
-                            <tr>
-                                <td>
-                                    <input type="checkbox"
-                                           name="Formulario.EnviosIds"
-                                           value="@envio.Id"
-                                           checked="@(Model.Formulario.EnviosIds.Contains(envio.Id))" />
-                                </td>
-
-                                <td class="codigo">
-                                    @envio.ReferenciaExterna
-                                </td>
-
-                                <td>
-                                    @envio.Localidad
-                                </td>
-
-                                <td class="num">
-                                    @envio.PesoKg kg
-                                </td>
-
-                                <td>
-                                    @if (envio.TieneCompromiso)
+    <div class="pagina">
+        <form method="post" id="formHoja">
+            <div class="grid items-start gap-[24px] lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div class="grid gap-[24px]">
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta"><span class="paso">1</span>Datos de la hoja</h2>
+                        <div class="grid gap-4 sm:grid-cols-3">
+                            <div class="campo">
+                                <label asp-for="Formulario.Fecha">Fecha de reparto</label>
+                                <input asp-for="Formulario.Fecha" type="date" />
+                                <span asp-validation-for="Formulario.Fecha"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="Formulario.HoraSalida">Hora de salida</label>
+                                <input asp-for="Formulario.HoraSalida" type="time" />
+                                <span asp-validation-for="Formulario.HoraSalida"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="Formulario.FranjaSeleccionada">Franja de entrega</label>
+                                <select asp-for="Formulario.FranjaSeleccionada">
+                                    <option value="">Elegí una franja…</option>
+                                    @foreach (var franja in franjas)
                                     {
-                                        <span>
-                                            @envio.FechaComprometida
-                                            |
-                                            @envio.HoraDesde a @envio.HoraHasta
-                                        </span>
+                                        <option value="@franja.Valor">@franja.Texto</option>
                                     }
-                                    else
+                                </select>
+                                <span asp-validation-for="Formulario.FranjaSeleccionada"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="Formulario.RepartidorId">Repartidor</label>
+                                <select asp-for="Formulario.RepartidorId">
+                                    <option value="">Elegí un repartidor…</option>
+                                    @foreach (var repartidor in Model.Repartidores)
                                     {
-                                        <span class="nota">
-                                            Se definirá al planificar
-                                        </span>
+                                        <option value="@repartidor.Id">@repartidor.Nombre</option>
                                     }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
+                                </select>
+                                <span asp-validation-for="Formulario.RepartidorId"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="Formulario.VehiculoId">Vehículo</label>
+                                <select asp-for="Formulario.VehiculoId">
+                                    <option value="">Elegí un vehículo…</option>
+                                    @foreach (var vehiculo in Model.Vehiculos)
+                                    {
+                                        <option value="@vehiculo.Id">@vehiculo.Matricula · @vehiculo.CapacidadPesoKg kg, @vehiculo.CapacidadVolumenM3 m³</option>
+                                    }
+                                </select>
+                                <span asp-validation-for="Formulario.VehiculoId"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="Formulario.MaximoParadas">Máximo de paradas</label>
+                                <input asp-for="Formulario.MaximoParadas" type="number" min="1" max="200" />
+                                <span asp-validation-for="Formulario.MaximoParadas"></span>
+                            </div>
+                        </div>
+                    </section>
 
-        <h3>Devoluciones al comercio</h3>
-        <p class="nota">
-            Envíos en devolución: la parada los lleva a la dirección de recepción de la cuenta comercial.
-            Solo aparecen los de cuentas con dirección configurada dentro de una zona de cobertura.
-        </p>
-
-        @if (Model.Devoluciones.Count == 0)
-        {
-            <p class="nota">No hay devoluciones pendientes de asignar.</p>
-        }
-        else
-        {
-            <div class="tabla">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Seleccionar</th>
-                            <th>Referencia</th>
-                            <th>Localidad del comercio</th>
-                            <th>Estado</th>
-                            <th>Peso</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var devolucion in Model.Devoluciones)
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta"><span class="paso">2</span>Envíos en depósito</h2>
+                        @if (Model.Envios.Count == 0)
                         {
-                            <tr>
-                                <td>
-                                    <input type="checkbox"
-                                           name="Formulario.DevolucionesIds"
-                                           value="@devolucion.Id"
-                                           checked="@(Model.Formulario.DevolucionesIds.Contains(devolucion.Id))" />
-                                </td>
-                                <td class="codigo">@devolucion.ReferenciaExterna</td>
-                                <td>@devolucion.Localidad</td>
-                                <td>@devolucion.Estado</td>
-                                <td class="num">@devolucion.PesoKg kg</td>
-                            </tr>
+                            <p class="vacio">No hay envíos en depósito.</p>
                         }
-                    </tbody>
-                </table>
-            </div>
-        }
-
-        @if (Model.RetiroHabilitado)
-        {
-        <h3>Retiros a domicilio</h3>
-        <p class="nota">
-            Hoja mixta (RF 39): los bultos retirados ocupan lugar desde la parada en que se suben; la API
-            valida la capacidad del vehículo parada por parada.
-        </p>
-
-        @if (Model.Retiros.Count == 0 && Model.EntregasRetiros.Count == 0)
-        {
-            <p class="nota">No hay retiros pendientes de asignar.</p>
-        }
-        else
-        {
-            <div class="tabla">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Seleccionar</th>
-                            <th>Parada</th>
-                            <th>Motivo</th>
-                            <th>Localidad</th>
-                            <th>Peso</th>
-                            <th>Franja</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var retiro in Model.Retiros)
+                        else
                         {
-                            <tr data-fecha-retiro="@retiro.Fecha.ToString("yyyy-MM-dd")">
-                                <td>
-                                    <input type="checkbox" name="Formulario.RetirosIds" value="@retiro.Id"
-                                           checked="@(Model.Formulario.RetirosIds.Contains(retiro.Id))" />
-                                </td>
-                                <td><i class="ph ph-arrow-circle-up"></i> Retiro (sube carga)</td>
-                                <td>@retiro.Motivo</td>
-                                <td>@retiro.Localidad</td>
-                                <td class="num">@retiro.PesoKg kg</td>
-                                <td>@retiro.Fecha @retiro.HoraDesde a @retiro.HoraHasta</td>
-                            </tr>
+                            <div class="tabla tabla-holgada">
+                                <table>
+                                    <thead>
+                                        <tr><th class="w-10"></th><th>Envío</th><th class="num">Peso</th><th>Compromiso</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var envio in Model.Envios)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" name="Formulario.EnviosIds" value="@envio.Id" id="envio-@envio.Id"
+                                                           checked="@(Model.Formulario.EnviosIds.Contains(envio.Id))" />
+                                                </td>
+                                                <td>
+                                                    <label for="envio-@envio.Id" class="m-0 cursor-pointer font-semibold"><span class="codigo">@envio.ReferenciaExterna</span></label>
+                                                    <span class="linea2">@envio.Localidad</span>
+                                                </td>
+                                                <td class="num">@envio.PesoKg kg</td>
+                                                <td>
+                                                    @if (envio.TieneCompromiso)
+                                                    {
+                                                        @envio.FechaComprometida <span class="linea2">@envio.HoraDesde–@envio.HoraHasta</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="nota">Se define al planificar</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                         }
-                        @foreach (var entrega in Model.EntregasRetiros)
+                    </section>
+
+                    <section class="tarjeta">
+                        <h2 class="titulo-tarjeta"><span class="paso">3</span>Devoluciones al comercio</h2>
+                        <p class="nota mb-4">Van a la dirección de recepción de la cuenta comercial. Solo aparecen las cuentas con dirección dentro de una zona de cobertura.</p>
+                        @if (Model.Devoluciones.Count == 0)
                         {
-                            <tr>
-                                <td>
-                                    <input type="checkbox" name="Formulario.EntregasRetirosIds" value="@entrega.Id"
-                                           checked="@(Model.Formulario.EntregasRetirosIds.Contains(entrega.Id))" />
-                                </td>
-                                <td><i class="ph ph-arrow-circle-down"></i> Entrega al comercio (baja carga)</td>
-                                <td>@entrega.Motivo</td>
-                                <td>@entrega.Localidad</td>
-                                <td class="num">@entrega.PesoKg kg</td>
-                                <td>-</td>
-                            </tr>
+                            <p class="vacio">No hay devoluciones pendientes de asignar.</p>
                         }
-                    </tbody>
-                </table>
-            </div>
-        }
-        }
+                        else
+                        {
+                            <div class="tabla tabla-holgada">
+                                <table>
+                                    <thead>
+                                        <tr><th class="w-10"></th><th>Envío</th><th>Estado</th><th class="num">Peso</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var devolucion in Model.Devoluciones)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" name="Formulario.DevolucionesIds" value="@devolucion.Id" id="devolucion-@devolucion.Id"
+                                                           checked="@(Model.Formulario.DevolucionesIds.Contains(devolucion.Id))" />
+                                                </td>
+                                                <td>
+                                                    <label for="devolucion-@devolucion.Id" class="m-0 cursor-pointer font-semibold"><span class="codigo">@devolucion.ReferenciaExterna</span></label>
+                                                    <span class="linea2">@devolucion.Localidad</span>
+                                                </td>
+                                                <td><span class="chip chip-peligro">@devolucion.Estado</span></td>
+                                                <td class="num">@devolucion.PesoKg kg</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </section>
 
-        <button type="submit"
-                class="btn-primario"
-                disabled="@(Model.Envios.Count + Model.Retiros.Count + Model.EntregasRetiros.Count + Model.Devoluciones.Count == 0)">
-            Crear y asignar hoja de ruta
-        </button>
-    </form>
-
-    <hr class="my-4" />
-
-    <!-- Listado de hojas de ruta -->
-    <h2>Hojas de ruta creadas</h2>
-
-    @if (Model.Hojas.Count == 0)
-    {
-        <p>
-            Todavía no hay hojas de ruta para este operador.
-        </p>
-    }
-    else
-    {
-        <div class="tabla">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Salida</th>
-                        <th>Paradas</th>
-                        <th>Peso asignado</th>
-                        <th>Identificador</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    @foreach (var hoja in Model.Hojas)
+                    @if (Model.RetiroHabilitado)
                     {
-                        <tr>
-                            <td>@hoja.Fecha</td>
-
-                            <td>
-                                @(hoja.HoraSalida?.ToString("HH:mm") ?? "Sin definir")
-                            </td>
-
-                            <td class="num">@hoja.CantidadParadas</td>
-
-                            <td class="num">@hoja.PesoAsignadoKg kg</td>
-
-                            <td class="codigo">@hoja.Id</td>
-
-                           <td>
-                                @if (hoja.Rendida)
-                                {
-                                    <span class="estado-despachada">
-                                        Rendida
-                                    </span>
-                                }
-                                else if (hoja.PendienteDeControl)
-                                {
-                                    @* RF 22: el repartidor ya rindió desde la app; el depósito controla y cierra. *@
-                                    <span class="estado-despachada">
-                                        Rendida por el repartidor
-                                    </span>
-                                    <a asp-page="/Rendicion" asp-route-hojaId="@hoja.Id" class="btn-primario">
-                                        Controlar rendición
-                                    </a>
-                                }
-                                else if (hoja.Despachada)
-                                {
-                                    <span class="estado-despachada">
-                                        Despachada
-                                    </span>
-
-                                    @if (hoja.Fecha < hoy)
-                                    {
-                                        <p class="nota">
-                                            Hoja de ruta de una fecha anterior.
-                                            No admite nuevos envíos urgentes.
-                                        </p>
-                                    }
-                                    else
-                                    {
-                                        <span class="nota">
-                                            En ruta: el repartidor rinde desde la app al volver.
-                                        </span>
-                                    }
-
-                                    @* Solo se permiten envíos urgentes en hojas despachadas de hoy. *@
-                                    @if (hoja.Fecha == hoy && Model.Envios.Count > 0)
-                                    {
-                                        <form method="post"
-                                            asp-page-handler="AgregarUrgente"
-                                            asp-route-hojaId="@hoja.Id"
-                                            class="mt-1.5 flex flex-wrap items-center gap-2">
-
-                                            @Html.AntiForgeryToken()
-
-                                            <select name="envioUrgenteId"
-                                                    aria-label="Envío urgente">
-                                                <option value="">Envío urgente…</option>
-
-                                                @foreach (var envio in Model.Envios)
-                                                {
-                                                    <option value="@envio.Id">
-                                                        @envio.ReferenciaExterna (@envio.Localidad)
-                                                    </option>
-                                                }
-                                            </select>
-
-                                            <select name="franjaUrgente"
-                                                    aria-label="Franja">
-                                                @foreach (var franja in Model.Franjas)
-                                                {
-                                                    var valor =
-                                                        $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
-
-                                                    <option value="@valor">
-                                                        @franja.HoraDesde.ToString("HH:mm")
-                                                        -
-                                                        @franja.HoraHasta.ToString("HH:mm")
-                                                    </option>
-                                                }
-                                            </select>
-
-                                            <button type="submit"
-                                                    class="btn-secundario">
-                                                Agregar urgente
-                                            </button>
-                                        </form>
-                                    }
-                                }
-                                else
-                                {
-                                    @* Hoja todavía no despachada *@
-
-                                    @if (hoja.Fecha < hoy)
-                                    {
-                                        <p class="nota">
-                                            Hoja de ruta de una fecha anterior.
-                                            No admite nuevos envíos.
-                                        </p>
-                                    }
-                                    else
-                                    {
-                                        @if (Model.Envios.Count > 0)
-                                        {
-                                            <form method="post"
-                                                asp-page-handler="AgregarEnvio"
-                                                asp-route-hojaId="@hoja.Id"
-                                                class="mt-1.5 flex flex-wrap items-center gap-2">
-
-                                                @Html.AntiForgeryToken()
-
-                                                <select name="envioId"
-                                                        aria-label="Envío a agregar"
-                                                        required>
-                                                    <option value="">Seleccionar envío…</option>
-
-                                                    @foreach (var envio in Model.Envios)
-                                                    {
-                                                        <option value="@envio.Id">
-                                                            @envio.ReferenciaExterna (@envio.Localidad)
-                                                        </option>
-                                                    }
-                                                </select>
-
-                                                <select name="franjaSeleccionada"
-                                                        aria-label="Franja horaria"
-                                                        required>
-                                                    @foreach (var franja in Model.Franjas)
-                                                    {
-                                                        var valor =
-                                                            $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
-
-                                                        <option value="@valor">
-                                                            @franja.HoraDesde.ToString("HH:mm")
-                                                            -
-                                                            @franja.HoraHasta.ToString("HH:mm")
-                                                        </option>
-                                                    }
-                                                </select>
-
-                                                <button type="submit" class="btn-secundario">
-                                                    Agregar envío
-                                                </button>
-                                            </form>
-                                        }
-
-                                        <form method="post"
-                                            asp-page-handler="Despachar"
-                                            asp-route-hojaId="@hoja.Id"
-                                            class="mt-2">
-
-                                            @Html.AntiForgeryToken()
-
-                                            <button type="button"
-                                                    class="btn-primario"
-                                                    onclick="abrirConfirmacionDespacho(this)">
-                                                Despachar
-                                            </button>
-                                        </form>
-
-                                        @* RF 39: mientras la hoja está en preparación se le puede sumar un retiro del mismo día. *@
-                                        var retirosDelDia = Model.Retiros.Where(r => r.Fecha == hoja.Fecha).ToList();
-                                        @if (Model.RetiroHabilitado && retirosDelDia.Count > 0)
-                                        {
-                                            <form method="post"
-                                                  asp-page-handler="AgregarRetiro"
-                                                  asp-route-hojaId="@hoja.Id"
-                                                  class="mt-1.5 flex flex-wrap items-center gap-2">
-
-                                                @Html.AntiForgeryToken()
-
-                                                <select name="retiroId" aria-label="Retiro" required>
-                                                    <option value="">Retiro…</option>
-                                                    @foreach (var retiro in retirosDelDia)
-                                                    {
-                                                        <option value="@retiro.Id">@retiro.Motivo (@retiro.Localidad, @retiro.HoraDesde a @retiro.HoraHasta)</option>
-                                                    }
-                                                </select>
-
-                                                <button type="submit" class="btn-secundario">
-                                                    Agregar retiro
-                                                </button>
-                                            </form>
-                                        }
-                                    }
-                                }
-                            </td>
-                        </tr>
+                        <section class="tarjeta">
+                            <h2 class="titulo-tarjeta"><span class="paso">4</span>Retiros a domicilio</h2>
+                            <p class="nota mb-4">Hoja mixta (RF 39): lo retirado ocupa lugar desde la parada en que sube, y la API valida la capacidad parada por parada.</p>
+                            @if (Model.Retiros.Count == 0 && Model.EntregasRetiros.Count == 0)
+                            {
+                                <p class="vacio">No hay retiros pendientes de asignar.</p>
+                            }
+                            else
+                            {
+                                <div class="tabla tabla-holgada">
+                                    <table>
+                                        <thead>
+                                            <tr><th class="w-10"></th><th>Parada</th><th>Localidad</th><th class="num">Peso</th><th>Franja</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var retiro in Model.Retiros)
+                                            {
+                                                <tr data-fecha-retiro="@retiro.Fecha.ToString("yyyy-MM-dd")">
+                                                    <td>
+                                                        <input type="checkbox" name="Formulario.RetirosIds" value="@retiro.Id" id="retiro-@retiro.Id"
+                                                               checked="@(Model.Formulario.RetirosIds.Contains(retiro.Id))" />
+                                                    </td>
+                                                    <td>
+                                                        <label for="retiro-@retiro.Id" class="m-0 cursor-pointer font-semibold"><i class="ph ph-arrow-circle-up"></i> Retiro, sube carga</label>
+                                                        <span class="linea2">@retiro.Motivo</span>
+                                                    </td>
+                                                    <td>@retiro.Localidad</td>
+                                                    <td class="num">@retiro.PesoKg kg</td>
+                                                    <td>@retiro.Fecha <span class="linea2">@retiro.HoraDesde–@retiro.HoraHasta</span></td>
+                                                </tr>
+                                            }
+                                            @foreach (var entrega in Model.EntregasRetiros)
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        <input type="checkbox" name="Formulario.EntregasRetirosIds" value="@entrega.Id" id="entrega-@entrega.Id"
+                                                               checked="@(Model.Formulario.EntregasRetirosIds.Contains(entrega.Id))" />
+                                                    </td>
+                                                    <td>
+                                                        <label for="entrega-@entrega.Id" class="m-0 cursor-pointer font-semibold"><i class="ph ph-arrow-circle-down"></i> Entrega al comercio, baja carga</label>
+                                                        <span class="linea2">@entrega.Motivo</span>
+                                                    </td>
+                                                    <td>@entrega.Localidad</td>
+                                                    <td class="num">@entrega.PesoKg kg</td>
+                                                    <td>—</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </section>
                     }
-                </tbody>
-            </table>
+                </div>
 
-            <dialog id="confirmarDespacho" class="modal-despacho">
-    <h2>Confirmar despacho</h2>
+                <aside class="tarjeta lg:sticky lg:top-[24px]">
+                    <h2 class="titulo-tarjeta">Nueva hoja de ruta</h2>
+                    <dl class="resumen">
+                        <dt>Paradas elegidas</dt><dd id="paradasElegidas">0</dd>
+                    </dl>
+                    <div asp-validation-summary="All" class="secciones text-peligro"></div>
+                    <p class="nota mb-5">La API comprueba las restricciones del vehículo y calcula el orden de las paradas.</p>
+                    <button type="submit" class="primario h-[44px] w-full"
+                            disabled="@(Model.Envios.Count + Model.Retiros.Count + Model.EntregasRetiros.Count + Model.Devoluciones.Count == 0)">
+                        <i class="ph ph-path"></i>Crear y asignar
+                    </button>
+                </aside>
+            </div>
+        </form>
 
-    <p>
-        ¿Confirmás que querés despachar esta hoja de ruta?
-    </p>
+        <section class="tarjeta">
+            <h2 class="titulo-tarjeta">Hojas de ruta <span class="chip">@Model.Hojas.Count</span></h2>
+            @if (Model.Hojas.Count == 0)
+            {
+                <p class="vacio">Todavía no hay hojas de ruta.</p>
+            }
+            else
+            {
+                <div class="tabla tabla-holgada">
+                    <table>
+                        <thead>
+                            <tr><th>Hoja</th><th class="num">Paradas</th><th class="num">Peso</th><th>Estado</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var hoja in Model.Hojas)
+                            {
+                                var anterior = hoja.Fecha < hoy;
+                                <tr>
+                                    <td>
+                                        <b>@hoja.Fecha</b>
+                                        <span class="linea2">Sale @(hoja.HoraSalida?.ToString("HH:mm") ?? "sin hora") · <span class="codigo" title="@hoja.Id">@hoja.Id.ToString()[..8]</span></span>
+                                    </td>
+                                    <td class="num">@hoja.CantidadParadas</td>
+                                    <td class="num">@hoja.PesoAsignadoKg kg</td>
+                                    <td>
+                                        @if (hoja.Rendida)
+                                        {
+                                            <span class="chip chip-exito">Rendida</span>
+                                        }
+                                        else if (hoja.PendienteDeControl)
+                                        {
+                                            @* RF 22: el repartidor ya rindió desde la app; el depósito controla y cierra. *@
+                                            <span class="chip chip-alerta">Rendida por el repartidor</span>
+                                        }
+                                        else if (hoja.Despachada)
+                                        {
+                                            <span class="chip chip-acento">En ruta</span>
+                                            <span class="linea2">@(anterior ? "De una fecha anterior" : "Se rinde desde la app al volver")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="chip">En preparación</span>
+                                            @if (anterior)
+                                            {
+                                                <span class="linea2">De una fecha anterior: no admite envíos</span>
+                                            }
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="flex flex-wrap items-center justify-end gap-2">
+                                            @if (hoja.PendienteDeControl)
+                                            {
+                                                <a asp-page="/Rendicion" asp-route-hojaId="@hoja.Id" class="btn-primario btn-chico">Controlar rendición</a>
+                                            }
+                                            else if (hoja.Despachada && !hoja.Rendida && hoja.Fecha == hoy && Model.Envios.Count > 0)
+                                            {
+                                                @* Solo se permiten envíos urgentes en hojas despachadas de hoy. *@
+                                                <details class="relative">
+                                                    <summary class="btn-secundario btn-chico list-none [&::-webkit-details-marker]:hidden"><i class="ph ph-lightning"></i>Agregar urgente</summary>
+                                                    <form method="post" asp-page-handler="AgregarUrgente" asp-route-hojaId="@hoja.Id"
+                                                          class="absolute right-0 z-10 mt-2 grid w-72 gap-3 rounded-xl border border-borde bg-superficie p-4 shadow-lg">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="campo">
+                                                            <label for="urgente-@hoja.Id">Envío</label>
+                                                            <select id="urgente-@hoja.Id" name="envioUrgenteId" required>
+                                                                <option value="">Elegí un envío…</option>
+                                                                @foreach (var envio in Model.Envios)
+                                                                {
+                                                                    <option value="@envio.Id">@envio.ReferenciaExterna (@envio.Localidad)</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div class="campo">
+                                                            <label for="franja-urgente-@hoja.Id">Franja</label>
+                                                            <select id="franja-urgente-@hoja.Id" name="franjaUrgente">
+                                                                @foreach (var franja in franjas)
+                                                                {
+                                                                    <option value="@franja.Valor">@franja.Texto</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="primario">Agregar urgente</button>
+                                                    </form>
+                                                </details>
+                                            }
+                                            else if (!hoja.Despachada && !anterior)
+                                            {
+                                                @if (Model.Envios.Count > 0)
+                                                {
+                                                    <details class="relative">
+                                                        <summary class="btn-secundario btn-chico list-none [&::-webkit-details-marker]:hidden"><i class="ph ph-plus"></i>Envío</summary>
+                                                        <form method="post" asp-page-handler="AgregarEnvio" asp-route-hojaId="@hoja.Id"
+                                                              class="absolute right-0 z-10 mt-2 grid w-72 gap-3 rounded-xl border border-borde bg-superficie p-4 shadow-lg">
+                                                            @Html.AntiForgeryToken()
+                                                            <div class="campo">
+                                                                <label for="envio-hoja-@hoja.Id">Envío</label>
+                                                                <select id="envio-hoja-@hoja.Id" name="envioId" required>
+                                                                    <option value="">Elegí un envío…</option>
+                                                                    @foreach (var envio in Model.Envios)
+                                                                    {
+                                                                        <option value="@envio.Id">@envio.ReferenciaExterna (@envio.Localidad)</option>
+                                                                    }
+                                                                </select>
+                                                            </div>
+                                                            <div class="campo">
+                                                                <label for="franja-hoja-@hoja.Id">Franja</label>
+                                                                <select id="franja-hoja-@hoja.Id" name="franjaSeleccionada" required>
+                                                                    @foreach (var franja in franjas)
+                                                                    {
+                                                                        <option value="@franja.Valor">@franja.Texto</option>
+                                                                    }
+                                                                </select>
+                                                            </div>
+                                                            <button type="submit" class="primario">Agregar envío</button>
+                                                        </form>
+                                                    </details>
+                                                }
 
-    <p class="nota">
-        Las entregas normales pasarán a En tránsito; las devoluciones conservarán su estado EnDevolucion hasta completar la devolución al comercio.
-    </p>
+                                                @* RF 39: mientras la hoja está en preparación se le puede sumar un retiro del mismo día. *@
+                                                var retirosDelDia = Model.Retiros.Where(r => r.Fecha == hoja.Fecha).ToList();
+                                                @if (Model.RetiroHabilitado && retirosDelDia.Count > 0)
+                                                {
+                                                    <details class="relative">
+                                                        <summary class="btn-secundario btn-chico list-none [&::-webkit-details-marker]:hidden"><i class="ph ph-plus"></i>Retiro</summary>
+                                                        <form method="post" asp-page-handler="AgregarRetiro" asp-route-hojaId="@hoja.Id"
+                                                              class="absolute right-0 z-10 mt-2 grid w-80 gap-3 rounded-xl border border-borde bg-superficie p-4 shadow-lg">
+                                                            @Html.AntiForgeryToken()
+                                                            <div class="campo">
+                                                                <label for="retiro-hoja-@hoja.Id">Retiro</label>
+                                                                <select id="retiro-hoja-@hoja.Id" name="retiroId" required>
+                                                                    <option value="">Elegí un retiro…</option>
+                                                                    @foreach (var retiro in retirosDelDia)
+                                                                    {
+                                                                        <option value="@retiro.Id">@retiro.Motivo (@retiro.Localidad, @retiro.HoraDesde–@retiro.HoraHasta)</option>
+                                                                    }
+                                                                </select>
+                                                            </div>
+                                                            <button type="submit" class="primario">Agregar retiro</button>
+                                                        </form>
+                                                    </details>
+                                                }
 
-    <div class="acciones-modal">
-        <button type="button"
-                class="btn-secundario"
-                onclick="cerrarConfirmacionDespacho()">
-            Cancelar
-        </button>
-
-        <button type="button"
-                class="btn-primario"
-                onclick="confirmarDespacho()">
-            Confirmar despacho
-        </button>
+                                                <form method="post" asp-page-handler="Despachar" asp-route-hojaId="@hoja.Id">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="button" class="primario btn-chico" onclick="abrirConfirmacionDespacho(this)">
+                                                        <i class="ph ph-paper-plane-tilt"></i>Despachar
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
     </div>
-</dialog>
 
-<script>
-    let formularioDespacho = null;
-
-    function abrirConfirmacionDespacho(boton) {
-        formularioDespacho = boton.closest("form");
-
-        document.getElementById("confirmarDespacho").showModal();
-    }
-
-    function cerrarConfirmacionDespacho() {
-        document.getElementById("confirmarDespacho").close();
-        formularioDespacho = null;
-    }
-
-    function confirmarDespacho() {
-        if (formularioDespacho) {
-            formularioDespacho.requestSubmit();
-        }
-    }
-</script>
+    <dialog id="confirmarDespacho" class="modal-despacho">
+        <h2 class="titulo-tarjeta">Confirmar despacho</h2>
+        <p>¿Despachás esta hoja de ruta?</p>
+        <p class="nota mt-2">Las entregas pasan a En tránsito; las devoluciones siguen En devolución hasta llegar al comercio.</p>
+        <div class="acciones-modal">
+            <button type="button" onclick="cerrarConfirmacionDespacho()">Cancelar</button>
+            <button type="button" class="primario" onclick="confirmarDespacho()">Confirmar despacho</button>
         </div>
-    }
+    </dialog>
+
+    <script>
+        let formularioDespacho = null;
+
+        function abrirConfirmacionDespacho(boton) {
+            formularioDespacho = boton.closest("form");
+            document.getElementById("confirmarDespacho").showModal();
+        }
+
+        function cerrarConfirmacionDespacho() {
+            document.getElementById("confirmarDespacho").close();
+            formularioDespacho = null;
+        }
+
+        function confirmarDespacho() {
+            if (formularioDespacho) {
+                formularioDespacho.requestSubmit();
+            }
+        }
+
+        // El resumen cuenta las paradas marcadas en las tres tablas.
+        (() => {
+            const form = document.getElementById("formHoja");
+            const contador = document.getElementById("paradasElegidas");
+            const contar = () => contador.textContent = form.querySelectorAll('input[type=checkbox][name^="Formulario."]:checked').length;
+            form.addEventListener("change", contar);
+            contar();
+        })();
+    </script>
 }
 
 @* Un retiro solo puede ir en una hoja de su misma fecha: se ocultan los de otros días. *@

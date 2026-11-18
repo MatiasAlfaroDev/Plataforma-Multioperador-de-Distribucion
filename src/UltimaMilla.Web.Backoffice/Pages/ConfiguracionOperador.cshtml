@@ -6,84 +6,41 @@
     ViewData["Title"] = "Identidad visual";
 }
 
-<div class="mx-auto max-w-3xl space-y-6">
-
-    <div>
-        <h1 class="font-display text-3xl font-bold">
-            Identidad visual
-        </h1>
-
-        <p class="mt-2 text-suave">
-            Configurá el color que identifica a tu operador
-            en el seguimiento público de los envíos.
-        </p>
-    </div>
-
-    @if (TempData["MensajeExito"] is string mensaje)
-    {
-        <div class="rounded-lg border border-green-300 bg-green-50 p-4 text-green-800"
-             role="status">
-            @mensaje
-        </div>
-    }
-
-    @if (!string.IsNullOrWhiteSpace(Model.Error))
-    {
-        <div class="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800"
-             role="alert">
-            @Model.Error
-        </div>
-    }
+<div class="pagina">
+    <partial name="_Toast" model="(false, Model.Error)" />
 
     @if (Model.Operador is not null)
     {
-        <div class="rounded-xl border border-borde bg-superficie p-6">
-
-            <h2 class="mb-5 text-xl font-semibold">
-                Configuración del operador
-            </h2>
-
-            <div class="mb-6">
-                <label class="mb-2 block text-sm font-medium">
-                    Nombre del operador
-                </label>
-
-                <div class="rounded-lg border border-borde p-3">
-                    @Model.Operador.Nombre
-                </div>
-            </div>
-
-            <form method="post" class="space-y-5">
+        <section class="tarjeta max-w-[720px]">
+            <h2 class="titulo-tarjeta">Identidad visual</h2>
+            <form method="post" class="grid gap-5">
                 @Html.AntiForgeryToken()
-
-                <div>
-                    <label asp-for="ColorPrimario"
-                           class="mb-2 block text-sm font-medium">
-                        Color principal
-                    </label>
-
+                <dl class="datos">
+                    <dt>Operador</dt><dd class="font-semibold">@Model.Operador.Nombre</dd>
+                </dl>
+                <div class="campo">
+                    <label asp-for="ColorPrimario">Color principal</label>
                     <div class="flex items-center gap-3">
-                        <input type="color"
-                               id="selectorColor"
-                               value="@Model.ColorPrimario"
-                               class="h-12 w-16 cursor-pointer rounded border border-borde" />
-
-                        <input asp-for="ColorPrimario"
-                               id="ColorPrimario"
-                               class="w-40 rounded-lg border border-borde bg-superficie p-3"
-                               maxlength="7" />
+                        <input type="color" id="selectorColor" value="@Model.ColorPrimario" class="h-[41px] w-16 cursor-pointer p-1" aria-label="Elegir color" />
+                        <input asp-for="ColorPrimario" id="ColorPrimario" class="w-36 font-display tabular-nums" maxlength="7" />
                     </div>
-
-                    <span asp-validation-for="ColorPrimario"
-                          class="mt-2 block text-sm text-red-600"></span>
+                    <span asp-validation-for="ColorPrimario"></span>
                 </div>
-
-                <button type="submit"
-                        class="rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700">
-                    Guardar cambios
-                </button>
+                <div class="rounded-xl border border-borde p-4">
+                    <p class="etiqueta mb-3">Así se ve en el seguimiento público</p>
+                    <div class="flex items-center gap-3 rounded-xl border-t-4 bg-hundido p-4" id="vistaPrevia" style="border-top-color: @Model.ColorPrimario">
+                        <span class="grid size-11 place-items-center rounded-xl text-2xl text-white" id="vistaPreviaIcono" style="background-color: @Model.ColorPrimario"><i class="ph ph-truck"></i></span>
+                        <div>
+                            <b class="block">@Model.Operador.Nombre</b>
+                            <span class="nota">Operador responsable de tu envío</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <button type="submit" class="primario">Guardar cambios</button>
+                </div>
             </form>
-        </div>
+        </section>
     }
 </div>
 
@@ -94,13 +51,20 @@
 
         if (!selector || !campo) return;
 
+        const pintar = color => {
+            document.getElementById("vistaPrevia").style.borderTopColor = color;
+            document.getElementById("vistaPreviaIcono").style.backgroundColor = color;
+        };
+
         selector.addEventListener("input", () => {
             campo.value = selector.value.toUpperCase();
+            pintar(selector.value);
         });
 
         campo.addEventListener("input", () => {
             if (/^#[0-9A-Fa-f]{6}$/.test(campo.value)) {
                 selector.value = campo.value;
+                pintar(campo.value);
             }
         });
     });

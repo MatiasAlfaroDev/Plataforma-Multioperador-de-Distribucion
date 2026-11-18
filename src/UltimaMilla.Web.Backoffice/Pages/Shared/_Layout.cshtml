@@ -5,9 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] · Backoffice</title>
     <link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
-    <link rel="preload" href="~/fuentes/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="~/fuentes/SourceSans3-400.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="~/app.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/iconos/phosphor.css" />
+    <script>
+    // Toasts: los de éxito se cierran solos a los 6 s; los de error quedan hasta que se cierran.
+    // window.toast(exito, mensaje) es para las páginas que hablan con la API por fetch.
+    (() => {
+        const pila = () => document.getElementById("toasts");
+
+        function programar(el) {
+            if (!el.classList.contains("toast-error"))
+                setTimeout(() => el.remove(), 6000);
+        }
+
+        window.toast = (exito, mensaje) => {
+            const el = document.createElement("div");
+            el.className = "toast" + (exito ? "" : " toast-error");
+            el.setAttribute("role", exito ? "status" : "alert");
+            el.innerHTML = `<i class="ph ${exito ? "ph-check-circle" : "ph-warning-circle"} text-xl"></i><div></div>` +
+                `<button type="button" title="Cerrar" data-cerrar-toast><i class="ph ph-x"></i></button>`;
+            el.querySelector("div").textContent = mensaje;
+            pila().append(el);
+            programar(el);
+        };
+
+        document.addEventListener("click", e => {
+            const boton = e.target.closest("[data-cerrar-toast]");
+            if (boton) boton.closest(".toast")?.remove();
+        });
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // Los toasts que una página pone en su cuerpo se juntan en la pila.
+            document.querySelectorAll("[data-toast]").forEach(el => { pila().append(el); programar(el); });
+        });
+    })();
+    </script>
 </head>
 
 @{
@@ -26,100 +59,157 @@
 
     var mostrarMenuPlataforma = !esPaginaPublica && User.IsInRole("AdministradorPlataforma");
 
-    // Entradas del menú lateral según el rol (letra 3.3): página, ícono de Phosphor y texto.
-    var entradas = new List<(string Pagina, string Icono, string Texto)>();
+    // Menú lateral por grupos según el rol (letra 3.3): página, ícono de Phosphor y texto.
+    var grupos = new List<(string Titulo, List<(string Pagina, string Icono, string Texto)> Entradas)>();
     if (mostrarMenu)
     {
-        entradas.Add(("/Index", "ph-package", "Envíos"));
-        entradas.Add(("/Retiros", "ph-hand-arrow-up", "Retiros"));
+        var operacion = new List<(string, string, string)> { ("/Index", "ph-package", "Envíos"), ("/Retiros", "ph-house-line", "Retiros") };
         if (esDespacho)
         {
-            entradas.Add(("/Tablero", "ph-gauge", "Tablero en vivo"));
-            entradas.Add(("/HojasDeRuta", "ph-path", "Hojas de ruta"));
-            entradas.Add(("/Avisos", "ph-bell", "Avisos a comercios"));
-            entradas.Add(("/Reportes", "ph-chart-bar", "Reportes"));
+            operacion.Add(("/Tablero", "ph-gauge", "Tablero en vivo"));
+            operacion.Add(("/HojasDeRuta", "ph-path", "Hojas de ruta"));
+            operacion.Add(("/Reportes", "ph-chart-bar", "Reportes"));
         }
-        
+        grupos.Add(("Operación", operacion));
+
+        var comercios = new List<(string, string, string)>();
         if (esAdmin)
         {
-            entradas.Add(("/Zonas", "ph-map-trifold", "Zonas de cobertura"));
-            entradas.Add(("/Tarifas", "ph-currency-dollar", "Tarifas"));
-            entradas.Add(("/ReglasOperativas", "ph-sliders-horizontal", "Reglas operativas"));
-            entradas.Add(("/Personal", "ph-users-three", "Personal"));
-            entradas.Add(("/Vehiculos", "ph-truck", "Vehículos"));
-            entradas.Add(("/SolicitudesComerciales", "ph-handshake", "Solicitudes de comercios"));
-            entradas.Add(("/ConfiguracionOperador", "ph-palette", "Identidad visual"));
-            entradas.Add(("/Comercios", "ph-storefront", "Comercios"));
+            comercios.Add(("/Comercios", "ph-storefront", "Comercios"));
+            comercios.Add(("/SolicitudesComerciales", "ph-handshake", "Solicitudes"));
         }
+        if (esDespacho)
+            comercios.Add(("/Avisos", "ph-webhooks-logo", "Avisos a comercios"));
+        if (comercios.Count > 0)
+            grupos.Add(("Comercios", comercios));
 
+        if (esAdmin)
+        {
+            grupos.Add(("Configuración", new List<(string, string, string)>
+            {
+                ("/Zonas", "ph-map-trifold", "Zonas de cobertura"),
+                ("/Tarifas", "ph-currency-dollar", "Tarifas"),
+                ("/ReglasOperativas", "ph-sliders-horizontal", "Reglas operativas"),
+                ("/Personal", "ph-users-three", "Personal"),
+                ("/Vehiculos", "ph-truck", "Vehículos"),
+                ("/ConfiguracionOperador", "ph-palette", "Identidad visual")
+            }));
+        }
     }
     if (mostrarMenuPlataforma)
     {
-        entradas.Add(("/MensajesFallidos", "ph-warning-octagon", "Mensajes fallidos"));
-        entradas.Add(("/Banderas", "ph-toggle-right", "Banderas de funcionalidad"));
+        grupos.Add(("Plataforma", new List<(string, string, string)>
+        {
+            ("/MensajesFallidos", "ph-warning-octagon", "Mensajes fallidos"),
+            ("/Banderas", "ph-toggle-right", "Banderas de funcionalidad")
+        }));
     }
-    var hayMenu = entradas.Count > 0;
+    var hayMenu = grupos.Count > 0;
+
+    var perfil =
+        esAdmin ? "Administrador del operador" :
+        User.IsInRole("AdministradorPlataforma") ? "Administrador de la plataforma" :
+        esDeposito ? "Operario de depósito" : "Despachador";
+    var nombre = User.Identity?.Name;
+
+    // Mensajes que las páginas dejan en TempData antes de redirigir: se muestran como toasts.
+    var exitos = new[] { "Mensaje", "MensajeExito", "Exito" }.Select(k => TempData[k] as string);
+    var errores = new[] { "MensajeError", "Error" }.Select(k => TempData[k] as string);
 }
 
 <body>
+    <div class="toasts" id="toasts" aria-live="polite">
+        @foreach (var m in exitos)
+        {
+            <partial name="_Toast" model="(true, m)" />
+        }
+        @foreach (var m in errores)
+        {
+            <partial name="_Toast" model="(false, m)" />
+        }
+    </div>
+
     @if (!hayMenu)
     {
-        <!-- Páginas públicas (login, registro, elegir operador): sin menú lateral -->
-        <header class="mx-auto flex max-w-5xl items-center gap-2.5 px-4 py-5 md:px-8">
-            <img src="~/logo.svg" alt="" class="size-8" />
-            <span class="font-display text-[17px] font-bold tracking-tight">Última Milla</span>
-            <span class="text-[13px] text-suave">Backoffice del operador</span>
-        </header>
-        <main class="mx-auto max-w-5xl px-4 pb-16 pt-6 md:px-8">@RenderBody()</main>
+        <!-- Páginas públicas (login, registro, elegir operador): columna centrada, sin menú -->
+        <main class="acceso">
+            <span class="marca w-auto">
+                <img src="~/logo.svg" alt="" class="size-12" />
+                <span class="flex flex-col text-[22px] leading-tight">Última Milla<span class="font-sans text-[15px] font-normal tracking-normal text-suave">Backoffice</span></span>
+            </span>
+            @RenderBody()
+        </main>
     }
     else
     {
-        <div class="lg:grid lg:min-h-dvh lg:grid-cols-[248px_1fr]">
-            <!-- Menú: lateral fijo en escritorio; desplegable con <details> en el celular -->
-            <aside class="border-b border-borde bg-superficie lg:sticky lg:top-0 lg:h-dvh lg:border-b-0 lg:border-r">
-                <details class="group lg:contents" open>
-                    <summary class="flex list-none items-center gap-2.5 px-4 py-3 text-texto no-underline lg:pointer-events-none lg:px-5 lg:py-5 [&::-webkit-details-marker]:hidden">
-                        <img src="~/logo.svg" alt="" class="size-8" />
-                        <span class="flex flex-col leading-tight">
-                            <span class="font-display text-[16px] font-bold tracking-tight">Última Milla</span>
-                            <span class="text-[12px] font-normal text-suave">Backoffice del operador</span>
-                        </span>
-                        <i class="ph ph-list ml-auto text-xl text-suave lg:hidden"></i>
-                    </summary>
+        <div class="shell" id="shell">
+            <script>
+                // El estado plegado se recuerda entre páginas; se aplica antes de pintar para que no salte.
+                try { if (localStorage.getItem("menuPlegado") === "1") document.getElementById("shell").classList.add("colapsado"); } catch { }
+            </script>
+            <aside class="lateral">
+                <div class="lateral-tope">
+                    <a asp-page="/Index" class="marca"><img src="~/logo.svg" alt="" class="size-8" /><span class="txt flex flex-col leading-tight">Última Milla<span class="font-sans text-[12px] font-normal tracking-normal text-suave">Backoffice</span></span></a>
+                    <button type="button" class="plegar" id="btnPlegar" title="Plegar menú" aria-expanded="true">
+                        <i class="ph ph-sidebar-simple"></i>
+                    </button>
+                </div>
 
-                    <nav class="flex flex-col gap-0.5 px-3 pb-4 lg:pb-0">
-                        @foreach (var e in entradas)
+                @for (var g = 0; g < grupos.Count; g++)
+                {
+                    if (g > 0)
+                    {
+                        <hr />
+                    }
+                    <p class="grupo">@grupos[g].Titulo</p>
+                    <nav>
+                        @foreach (var e in grupos[g].Entradas)
                         {
-                            <a asp-page="@e.Pagina" class="nav-item" aria-current="@(paginaActual == e.Pagina ? "page" : null)">
-                                <i class="ph @e.Icono"></i>@e.Texto
+                            <a asp-page="@e.Pagina" class="nav-item" title="@e.Texto" aria-current="@(paginaActual == e.Pagina ? "page" : null)">
+                                <i class="ph @e.Icono"></i><span class="txt">@e.Texto</span>
                             </a>
                         }
                     </nav>
+                }
 
-                    <div class="flex flex-col gap-0.5 border-t border-borde px-3 py-3 lg:absolute lg:inset-x-0 lg:bottom-0">
-                        <a asp-page="/SeleccionarOperador" class="nav-item"><i class="ph ph-arrows-left-right"></i>Cambiar operador</a>
-                        <button type="button" id="btnCerrarSesion"
-                                class="nav-item w-full justify-start border-0 bg-transparent">
-                            <i class="ph ph-sign-out"></i>Cerrar sesión
-                        </button>
+                <div class="lateral-pie">
+                    <div class="usuario">
+                        <span class="avatar" title="@nombre">@(string.IsNullOrEmpty(nombre) ? "?" : char.ToUpperInvariant(nombre[0]).ToString())</span>
+                        <div class="txt min-w-0 flex-1">
+                            <b class="block truncate">@nombre</b>
+                            <small>@perfil</small>
+                        </div>
                     </div>
-                </details>
+                    <button type="button" id="btnCerrarSesion" class="nav-item" title="Cerrar sesión">
+                        <i class="ph ph-sign-out"></i><span class="txt">Cerrar sesión</span>
+                    </button>
+                </div>
             </aside>
 
-            <main class="min-w-0 px-4 py-8 md:px-10 md:py-12">
-                <div class="mx-auto max-w-6xl">@RenderBody()</div>
-            </main>
+            <main class="contenido">@RenderBody()</main>
         </div>
     }
 
+
     <script>
     document.addEventListener("DOMContentLoaded", () => {
-        // En escritorio el menú siempre está abierto; en el celular arranca cerrado.
-        const menu = document.querySelector("aside details");
-        if (menu && !matchMedia("(min-width: 1024px)").matches) menu.open = false;
+        const shell = document.getElementById("shell");
+        const btnPlegar = document.getElementById("btnPlegar");
+        if (shell && btnPlegar) {
+            const reflejar = () => {
+                const plegado = shell.classList.contains("colapsado");
+                btnPlegar.title = plegado ? "Desplegar menú" : "Plegar menú";
+                btnPlegar.setAttribute("aria-expanded", plegado ? "false" : "true");
+            };
+            reflejar();
+            btnPlegar.addEventListener("click", () => {
+                shell.classList.toggle("colapsado");
+                try { localStorage.setItem("menuPlegado", shell.classList.contains("colapsado") ? "1" : "0"); } catch { }
+                reflejar();
+            });
+        }
 
         const btnCerrarSesion = document.getElementById("btnCerrarSesion");
-
         if (!btnCerrarSesion) return;
 
         btnCerrarSesion.addEventListener("click", async () => {
@@ -132,16 +222,12 @@
                 });
 
                 if (!respuesta.ok) {
-                    throw new Error(
-                        `No se pudo cerrar sesión. Código: ${respuesta.status}`
-                    );
+                    throw new Error(`No se pudo cerrar sesión. Código: ${respuesta.status}`);
                 }
 
                 window.location.replace("/Login");
-
             } catch (error) {
-                console.error("Error al cerrar sesión:", error);
-                alert(error.message);
+                window.toast(false, error.message);
                 btnCerrarSesion.disabled = false;
             }
         });

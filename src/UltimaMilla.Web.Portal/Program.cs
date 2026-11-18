@@ -64,8 +64,15 @@ builder.Services.AddCascadingAuthenticationState();
 
 // Blazor InteractiveServer (informe 6.1). Data Protection ya está en Redis; con más de una réplica
 // Traefik mantiene cada circuito en su instancia con la cookie de afinidad del compose.
+// Las páginas piden los datos a la API desde el navegador (con la cookie) y el resultado vuelve al circuito
+// por JS interop. Con el tope por defecto de 32 KB, un listado de ~100 envíos (56 KB) tiraba el circuito y la
+// página quedaba reconectando.
+// ponytail: tope de 1 MB, unos 1.900 envíos de listado; si un comercio pasa eso, paginar GET /api/envios.
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddHubOptions(o => o.MaximumReceiveMessageSize = 1024 * 1024);
+
+builder.Services.AddScoped<Notificaciones>();
 
 builder.Services.AddHttpClient<EnviosApiClient>(c =>
     c.BaseAddress = new Uri(builder.Configuration["Api:BaseUrl"] ?? "http://localhost:5080/"));

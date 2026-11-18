@@ -1,4 +1,3 @@
-
 @page
 @model UltimaMilla.Web.Backoffice.Pages.ComerciosModel
 
@@ -6,175 +5,64 @@
     ViewData["Title"] = "Comercios";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Comercios</h1>
-        <p>Consultá, da de baja o reactivá los comercios vinculados a tu operador.</p>
-    </div>
+<div class="pagina">
+    <partial name="_Toast" model="(false, Model.Error)" />
+
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Comercios vinculados <span class="chip">@Model.Comercios.Count</span></h2>
+        @if (Model.Comercios.Count == 0)
+        {
+            <p class="vacio">No hay comercios vinculados.</p>
+        }
+        else
+        {
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr><th>Comercio</th><th>Estado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Model.Comercios)
+                        {
+                            var (estado, clase) = c.Estado == "Confirmada"
+                                ? (c.Activa ? ("Activo", "chip chip-exito") : ("De baja", "chip chip-peligro"))
+                                : (c.Estado, "chip");
+
+                            <tr>
+                                <td><b>@c.Nombre</b><span class="linea2">RUT @c.Rut</span></td>
+                                <td><span class="@clase">@estado</span></td>
+                                <td class="text-right">
+                                    @if (c.Estado == "Confirmada")
+                                    {
+                                        var esBaja = c.Activa;
+
+                                        <form method="post" asp-page-handler="@(esBaja ? "Baja" : "Reactivar")" class="formulario-comercio">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@c.CuentaId" />
+                                            <button type="button" class="btn-chico @(esBaja ? "peligro" : "primario")"
+                                                    data-accion="@(esBaja ? "baja" : "reactivar")" data-comercio="@c.Nombre">
+                                                @(esBaja ? "Dar de baja" : "Reactivar")
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 </div>
 
-@if (!string.IsNullOrWhiteSpace(Model.Mensaje))
-{
-    <p class="aviso ok" role="status">@Model.Mensaje</p>
-}
-
-@if (!string.IsNullOrWhiteSpace(Model.Error))
-{
-    <p class="aviso error" role="alert">@Model.Error</p>
-}
-
-@if (Model.Comercios.Count == 0)
-{
-    <p class="nota">No hay comercios vinculados.</p>
-}
-else
-{
-    <div class="tabla">
-        <table>
-            <thead>
-                <tr>
-                    <th>Comercio</th>
-                    <th>RUT</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var c in Model.Comercios)
-                {
-                    var estado = c.Estado == "Confirmada"
-                        ? (c.Activa ? "Activo" : "De baja")
-                        : c.Estado;
-
-                    <tr>
-                        <td>@c.Nombre</td>
-                        <td>@c.Rut</td>
-                        <td>@estado</td>
-                        <td>
-                            @if (c.Estado == "Confirmada")
-                            {
-                                var esBaja = c.Activa;
-                                var accion = esBaja ? "Baja" : "Reactivar";
-
-                                <form method="post"
-                                      asp-page-handler="@accion"
-                                      class="inline formulario-comercio">
-                                    @Html.AntiForgeryToken()
-
-                                    <input type="hidden"
-                                           name="id"
-                                           value="@c.CuentaId" />
-
-                                    <button type="button"
-                                            class="@(esBaja ? "peligro" : "primario")"
-                                            data-accion="@(esBaja ? "baja" : "reactivar")"
-                                            data-comercio="@c.Nombre">
-                                        @(esBaja ? "Dar de baja" : "Reactivar")
-                                    </button>
-                                </form>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+<dialog id="modalComercio" class="modal-despacho" aria-labelledby="modalComercioTitulo" aria-describedby="modalComercioDescripcion">
+    <h2 id="modalComercioTitulo" class="titulo-tarjeta"></h2>
+    <p id="modalComercioDescripcion"></p>
+    <div class="acciones-modal">
+        <button type="button" id="cancelarComercio">Cancelar</button>
+        <button type="button" id="confirmarComercio">Confirmar</button>
     </div>
-}
-
-<div id="modalComercio"
-     class="modal-comercio"
-     role="dialog"
-     aria-modal="true"
-     aria-labelledby="modalComercioTitulo"
-     aria-describedby="modalComercioDescripcion"
-     hidden>
-
-    <div class="modal-comercio-contenido">
-        <h2 id="modalComercioTitulo"></h2>
-
-        <p id="modalComercioDescripcion"></p>
-
-        <div class="modal-comercio-acciones">
-            <button type="button"
-                    id="cancelarComercio"
-                    class="modal-cancelar">
-                Cancelar
-            </button>
-
-            <button type="button"
-                    id="confirmarComercio"
-                    class="modal-confirmar">
-                Confirmar
-            </button>
-        </div>
-    </div>
-</div>
-
-<style>
-    .modal-comercio[hidden] {
-        display: none !important;
-    }
-
-    .modal-comercio {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-        background: rgba(0, 0, 0, 0.55);
-    }
-
-    .modal-comercio-contenido {
-        background: #fff;
-        color: #242424;
-        border-radius: 14px;
-        padding: 28px;
-        width: 100%;
-        max-width: 440px;
-        box-shadow: 0 15px 45px rgba(0, 0, 0, 0.2);
-    }
-
-    .modal-comercio-contenido h2 {
-        margin: 0 0 16px;
-        font-size: 22px;
-    }
-
-    .modal-comercio-contenido p {
-        line-height: 1.6;
-        margin-bottom: 25px;
-    }
-
-    .modal-comercio-acciones {
-        display: flex;
-        justify-content: flex-end;
-        gap: 12px;
-    }
-
-    .modal-cancelar,
-    .modal-confirmar {
-        padding: 11px 18px;
-        border-radius: 8px;
-        border: none;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .modal-cancelar {
-        background: #e8e8e8;
-        color: #333;
-    }
-
-    .modal-confirmar {
-        background: #c62828;
-        color: #fff;
-    }
-
-    .modal-confirmar.reactivar {
-        background: #2e7d32;
-    }
-</style>
+</dialog>
 
 <script>
     document.addEventListener("DOMContentLoaded", () => {
@@ -182,70 +70,34 @@ else
         const titulo = document.getElementById("modalComercioTitulo");
         const descripcion = document.getElementById("modalComercioDescripcion");
         const confirmar = document.getElementById("confirmarComercio");
-        const cancelar = document.getElementById("cancelarComercio");
-
         let formularioActual = null;
-        let botonAnterior = null;
 
-        function cerrarModal() {
-            modal.hidden = true;
-            formularioActual = null;
-            botonAnterior?.focus();
-        }
+        document.querySelectorAll(".formulario-comercio button").forEach(boton => {
+            boton.addEventListener("click", () => {
+                formularioActual = boton.closest("form");
+                const comercio = boton.dataset.comercio;
 
-        document.querySelectorAll(".formulario-comercio button")
-            .forEach(boton => {
-                boton.addEventListener("click", () => {
-                    formularioActual = boton.closest("form");
-                    botonAnterior = boton;
-
-                    const accion = boton.dataset.accion;
-                    const comercio = boton.dataset.comercio;
-
-                    if (accion === "baja") {
-                        titulo.textContent = "Dar de baja comercio";
-                        descripcion.textContent =
-                            `¿Querés dar de baja a "${comercio}"? ` +
-                            "No podrá crear nuevos envíos ni retiros. " +
-                            "Las operaciones en curso no se modificarán.";
-
-                        confirmar.textContent = "Dar de baja";
-                        confirmar.classList.remove("reactivar");
-                    } else {
-                        titulo.textContent = "Reactivar comercio";
-                        descripcion.textContent =
-                            `¿Querés reactivar a "${comercio}"? ` +
-                            "Podrá volver a realizar nuevas operaciones.";
-
-                        confirmar.textContent = "Reactivar";
-                        confirmar.classList.add("reactivar");
-                    }
-
-                    modal.hidden = false;
-                    cancelar.focus();
-                });
+                if (boton.dataset.accion === "baja") {
+                    titulo.textContent = "Dar de baja el comercio";
+                    descripcion.textContent = `¿Das de baja a "${comercio}"? No podrá crear envíos ni retiros nuevos; lo que está en curso no cambia.`;
+                    confirmar.textContent = "Dar de baja";
+                    confirmar.className = "peligro";
+                } else {
+                    titulo.textContent = "Reactivar el comercio";
+                    descripcion.textContent = `¿Reactivás a "${comercio}"? Va a poder operar de nuevo.`;
+                    confirmar.textContent = "Reactivar";
+                    confirmar.className = "primario";
+                }
+                modal.showModal();
             });
+        });
 
-        cancelar.addEventListener("click", cerrarModal);
-
+        document.getElementById("cancelarComercio").addEventListener("click", () => modal.close());
+        modal.addEventListener("close", () => formularioActual = null);
         confirmar.addEventListener("click", () => {
             if (!formularioActual) return;
-
-            const formulario = formularioActual;
             confirmar.disabled = true;
-            formulario.requestSubmit();
-        });
-
-        modal.addEventListener("click", evento => {
-            if (evento.target === modal) {
-                cerrarModal();
-            }
-        });
-
-        document.addEventListener("keydown", evento => {
-            if (evento.key === "Escape" && !modal.hidden) {
-                cerrarModal();
-            }
+            formularioActual.requestSubmit();
         });
     });
 </script>

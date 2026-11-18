@@ -5,90 +5,50 @@
     ViewData["Title"] = "Solicitudes de comercios";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Solicitudes de comercios</h1>
-        <p>Gestioná las solicitudes de vinculación de comercios con tu operador logístico.</p>
-    </div>
+<div class="pagina">
+    <partial name="_Toast" model="(false, Model.Error)" />
+
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Solicitudes de vinculación <span class="chip">@Model.Solicitudes.Count</span></h2>
+        @if (Model.Solicitudes.Count == 0)
+        {
+            <p class="vacio">No hay solicitudes pendientes. Cuando un comercio pida trabajar con tu operador, aparece acá.</p>
+        }
+        else
+        {
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr><th>Comercio</th><th>Estado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var solicitud in Model.Solicitudes)
+                        {
+                            <tr>
+                                <td>
+                                    <b>@solicitud.NombreComercio</b>
+                                    <span class="linea2">Pedida el @solicitud.CreadoEn.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                </td>
+                                <td><span class="chip chip-alerta">Pendiente</span></td>
+                                <td>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <form method="post" asp-page-handler="Rechazar">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@solicitud.Id" />
+                                            <button type="submit" class="peligro btn-chico" onclick="return confirm('¿Rechazar esta solicitud?');">Rechazar</button>
+                                        </form>
+                                        <form method="post" asp-page-handler="Aceptar">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@solicitud.Id" />
+                                            <button type="submit" class="primario btn-chico">Aceptar</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 </div>
-
-@if (!string.IsNullOrWhiteSpace(Model.Mensaje))
-{
-    <p class="aviso ok" role="status">
-        @Model.Mensaje
-    </p>
-}
-
-@if (!string.IsNullOrWhiteSpace(Model.Error))
-{
-    <p class="aviso error" role="alert">
-        @Model.Error
-    </p>
-}
-
-@if (Model.Solicitudes.Count == 0)
-{
-    <p class="nota">No hay solicitudes pendientes.</p>
-}
-else
-{
-    <div class="tabla">
-        <table>
-            <thead>
-                <tr>
-                    <th>Comercio</th>
-                    <th>Fecha de solicitud</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var solicitud in Model.Solicitudes)
-                {
-                    <tr>
-                        <td>@solicitud.NombreComercio</td>
-
-                        <td>
-                            @solicitud.CreadoEn.ToLocalTime()
-                                .ToString("dd/MM/yyyy HH:mm")
-                        </td>
-
-                        <td>Pendiente</td>
-
-                        <td>
-                            <form method="post"
-                                  asp-page-handler="Aceptar"
-                                  class="inline">
-                                @Html.AntiForgeryToken()
-
-                                <input type="hidden"
-                                       name="id"
-                                       value="@solicitud.Id" />
-
-                                <button type="submit" class="primario">
-                                    Aceptar
-                                </button>
-                            </form>
-
-                            <form method="post"
-                                  asp-page-handler="Rechazar"
-                                  class="inline">
-                                @Html.AntiForgeryToken()
-
-                                <input type="hidden"
-                                       name="id"
-                                       value="@solicitud.Id" />
-
-                                <button type="submit"
-                                        class="peligro"
-                                        onclick="return confirm('¿Rechazar esta solicitud?');">
-                                    Rechazar
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-}

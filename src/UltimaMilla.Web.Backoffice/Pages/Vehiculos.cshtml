@@ -5,84 +5,73 @@
     ViewData["Title"] = "Vehículos";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Vehículos</h1>
-        <p>Flota del operador y su capacidad de carga. Las hojas de ruta solo ofrecen los vehículos activos.</p>
-    </div>
+<div class="pagina">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <p class="aviso error" role="alert">@Model.Error</p>
+    }
+
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Flota <span class="chip">@Model.Vehiculos.Count</span></h2>
+        @if (Model.Vehiculos.Count == 0)
+        {
+            <p class="vacio">Todavía no hay vehículos dados de alta.</p>
+        }
+        else
+        {
+            <div class="tabla tabla-holgada">
+                <table>
+                    <thead>
+                        <tr><th>Matrícula</th><th class="num">Peso</th><th class="num">Volumen</th><th>Estado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var v in Model.Vehiculos)
+                        {
+                            <tr>
+                                <td><b class="codigo">@v.Matricula</b></td>
+                                <td class="num">@v.CapacidadPesoKg.ToString("0.##") kg</td>
+                                <td class="num">@v.CapacidadVolumenM3.ToString("0.##") m³</td>
+                                <td><span class="chip @(v.Activo ? "chip-exito" : null)">@(v.Activo ? "Activo" : "De baja")</span></td>
+                                <td class="text-right">
+                                    <form method="post" asp-page-handler="Estado">
+                                        <input type="hidden" name="id" value="@v.Id" />
+                                        <input type="hidden" name="activo" value="@((!v.Activo).ToString().ToLowerInvariant())" />
+                                        <button type="submit" class="btn-chico @(v.Activo ? "peligro" : null)">@(v.Activo ? "Dar de baja" : "Reactivar")</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="nota mt-3">Las hojas de ruta solo ofrecen los vehículos activos.</p>
+        }
+    </section>
+
+    <section class="tarjeta">
+        <h2 class="titulo-tarjeta">Dar de alta</h2>
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="aviso error mb-4"></div>
+            <div class="grid gap-4 sm:grid-cols-3">
+                <div class="campo">
+                    <label asp-for="Formulario.Matricula">Matrícula</label>
+                    <input asp-for="Formulario.Matricula" />
+                    <span asp-validation-for="Formulario.Matricula"></span>
+                </div>
+                <div class="campo">
+                    <label asp-for="Formulario.CapacidadPesoKg">Capacidad de peso</label>
+                    <div class="sufijo"><input asp-for="Formulario.CapacidadPesoKg" type="number" step="0.01" min="0.01" /><span>kg</span></div>
+                    <span asp-validation-for="Formulario.CapacidadPesoKg"></span>
+                </div>
+                <div class="campo">
+                    <label asp-for="Formulario.CapacidadVolumenM3">Capacidad de volumen</label>
+                    <div class="sufijo"><input asp-for="Formulario.CapacidadVolumenM3" type="number" step="0.01" min="0.01" /><span>m³</span></div>
+                    <span asp-validation-for="Formulario.CapacidadVolumenM3"></span>
+                </div>
+            </div>
+            <div class="acciones">
+                <button type="submit" class="primario"><i class="ph ph-truck"></i>Dar de alta</button>
+            </div>
+        </form>
+    </section>
 </div>
-
-@if (TempData["Mensaje"] is string mensaje)
-{
-    <p class="aviso ok" role="status">@mensaje</p>
-}
-
-@if (!string.IsNullOrWhiteSpace(Model.Error))
-{
-    <p class="aviso error" role="alert">@Model.Error</p>
-}
-
-<section>
-    <h2>Flota</h2>
-
-    @if (Model.Vehiculos.Count == 0)
-    {
-        <p class="nota">Todavía no hay vehículos dados de alta.</p>
-    }
-    else
-    {
-        <div class="tabla">
-            <table>
-                <thead>
-                    <tr><th>Matrícula</th><th>Peso (kg)</th><th>Volumen (m³)</th><th>Estado</th><th></th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var v in Model.Vehiculos)
-                    {
-                        <tr>
-                            <td>@v.Matricula</td>
-                            <td>@v.CapacidadPesoKg.ToString("0.##")</td>
-                            <td>@v.CapacidadVolumenM3.ToString("0.##")</td>
-                            <td>@(v.Activo ? "Activo" : "Inactivo")</td>
-                            <td>
-                                <form method="post" asp-page-handler="Estado">
-                                    <input type="hidden" name="id" value="@v.Id" />
-                                    <input type="hidden" name="activo" value="@((!v.Activo).ToString().ToLowerInvariant())" />
-                                    <button type="submit">@(v.Activo ? "Dar de baja" : "Reactivar")</button>
-                                </form>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-</section>
-
-<section>
-    <h2>Dar de alta</h2>
-
-    <form method="post">
-        <div asp-validation-summary="All" class="error"></div>
-
-        <div class="campos">
-            <div>
-                <label asp-for="Formulario.Matricula">Matrícula</label>
-                <input asp-for="Formulario.Matricula" />
-                <span asp-validation-for="Formulario.Matricula" class="error"></span>
-            </div>
-            <div>
-                <label asp-for="Formulario.CapacidadPesoKg">Capacidad de peso (kg)</label>
-                <input asp-for="Formulario.CapacidadPesoKg" type="number" step="0.01" min="0.01" />
-                <span asp-validation-for="Formulario.CapacidadPesoKg" class="error"></span>
-            </div>
-            <div>
-                <label asp-for="Formulario.CapacidadVolumenM3">Capacidad de volumen (m³)</label>
-                <input asp-for="Formulario.CapacidadVolumenM3" type="number" step="0.01" min="0.01" />
-                <span asp-validation-for="Formulario.CapacidadVolumenM3" class="error"></span>
-            </div>
-        </div>
-
-        <button type="submit" class="primario"><i class="ph ph-truck"></i>Dar de alta</button>
-    </form>
-</section>

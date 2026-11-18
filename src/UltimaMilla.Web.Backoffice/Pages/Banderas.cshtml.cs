@@ -39,7 +39,7 @@ public sealed class BanderasModel(BanderasApiClient api) : PageModel
         }
         catch (HttpRequestException ex)
         {
-            TempData["Mensaje"] = $"No se pudo cambiar: {ex.Message}";
+            TempData["MensajeError"] = $"No se pudo cambiar: {ex.Message}";
         }
 
         return RedirectToPage();

@@ -5,45 +5,23 @@
     ViewData["Title"] = "Iniciar sesión";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Iniciar sesión</h1>
-        <p>Acceso para operadores logísticos.</p>
-    </div>
-</div>
-
-<section class="tarjeta max-w-md">
-    <form id="formLogin">
-        <div>
-            <div>
-                <label for="email">Correo electrónico</label>
-                <input id="email"
-                       type="email"
-                       autocomplete="username"
-                       required />
-            </div>
-            <div>
-                <label for="password">Contraseña</label>
-                <input id="password"
-                       type="password"
-                       autocomplete="current-password"
-                       required />
-            </div>
+<section class="tarjeta max-w-[400px]">
+    <h1 class="titulo-tarjeta">Backoffice del operador</h1>
+    <form id="formLogin" class="grid gap-4">
+        <div class="campo">
+            <label for="email">Correo electrónico</label>
+            <input id="email" type="email" autocomplete="username" required />
         </div>
-
-        <div class="acciones">
-            <button class="primario" type="submit" id="btnLogin">
-                Iniciar sesión
-            </button>
+        <div class="campo">
+            <label for="password">Contraseña</label>
+            <input id="password" type="password" autocomplete="current-password" required />
         </div>
-
-        <p id="mensajeError" class="error" role="alert"></p>
+        <button class="primario mt-2 h-[44px] w-full" type="submit" id="btnLogin">Ingresar</button>
     </form>
 </section>
 
-<p class="nota">
-    ¿Todavía no tenés una cuenta?
-    <a asp-page="/Registro">Registrar operador logístico</a>
+<p class="nota max-w-[400px] text-center">
+    ¿Todavía no tenés una cuenta? <a asp-page="/Registro">Registrar operador logístico</a>
 </p>
 
 <script>
@@ -51,45 +29,34 @@
         event.preventDefault();
 
         const boton = document.getElementById("btnLogin");
-        const error = document.getElementById("mensajeError");
-
         boton.disabled = true;
-        error.textContent = "";
+        boton.textContent = "Ingresando…";
 
         try {
             const respuesta = await fetch("/api/auth/login", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 credentials: "same-origin",
                 body: JSON.stringify({
                     email: document.getElementById("email").value,
                     password: document.getElementById("password").value,
                     aplicacion: "backoffice"
-
                 })
             });
 
             if (!respuesta.ok) {
-            if (respuesta.status === 401) {
-                throw new Error("Correo o contraseña incorrectos.");
+                if (respuesta.status === 401)
+                    throw new Error("Correo o contraseña incorrectos.");
+                if (respuesta.status === 403)
+                    throw new Error("No tenés permisos para acceder al Backoffice.");
+                throw new Error("No se pudo iniciar sesión.");
             }
-
-            if (respuesta.status === 403) {
-                throw new Error(
-                    "No tenés permisos para acceder al Backoffice."
-                );
-            }
-
-            throw new Error("No se pudo iniciar sesión.");
-        }
 
             window.location.assign("/SeleccionarOperador");
         } catch (ex) {
-            error.textContent = ex.message;
-        } finally {
+            window.toast(false, ex.message);
             boton.disabled = false;
+            boton.textContent = "Ingresar";
         }
     });
 </script>

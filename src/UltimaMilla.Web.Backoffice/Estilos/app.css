@@ -1,45 +1,21 @@
 @import "tailwindcss" source(none);
 @source "../Pages";
 @import "../../estilos-web/tema.css";
+@import "../../estilos-web/componentes.css";
 
-/* Modal de confirmación de despacho */
-
-dialog.modal-despacho {
-    position: fixed;
-    inset: 0;
-    margin: auto;
-
-    width: min(440px, 90vw);
-    max-width: 90vw;
-    max-height: 90vh;
-
-    padding: 28px;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-
-    background: #ffffff;
-    color: #1f2937;
-
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-}
-
-dialog.modal-despacho::backdrop {
-    background: rgba(0, 0, 0, 0.45);
-}
-
-.acciones-modal {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 24px;
-}
-
-.estado-despachada {
-    display: inline-block;
-    padding: 8px 14px;
-    border-radius: 999px;
-    background-color: #dcfce7;
-    color: #166534;
-    font-size: 13px;
-    font-weight: 600;
+/* Lo propio del Backoffice. */
+@layer components {
+  /* Modal de confirmación de despacho (Hojas de ruta): el dialog del tema, centrado y angosto. */
+  dialog.modal-despacho { @apply fixed inset-0 m-auto max-h-[90vh] w-[min(440px,90vw)] p-[24px]; }
+  .acciones-modal { @apply mt-6 flex justify-end gap-3; }
+  /* Modales de acción (recibir en depósito, reprogramar, aceptar solicitud). */
+  dialog.modal-recepcion { @apply p-[24px]; }
+  .modal-campo { @apply mt-4 flex flex-col gap-1.5; }
+  .modal-campo label { @apply m-0 text-[13px] font-semibold; }
+  .modal-acciones { @apply mt-6 justify-end; }
+  /* Interruptor de las banderas: el botón envía el valor contrario. */
+  .interruptor { @apply relative h-6 w-11 shrink-0 rounded-full border-0 bg-borde-fuerte p-0 transition-colors hover:bg-borde-fuerte active:scale-100; }
+  .interruptor::after { @apply absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform content-['']; }
+  .interruptor[aria-checked=true] { @apply bg-exito hover:bg-exito; }
+  .interruptor[aria-checked=true]::after { @apply translate-x-5; }
 }

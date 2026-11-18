@@ -21,3 +21,6 @@ infra/.terraform.lock.hcl.bak
 
 coverage/
 TestResults/
+
+# Mockups del companion visual de brainstorming
+.superpowers/

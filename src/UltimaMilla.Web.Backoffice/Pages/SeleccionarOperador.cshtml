@@ -5,126 +5,96 @@
     ViewData["Title"] = "Seleccionar operador";
 }
 
-<section>
-    <div class="encabezado">
-        <div>
-            <h1>Seleccionar operador</h1>
-            <p>Seleccioná la membresía con la que querés trabajar.</p>
-        </div>
+<section class="tarjeta max-w-[480px]">
+    <h1 class="titulo-tarjeta">Elegí el operador</h1>
+    <div id="listaOperadores" class="grid gap-2.5">
+        <p class="vacio">Cargando…</p>
     </div>
-
-    <div id="listaOperadores" class="mt-6 space-y-4"></div>
-
-    <p id="mensajeError" class="aviso error mt-4" role="alert"></p>
 </section>
 
 <script>
     const lista = document.getElementById("listaOperadores");
-    const error = document.getElementById("mensajeError");
+
+    const perfiles = {
+        AdministradorOperador: "Administrador",
+        Operador: "Despachador",
+        AdministradorPlataforma: "Administrador de la plataforma"
+    };
+
+    async function seleccionar(membresia, boton) {
+        if (boton) boton.disabled = true;
+
+        try {
+            const respuesta = await fetch("/api/auth/seleccionar-operador", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({ membresiaId: membresia.id })
+            });
+
+            if (!respuesta.ok)
+                throw new Error("No se pudo seleccionar el operador.");
+
+            // El administrador de plataforma solo tiene las pantallas de plataforma.
+            window.location.replace(membresia.perfil === "AdministradorPlataforma" ? "/MensajesFallidos" : "/");
+        } catch (ex) {
+            window.toast(false, ex.message);
+            if (boton) boton.disabled = false;
+        }
+    }
+
+    // Los nombres salen del listado de operadores; si no se puede leer, queda el identificador.
+    async function nombresDeOperador() {
+        try {
+            const respuesta = await fetch("/api/operadores", { credentials: "same-origin" });
+            if (!respuesta.ok) return {};
+            return Object.fromEntries((await respuesta.json()).map(o => [o.id, o.nombre]));
+        } catch {
+            return {};
+        }
+    }
 
     async function cargarOperadores() {
         try {
-            const respuesta = await fetch("/api/auth/membresias", {
-                credentials: "same-origin"
-            });
+            const respuesta = await fetch("/api/auth/membresias", { credentials: "same-origin" });
 
             if (respuesta.status === 401) {
                 window.location.assign("/Login");
                 return;
             }
-
-            if (!respuesta.ok) {
+            if (!respuesta.ok)
                 throw new Error("No se pudieron cargar las membresías.");
-            }
 
-            const membresias = await respuesta.json();
-
-            const operadores = membresias.filter(m =>
-                m.perfil === "AdministradorOperador" ||
-                m.perfil === "Operador" ||
-                m.perfil === "AdministradorPlataforma"
-            );
+            const operadores = (await respuesta.json()).filter(m => m.perfil in perfiles);
 
             if (operadores.length === 0) {
-                error.textContent =
-                    "Tu usuario no tiene permisos para acceder al Backoffice.";
+                lista.innerHTML = "";
+                const aviso = document.createElement("p");
+                aviso.className = "aviso error";
+                aviso.textContent = "Tu usuario no tiene permisos para acceder al Backoffice.";
+                lista.append(aviso);
                 return;
             }
             if (operadores.length === 1) {
-    try {
-        const respuestaSeleccion = await fetch(
-            "/api/auth/seleccionar-operador",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                credentials: "same-origin",
-                body: JSON.stringify({
-                    membresiaId: operadores[0].id
-                })
+                await seleccionar(operadores[0]);
+                return;
             }
-        );
 
-        if (!respuestaSeleccion.ok) {
-            throw new Error("No se pudo seleccionar el operador.");
-        }
-
-        window.location.replace("/");
-        return;
-    } catch (ex) {
-        error.textContent = ex.message;
-        return;
-    }
-}
-
+            const nombres = await nombresDeOperador();
+            lista.innerHTML = "";
             operadores.forEach(m => {
                 const boton = document.createElement("button");
                 boton.type = "button";
-                boton.className = "primario";
-                boton.style.display = "block";
-                boton.style.marginBottom = "1rem";
-                boton.textContent =
-                    `${m.perfil} - Operador ${m.operadorId}`;
-
-                boton.addEventListener("click", async () => {
-                    boton.disabled = true;
-                    error.textContent = "";
-
-                    try {
-                        const respuestaSeleccion = await fetch(
-                            "/api/auth/seleccionar-operador",
-                            {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json"
-                                },
-                                credentials: "same-origin",
-                                body: JSON.stringify({
-                                    membresiaId: m.id
-                                })
-                            }
-                        );
-
-                        if (!respuestaSeleccion.ok) {
-                            throw new Error(
-                                "No se pudo seleccionar el operador."
-                            );
-                        }
-
-                        // El administrador de plataforma solo tiene la pantalla de mensajes fallidos.
-                        window.location.assign(
-                            m.perfil === "AdministradorPlataforma" ? "/MensajesFallidos" : "/");
-                    } catch (ex) {
-                        error.textContent = ex.message;
-                        boton.disabled = false;
-                    }
-                });
-
-                lista.appendChild(boton);
+                boton.className = "h-auto w-full justify-between px-4 py-3 text-left";
+                boton.innerHTML = '<span><b class="block"></b><span class="nota"></span></span><i class="ph ph-arrow-right text-suave"></i>';
+                boton.querySelector("b").textContent = nombres[m.operadorId] ?? `Operador ${m.operadorId}`;
+                boton.querySelector(".nota").textContent = perfiles[m.perfil];
+                boton.addEventListener("click", () => seleccionar(m, boton));
+                lista.append(boton);
             });
         } catch (ex) {
-            error.textContent = ex.message;
+            lista.innerHTML = "";
+            window.toast(false, ex.message);
         }
     }
 

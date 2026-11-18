@@ -1,22 +1,23 @@
 /*
   Sistema visual compartido por Portal y Backoffice (Tailwind v4).
   Mismos tokens que la app móvil (src/UltimaMilla.Mobile/Resources/Styles/Colors.xaml):
-  neutros zinc, un solo acento naranja, colores de estado solo para estado.
-  Tipografía: Space Grotesk en títulos y cifras, IBM Plex Sans en el resto.
+  neutros zinc, un solo acento naranja, colores de estado solo para estado. Siempre en claro.
+  Tipografía: Work Sans en títulos y cifras, Source Sans 3 en el resto.
   Radios: tarjetas 16px (rounded-2xl), controles 12px (rounded-xl), chips redondos.
 
   Las clases sueltas (.nota, .aviso, .filtro, .campos, .tabla, button.primario...) ya las
   usan las páginas y su JS; se mantienen los nombres y acá cambia solo cómo se ven.
 */
 
-@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("fuentes/IBMPlexSans-Regular.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("fuentes/IBMPlexSans-Medium.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("fuentes/IBMPlexSans-SemiBold.woff2") format("woff2"); }
-@font-face { font-family: "Space Grotesk"; font-weight: 500; font-display: swap; src: url("fuentes/SpaceGrotesk-Medium.woff2") format("woff2"); }
-@font-face { font-family: "Space Grotesk"; font-weight: 700; font-display: swap; src: url("fuentes/SpaceGrotesk-Bold.woff2") format("woff2"); }
+@font-face { font-family: "Source Sans 3"; font-weight: 400; font-display: swap; src: url("fuentes/SourceSans3-400.woff2") format("woff2"); }
+@font-face { font-family: "Source Sans 3"; font-weight: 500; font-display: swap; src: url("fuentes/SourceSans3-500.woff2") format("woff2"); }
+@font-face { font-family: "Source Sans 3"; font-weight: 600; font-display: swap; src: url("fuentes/SourceSans3-600.woff2") format("woff2"); }
+@font-face { font-family: "Work Sans"; font-weight: 500; font-display: swap; src: url("fuentes/WorkSans-500.woff2") format("woff2"); }
+@font-face { font-family: "Work Sans"; font-weight: 600; font-display: swap; src: url("fuentes/WorkSans-600.woff2") format("woff2"); }
+@font-face { font-family: "Work Sans"; font-weight: 700; font-display: swap; src: url("fuentes/WorkSans-700.woff2") format("woff2"); }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --c-fondo: #f4f4f5;
   --c-superficie: #ffffff;
   --c-hundido: #fafafa;
@@ -36,31 +37,9 @@
   --c-alerta-suave: #fef3c7;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --c-fondo: #0c0c0e;
-    --c-superficie: #18181b;
-    --c-hundido: #131316;
-    --c-borde: #27272a;
-    --c-borde-fuerte: #3f3f46;
-    --c-texto: #f4f4f5;
-    --c-suave: #a1a1aa;
-    --c-acento: #f97316;
-    --c-acento-hover: #fb923c;
-    --c-sobre-acento: #431407;
-    --c-acento-suave: #2c1608;
-    --c-exito: #4ade80;
-    --c-exito-suave: #0f2918;
-    --c-peligro: #f87171;
-    --c-peligro-suave: #2c1313;
-    --c-alerta: #fbbf24;
-    --c-alerta-suave: #2b1d08;
-  }
-}
-
 @theme inline {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Work Sans", "Source Sans 3", ui-sans-serif, sans-serif;
 
   --color-fondo: var(--c-fondo);
   --color-superficie: var(--c-superficie);

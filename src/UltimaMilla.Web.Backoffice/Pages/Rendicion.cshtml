@@ -5,94 +5,90 @@
     ViewData["Title"] = "Control de rendición";
 }
 
-<div class="encabezado">
-    <div>
-        <h1>Control de rendición</h1>
-        <p>El repartidor ya rindió desde la app. Escaneá lo que recibís: los bultos que no se entregaron y los que retiró en domicilios. Si coincide con la hoja, quedan en el depósito y la hoja se cierra.</p>
-    </div>
-</div>
+<div class="pagina">
+    <a asp-page="/HojasDeRuta" class="nota w-fit"><i class="ph ph-arrow-left"></i> Hojas de ruta</a>
 
-@if (!string.IsNullOrWhiteSpace(Model.Error))
-{
-    <div class="aviso error">
-        @Model.Error
-    </div>
-}
+    <partial name="_Toast" model="(false, Model.Error)" />
 
-<p class="nota">Hoja de ruta <span class="codigo">@Model.HojaId</span></p>
-
-@if (Model.Rendicion is { } rendicion)
-{
-    @if (rendicion.Estado == "Rendida")
+    @if (Model.Rendicion is { } rendicion)
     {
-        <div class="aviso ok">La rendición de esta hoja ya fue controlada: la hoja está cerrada.</div>
-    }
-    else if (rendicion.Estado != "PendienteDeControl")
-    {
-        <div class="aviso">El repartidor todavía no rindió esta hoja desde la app. El control se hace después de su rendición.</div>
-    }
-    else
-    {
-        @if (rendicion.ParadasSinResultado.Count > 0)
+        @if (rendicion.Estado == "Rendida")
         {
-            <div class="aviso error">
-                Hay paradas sin resultado: @string.Join(", ", rendicion.ParadasSinResultado).
-                El repartidor tiene que registrarlas y sincronizar la app antes de rendir.
-            </div>
+            <p class="aviso ok">La rendición de esta hoja ya fue controlada: la hoja está cerrada.</p>
         }
-
-        <h2>Lo que tiene que volver (@Model.TotalBultos bultos)</h2>
-
-        @if (rendicion.Retornos.Count == 0)
+        else if (rendicion.Estado != "PendienteDeControl")
         {
-            <p>No vuelve nada: todo se entregó. Igual hay que confirmar el control para cerrar la hoja.</p>
+            <p class="aviso">El repartidor todavía no rindió esta hoja desde la app. El control se hace después de su rendición.</p>
         }
         else
         {
-            <div class="tabla">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Tipo</th>
-                            <th>Referencia</th>
-                            <th>Bultos</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var retorno in rendicion.Retornos)
+            @if (rendicion.ParadasSinResultado.Count > 0)
+            {
+                <p class="aviso error">
+                    Hay paradas sin resultado: @string.Join(", ", rendicion.ParadasSinResultado).
+                    El repartidor tiene que registrarlas y sincronizar la app antes de rendir.
+                </p>
+            }
+
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="HojaId" />
+
+                <div class="grid items-start gap-[24px] lg:grid-cols-[minmax(0,1fr)_320px]">
+                    <section class="tarjeta">
+                        <div class="cabecera-tarjeta">
+                            <h1 class="titulo-tarjeta">Lo que tiene que volver <span class="chip">@Model.TotalBultos bultos</span></h1>
+                            <span class="nota">Hoja <span class="codigo">@Model.HojaId</span></span>
+                        </div>
+                        @if (rendicion.Retornos.Count == 0)
                         {
-                            <tr>
-                                <td>@(retorno.Tipo == "Retiro" ? "Retirado en domicilio" : "No entregado")</td>
-                                <td>@retorno.Referencia</td>
-                                <td class="codigo">@string.Join(", ", retorno.Bultos)</td>
-                            </tr>
+                            <p class="vacio">No vuelve nada: todo se entregó. Igual hay que confirmar el control para cerrar la hoja.</p>
                         }
-                    </tbody>
-                </table>
-            </div>
+                        else
+                        {
+                            <div class="tabla tabla-holgada">
+                                <table>
+                                    <thead>
+                                        <tr><th>Referencia</th><th>Bultos</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var retorno in rendicion.Retornos)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <b class="codigo">@retorno.Referencia</b>
+                                                    <span class="linea2">@(retorno.Tipo == "Retiro" ? "Retirado en domicilio" : "No entregado")</span>
+                                                </td>
+                                                <td class="codigo">@string.Join(", ", retorno.Bultos)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </section>
+
+                    <aside class="tarjeta lg:sticky lg:top-[24px]">
+                        <h2 class="titulo-tarjeta">Control en depósito</h2>
+                        <div class="grid gap-4">
+                            <div class="campo">
+                                <label asp-for="Escaneados">Bultos escaneados</label>
+                                <textarea asp-for="Escaneados" rows="6" placeholder="Un código por línea"></textarea>
+                                <span asp-validation-for="Escaneados"></span>
+                            </div>
+                            <div class="campo">
+                                <label asp-for="Responsable">Recibe en el depósito</label>
+                                <input type="text" asp-for="Responsable" />
+                                <span asp-validation-for="Responsable"></span>
+                            </div>
+                            <p class="nota">Si se perdió un bulto, declarar el extravío desde el detalle del envío y volver a controlar.</p>
+                            <button type="submit" class="primario h-[44px] w-full" disabled="@(rendicion.ParadasSinResultado.Count > 0)">
+                                Confirmar y cerrar la hoja
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            </form>
         }
-
-        <form method="post">
-            @Html.AntiForgeryToken()
-            <input type="hidden" asp-for="HojaId" />
-
-            <div>
-                <label asp-for="Escaneados">Bultos escaneados</label>
-                <textarea asp-for="Escaneados" rows="6" placeholder="Un código por línea"></textarea>
-                <p class="nota">Si falta algún bulto y se perdió, declarar el extravío del envío desde su detalle y volver a controlar.</p>
-            </div>
-
-            <div>
-                <label asp-for="Responsable">Recibe en el depósito</label>
-                <input type="text" asp-for="Responsable" />
-            </div>
-
-            <div class="acciones">
-                <a asp-page="/HojasDeRuta">Cancelar</a>
-                <button type="submit" class="btn-primario" disabled="@(rendicion.ParadasSinResultado.Count > 0)">
-                    Confirmar control y cerrar la hoja
-                </button>
-            </div>
-        </form>
     }
-}
+</div>

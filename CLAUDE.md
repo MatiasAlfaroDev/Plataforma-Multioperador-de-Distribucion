@@ -30,18 +30,24 @@ Los navegadores resuelven `*.localhost` solos.
 ### Estilos de Portal y Backoffice (Tailwind v4)
 
 Los dos sitios usan Tailwind v4 con el binario standalone (sin Node), v4.1.11. El tema compartido
-(tokens, tipografía, componentes) está en `src/estilos-web/tema.css`, y cada sitio tiene su entrada
-en `Estilos/app.css`. **El CSS compilado (`wwwroot/app.css`) se commitea**, así los Dockerfile y el
-CI no lo compilan; hay que regenerarlo después de tocar markup o el tema:
+(tokens, tipografía, siempre en claro) está en `src/estilos-web/tema.css`, y los componentes de los dos
+(sidebar colapsable, toasts, tarjetas, campos, tablas, selects) en `src/estilos-web/componentes.css`;
+cada sitio tiene su entrada en `Estilos/app.css`. **El CSS compilado (`wwwroot/app.css`) se commitea**,
+así los Dockerfile y el CI no lo compilan; hay que regenerarlo después de tocar markup o el tema:
 
 ```bash
 tailwindcss -i src/UltimaMilla.Web.Portal/Estilos/app.css -o src/UltimaMilla.Web.Portal/wwwroot/app.css --minify
 tailwindcss -i src/UltimaMilla.Web.Backoffice/Estilos/app.css -o src/UltimaMilla.Web.Backoffice/wwwroot/app.css --minify
 ```
 
-Marca compartida con la app móvil en `assets/marca/`: logo, IBM Plex Sans (texto), Space Grotesk
-(títulos y cifras) e íconos Phosphor. Sin emojis en la interfaz; los íconos son `<i class="ph ph-...">`
-en web y `app:Iconos` en MAUI.
+Marca en `assets/marca/`: logo, fuentes e íconos Phosphor. Las webs usan Source Sans 3 (texto) y
+Work Sans (títulos y cifras); la app móvil sigue con IBM Plex Sans y Space Grotesk. Sin emojis en la
+interfaz; los íconos son `<i class="ph ph-...">` en web y `app:Iconos` en MAUI.
+
+Mensajes al usuario: toasts. En el Portal, `Services/Notificaciones` (scoped por circuito) y el layout
+los muestra. En el Backoffice, lo que una página deja en `TempData` (`Mensaje`, `MensajeExito`, `Exito`
+para éxito; `MensajeError`, `Error` para error) lo muestra el layout; dentro de una página se usa
+`<partial name="_Toast" model="(exito, mensaje)" />`, y desde JS `window.toast(exito, mensaje)`.
 
 ### App móvil (solución aparte)
 
