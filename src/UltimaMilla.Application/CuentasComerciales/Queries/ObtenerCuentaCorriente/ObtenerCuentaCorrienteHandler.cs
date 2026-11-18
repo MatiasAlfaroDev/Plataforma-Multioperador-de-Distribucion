@@ -1,4 +1,5 @@
-﻿using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Common;
+using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Seguridad;
 using UltimaMilla.Domain.Organizacion;
 using UltimaMilla.Domain.Retiros;
@@ -89,8 +90,8 @@ public static class CalculadoraCuentaCorriente
         DateOnly desde,
         DateOnly hasta)
     {
-        var inicio = new DateTimeOffset(desde.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
-        var fin = new DateTimeOffset(hasta.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+        var inicio = HoraUruguay.InicioDelDia(desde);
+        var fin = HoraUruguay.InicioDelDia(hasta.AddDays(1));
 
         var resultado = new List<CuentaCorrienteOperadorDto>();
 

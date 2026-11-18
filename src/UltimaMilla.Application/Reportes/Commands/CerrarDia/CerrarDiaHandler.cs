@@ -1,4 +1,5 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Common;
 using UltimaMilla.Domain.Reportes;
 
 namespace UltimaMilla.Application.Reportes.Commands.CerrarDia;
@@ -16,16 +17,14 @@ public sealed class CerrarDiaHandler(
     IUnitOfWork unitOfWork,
     TimeProvider reloj)
 {
-    // A diferencia de los reportes (que hoy cortan el día en UTC), el día del cierre es el de Uruguay.
-    private static readonly TimeZoneInfo ZonaHoraria = TimeZoneInfo.FindSystemTimeZoneById("America/Montevideo");
-
     public async Task<CierreDiario> Handle(CerrarDiaCommand command, CancellationToken ct)
     {
         if (command.OperadorId == Guid.Empty)
             throw new ArgumentException("El operador es obligatorio.");
 
-        var inicio = InicioDelDia(command.Fecha);
-        var fin = InicioDelDia(command.Fecha.AddDays(1));
+        // Día de Uruguay, el mismo corte que usan los reportes: el cierre y /reportes coinciden para la misma fecha.
+        var inicio = HoraUruguay.InicioDelDia(command.Fecha);
+        var fin = HoraUruguay.InicioDelDia(command.Fecha.AddDays(1));
 
         var conteos = await reportes.ContarPorEstadoAsync(command.OperadorId, inicio, fin, ct);
         var cumplimiento = await reportes.ObtenerCumplimientoAsync(command.OperadorId, inicio, fin, ct);
@@ -56,10 +55,4 @@ public sealed class CerrarDiaHandler(
         await unitOfWork.GuardarCambiosAsync(ct);
         return cierre;
     }
-
-    /// <summary>Hora local de Uruguay, para que la tarea programada decida si ya pasó la hora del cierre y qué día cerrar.</summary>
-    public static DateTime HoraLocal(DateTimeOffset ahora) => TimeZoneInfo.ConvertTime(ahora, ZonaHoraria).DateTime;
-
-    private static DateTimeOffset InicioDelDia(DateOnly fecha) =>
-        new(TimeZoneInfo.ConvertTimeToUtc(fecha.ToDateTime(TimeOnly.MinValue), ZonaHoraria), TimeSpan.Zero);
 }

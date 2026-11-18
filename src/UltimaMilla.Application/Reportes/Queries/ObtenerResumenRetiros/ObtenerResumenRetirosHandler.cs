@@ -1,3 +1,4 @@
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Seguridad;
 
@@ -29,15 +30,9 @@ public sealed class ObtenerResumenRetirosHandler(
                 "El rango de fechas no es válido.");
 
         // Misma convención UTC del reporte actual de envíos.
-        var inicio = new DateTimeOffset(
-            desde.ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var inicio = HoraUruguay.InicioDelDia(desde);
 
-        var finExclusivo = new DateTimeOffset(
-            hasta.AddDays(1).ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var finExclusivo = HoraUruguay.InicioDelDia(hasta.AddDays(1));
 
         var estados = await repositorio.ContarPorEstadoAsync(
             operadorId, inicio, finExclusivo, ct);

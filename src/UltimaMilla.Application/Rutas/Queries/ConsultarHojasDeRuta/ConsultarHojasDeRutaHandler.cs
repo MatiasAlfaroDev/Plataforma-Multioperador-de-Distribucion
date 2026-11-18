@@ -1,4 +1,5 @@
 
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Configuracion;
@@ -151,8 +152,7 @@ public sealed class ConsultarHojasDeRutaHandler(
         DateTimeOffset? inicioEntrega = null;
 
         if (hayFiltros){
-            var zonaHoraria = TimeZoneInfo.FindSystemTimeZoneById(
-                "America/Montevideo");
+            var zonaHoraria = HoraUruguay.Zona;
 
             var fechaHoraLocal = DateTime.SpecifyKind(
                 fecha!.Value.ToDateTime(horaDesde!.Value),

@@ -17,10 +17,16 @@ public sealed record CierreDiarioDto(
 /// <summary>Cierres diarios del operador de la sesión en un rango de fechas.</summary>
 public sealed class ListarCierresDiariosHandler(ICierreDiarioRepository cierres)
 {
+    /// <summary>Tope del rango: un año de cierres alcanza para cualquier comparación.</summary>
+    public const int MaximoDias = 366;
+
     public async Task<IReadOnlyList<CierreDiarioDto>> Handle(DateOnly desde, DateOnly hasta, CancellationToken ct)
     {
         if (hasta < desde)
             throw new ArgumentException("Rango de fechas no válido.");
+
+        if (hasta.DayNumber - desde.DayNumber >= MaximoDias)
+            throw new ArgumentException($"El rango no puede superar los {MaximoDias} días.");
 
         var lista = await cierres.ListarAsync(desde, hasta, ct);
         return lista.Select(c => new CierreDiarioDto(

@@ -1,4 +1,5 @@
 
+using UltimaMilla.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Configuracion;
@@ -125,25 +126,21 @@ public sealed class ReporteEnviosRepository(
         if (operadorId == Guid.Empty)
             throw new ArgumentException("El operador es obligatorio.");
 
-        var datos = await db.Envios
+        var altas = await db.Envios
             .AsNoTracking()
             .Where(e =>
                 e.OperadorId == operadorId &&
                 e.FechaAlta >= desde &&
                 e.FechaAlta < hastaExclusivo)
-            .GroupBy(e => e.FechaAlta.Date)
-            .Select(g => new
-            {
-                Fecha = g.Key,
-                Cantidad = g.Count()
-            })
-            .OrderBy(x => x.Fecha)
+            .Select(e => e.FechaAlta)
             .ToListAsync(ct);
 
-        return datos
-            .Select(x => new VolumenDiarioReporte(
-                DateOnly.FromDateTime(x.Fecha),
-                x.Cantidad))
+        // Se agrupa por día de Uruguay, igual que el rango.
+        // ponytail: agrupa en memoria (una fecha por envío); pasarlo a SQL con AT TIME ZONE si el volumen lo pide.
+        return altas
+            .GroupBy(HoraUruguay.Fecha)
+            .OrderBy(g => g.Key)
+            .Select(g => new VolumenDiarioReporte(g.Key, g.Count()))
             .ToList();
     }
 
@@ -545,8 +542,7 @@ public sealed class ReporteEnviosRepository(
 
         var idsReprogramados = reprogramados.ToHashSet();
 
-        var zonaHoraria = TimeZoneInfo.FindSystemTimeZoneById(
-            "America/Montevideo");
+        var zonaHoraria = HoraUruguay.Zona;
 
         var aTiempo = 0;
         var fueraDePlazo = 0;

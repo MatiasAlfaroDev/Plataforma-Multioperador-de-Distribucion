@@ -1,5 +1,10 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Reportes.Commands.CerrarDia;
+using UltimaMilla.Application.Reportes.Queries.ListarCierresDiarios;
+using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
+using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
+using UltimaMilla.Application.Reportes.Queries.ObtenerResumenEnvios;
 using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Reportes;
 
@@ -92,6 +97,39 @@ public class CierreDiarioTests
         Assert.Null(cierre.PorcentajeCumplimiento);
     }
 
+    [Fact]
+    public void El_dia_de_Uruguay_empieza_a_las_tres_UTC()
+    {
+        Assert.Equal(new DateOnly(2026, 11, 16), HoraUruguay.Fecha(new DateTimeOffset(2026, 11, 17, 2, 59, 0, TimeSpan.Zero)));
+        Assert.Equal(new DateOnly(2026, 11, 17), HoraUruguay.Fecha(new DateTimeOffset(2026, 11, 17, 3, 0, 0, TimeSpan.Zero)));
+        Assert.Equal(new DateTimeOffset(2026, 11, 17, 3, 0, 0, TimeSpan.Zero), HoraUruguay.InicioDelDia(new DateOnly(2026, 11, 17)));
+    }
+
+    [Fact]
+    public async Task Los_reportes_cortan_el_dia_igual_que_el_cierre()
+    {
+        var reportes = new ReportesFalsos();
+        var esperado = (new DateTimeOffset(2026, 11, 16, 3, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 11, 17, 3, 0, 0, TimeSpan.Zero));
+
+        await new ObtenerResumenEnviosHandler(reportes).Handle(OperadorA, Fecha, Fecha, default);
+        Assert.Equal(esperado, reportes.Rangos["estados"]);
+
+        await new ObtenerCumplimientoHandler(reportes).Handle(OperadorA, Fecha, Fecha, default);
+        Assert.Equal(esperado, reportes.Rangos["cumplimiento"]);
+
+        await new ObtenerPuntualidadHandler(reportes).Handle(OperadorA, Fecha, Fecha, default);
+        Assert.Equal(esperado, reportes.Rangos["puntualidad"]);
+    }
+
+    [Fact]
+    public async Task La_consulta_de_cierres_no_acepta_mas_de_un_anio()
+    {
+        var handler = new ListarCierresDiariosHandler(new CierresEnMemoria().Del(OperadorA));
+
+        await handler.Handle(new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 1), default);
+        await Assert.ThrowsAsync<ArgumentException>(() => handler.Handle(new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 2), default));
+    }
+
     private static CerrarDiaHandler Handler(
         IReporteEnviosRepository reportes, ICierreDiarioRepository cierres, IUnitOfWork unitOfWork, DateTimeOffset ahora) =>
         new(reportes, cierres, unitOfWork, new RelojFijo(ahora));
@@ -102,6 +140,7 @@ public class CierreDiarioTests
 
         public DateTimeOffset Desde { get; private set; }
         public DateTimeOffset Hasta { get; private set; }
+        public Dictionary<string, (DateTimeOffset, DateTimeOffset)> Rangos { get; } = [];
 
         public void Fijar(Guid operadorId, int enviados, int completas, int parciales, int fallidas, int aTiempo, int fueraDePlazo) =>
             datos[operadorId] = (
@@ -112,17 +151,24 @@ public class CierreDiarioTests
         public Task<IReadOnlyList<ConteoEnviosPorEstado>> ContarPorEstadoAsync(Guid operadorId, DateTimeOffset desde, DateTimeOffset hastaExclusivo, CancellationToken ct)
         {
             (Desde, Hasta) = (desde, hastaExclusivo);
+            Rangos["estados"] = (desde, hastaExclusivo);
             IReadOnlyList<ConteoEnviosPorEstado> conteos = datos.TryGetValue(operadorId, out var d) && d.Enviados > 0
                 ? [new(EstadoEnvio.Admitido, d.Enviados - 1), new(EstadoEnvio.Entregado, 1)]
                 : [];
             return Task.FromResult(conteos);
         }
 
-        public Task<CumplimientoReporte> ObtenerCumplimientoAsync(Guid operadorId, DateTimeOffset desde, DateTimeOffset hastaExclusivo, CancellationToken ct) =>
-            Task.FromResult(new CumplimientoReporte(datos.TryGetValue(operadorId, out var d) ? [d.Zona] : [], []));
+        public Task<CumplimientoReporte> ObtenerCumplimientoAsync(Guid operadorId, DateTimeOffset desde, DateTimeOffset hastaExclusivo, CancellationToken ct)
+        {
+            Rangos["cumplimiento"] = (desde, hastaExclusivo);
+            return Task.FromResult(new CumplimientoReporte(datos.TryGetValue(operadorId, out var d) ? [d.Zona] : [], []));
+        }
 
-        public Task<ResultadoPuntualidadReporte> ObtenerPuntualidadAsync(Guid operadorId, DateTimeOffset desde, DateTimeOffset hastaExclusivo, CancellationToken ct) =>
-            Task.FromResult(datos.TryGetValue(operadorId, out var d) ? d.Puntualidad : new ResultadoPuntualidadReporte(0, 0, 0, 0, null));
+        public Task<ResultadoPuntualidadReporte> ObtenerPuntualidadAsync(Guid operadorId, DateTimeOffset desde, DateTimeOffset hastaExclusivo, CancellationToken ct)
+        {
+            Rangos["puntualidad"] = (desde, hastaExclusivo);
+            return Task.FromResult(datos.TryGetValue(operadorId, out var d) ? d.Puntualidad : new ResultadoPuntualidadReporte(0, 0, 0, 0, null));
+        }
 
         public Task<IReadOnlyList<ConteoMotivoNoEntrega>> ContarMotivosNoEntregaAsync(Guid operadorId, DateTimeOffset desde, DateTimeOffset hastaExclusivo, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<VolumenDiarioReporte>> ObtenerVolumenDiarioAsync(Guid operadorId, DateTimeOffset desde, DateTimeOffset hastaExclusivo, CancellationToken ct) => throw new NotSupportedException();

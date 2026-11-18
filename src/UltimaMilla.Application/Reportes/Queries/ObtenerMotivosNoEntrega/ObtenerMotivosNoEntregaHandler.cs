@@ -1,4 +1,5 @@
 
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 
 namespace UltimaMilla.Application.Reportes.Queries.ObtenerMotivosNoEntrega;
@@ -20,15 +21,9 @@ public sealed class ObtenerMotivosNoEntregaHandler(
             throw new ArgumentException(
                 "El rango de fechas no es válido.");
 
-        var inicio = new DateTimeOffset(
-            desde.ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var inicio = HoraUruguay.InicioDelDia(desde);
 
-        var finExclusivo = new DateTimeOffset(
-            hasta.AddDays(1).ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var finExclusivo = HoraUruguay.InicioDelDia(hasta.AddDays(1));
 
         var conteos = await repositorio.ContarMotivosNoEntregaAsync(
             operadorId,

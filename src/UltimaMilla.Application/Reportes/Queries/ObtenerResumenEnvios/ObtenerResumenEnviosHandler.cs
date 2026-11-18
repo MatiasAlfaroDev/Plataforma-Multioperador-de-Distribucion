@@ -1,4 +1,5 @@
 
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 
 namespace UltimaMilla.Application.Reportes.Queries.ObtenerResumenEnvios;
@@ -24,14 +25,10 @@ public sealed class ObtenerResumenEnviosHandler(
             throw new ArgumentException(
                 "La fecha hasta está fuera del rango permitido.");
 
-        // Primera versión: el período se interpreta en UTC.
-        var inicio = new DateTimeOffset(
-            desde.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+        // El período se interpreta en días de Uruguay, igual que el cierre diario.
+        var inicio = HoraUruguay.InicioDelDia(desde);
 
-        var finExclusivo = new DateTimeOffset(
-            hasta.AddDays(1).ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var finExclusivo = HoraUruguay.InicioDelDia(hasta.AddDays(1));
 
         var conteos = await repositorio.ContarPorEstadoAsync(
             operadorId,
