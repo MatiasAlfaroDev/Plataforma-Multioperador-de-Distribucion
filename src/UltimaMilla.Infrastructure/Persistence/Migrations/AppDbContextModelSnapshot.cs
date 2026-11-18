@@ -1524,6 +1524,60 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                     b.ToTable("cambios_bandera", (string)null);
                 });
 
+            modelBuilder.Entity("UltimaMilla.Domain.Reportes.CierreDiario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ATiempo")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CalculadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreadoEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EntregasCompletas")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EntregasParciales")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EnviosCreados")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("Fecha")
+                        .HasColumnType("date");
+
+                    b.Property<int>("FueraDePlazo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("IntentosFallidos")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OperadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PorcentajeCumplimiento")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("PorcentajePuntualidad")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Fecha")
+                        .IsUnique();
+
+                    b.ToTable("cierres_diarios", (string)null);
+                });
+
             modelBuilder.Entity("UltimaMilla.Domain.Retiros.BultoRetiro", b =>
                 {
                     b.Property<Guid>("Id")
