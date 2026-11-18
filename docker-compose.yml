@@ -191,8 +191,12 @@ services:
       # Lock de las tareas programadas (reintento de avisos fallidos).
       ConnectionStrings__Redis: "redis:6379"
       # Correo al destinatario con el enlace de seguimiento (letra 3.3): lo captura Mailpit.
-      Correo__Host: "mailpit"
-      Correo__Puerto: "1025"
+      # Correo real mediante Gmail SMTP
+      Correo__Host: "smtp.gmail.com"
+      Correo__Puerto: "587"
+      Correo__Usuario: "${GMAIL_USUARIO:?Falta GMAIL_USUARIO}"
+      Correo__Password: "${GMAIL_APP_PASSWORD:?Falta GMAIL_APP_PASSWORD}"
+      Correo__Remitente: "${GMAIL_USUARIO:?Falta GMAIL_USUARIO}"
       Seguimiento__UrlBase: "${URL_SEGUIMIENTO:-http://portal.localhost:8000/seguimiento}"
       # Push al repartidor cuando le asignan un envío (AvisarAsignacionConsumer). Misma cuenta de servicio que la API.
       Firebase__CredencialesRuta: "/run/secretos/firebase-cuenta-servicio.json"

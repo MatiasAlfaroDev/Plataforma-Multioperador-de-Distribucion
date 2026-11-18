@@ -105,6 +105,7 @@ public class RegistrarEventoMovilHandlerTests
             maximoParadas: 10);
 
         _hoja.AgregarEnvio(_envio);
+        _hoja.MarcarDespachada(Alta.AddMinutes(30));
 
         _hojas.Lista.Add(_hoja);
 

@@ -38,12 +38,11 @@ public class MaquinaEstadosEnvioTests
     }
 
     [Theory]
-    [InlineData(EstadoEnvio.Admitido)]
     [InlineData(EstadoEnvio.EnDeposito)]
-    [InlineData(EstadoEnvio.EntregadoParcialmente)]
     [InlineData(EstadoEnvio.AsignadoARuta)]
     [InlineData(EstadoEnvio.EnTransito)]
     [InlineData(EstadoEnvio.NoEntregado)]
+    [InlineData(EstadoEnvio.EntregadoParcialmente)]
     [InlineData(EstadoEnvio.Reprogramado)]
     [InlineData(EstadoEnvio.EnDevolucion)]
     public void EstadoNoFinal_PermiteDeclararExtraviado(
@@ -65,6 +64,7 @@ public class MaquinaEstadosEnvioTests
     [Theory]
     [InlineData(EstadoEnvio.Admitido, DisparadorEnvio.Entregar)]
     [InlineData(EstadoEnvio.Admitido, DisparadorEnvio.AsignarARuta)]
+    [InlineData(EstadoEnvio.Admitido, DisparadorEnvio.DeclararExtraviado)]
     [InlineData(EstadoEnvio.EnDeposito, DisparadorEnvio.Entregar)]
     [InlineData(EstadoEnvio.AsignadoARuta, DisparadorEnvio.Entregar)]
     [InlineData(EstadoEnvio.EnTransito, DisparadorEnvio.RecibirEnDeposito)]

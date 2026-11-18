@@ -522,6 +522,11 @@ public class AvisosTests
         public Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(Guid comercioId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<CuentaComercialDto>>(cuentas);
 
+        public Task<CuentaComercial?> ObtenerPorComercioAsync(
+    Guid cuentaComercialId,
+    Guid comercioId,
+    CancellationToken ct) =>
+    throw new NotSupportedException();
         public Task<CuentaComercial?> ObtenerAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<CuentaComercialDto>> ListarResumenAsync(Guid operadorId, Guid? cuentaComercialId, CancellationToken ct) => throw new NotSupportedException();
         public Task<CuentaComercial?> ObtenerPorOperadorYComercioAsync(Guid operadorId, Guid comercioId, CancellationToken ct) => throw new NotSupportedException();

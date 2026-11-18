@@ -22,6 +22,13 @@
 
 @if (Model.Envio is { } envio)
 {
+    @if (Model.ErrorAccion is not null)
+    {
+        <div class="aviso error" role="alert">
+            @Model.ErrorAccion
+        </div>
+    }
+
     <h2>Información general</h2>
 
     <div class="tabla">
@@ -69,6 +76,7 @@
                     <th>Estado</th>
                     <th>Peso (kg)</th>
                     <th>Dimensiones (cm)</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -82,6 +90,42 @@
                             @bulto.AltoCm ×
                             @bulto.AnchoCm ×
                             @bulto.ProfundidadCm
+                        </td>
+                        <td>
+                            @if (envio.Estado is "EnDeposito" or "NoEntregado" or "EntregadoParcialmente" or "AsignadoARuta" or "EnTransito")
+                            {
+                                if (bulto.Estado == "Pendiente" && Model.PuedeGestionarDespacho)
+                                {
+                                    <form method="post"
+                                          asp-page-handler="ExtraviarBulto"
+                                          asp-route-id="@envio.Id"
+                                          style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
+                                        <input type="text"
+                                               name="justificacion"
+                                               maxlength="150"
+                                               required
+                                               style="width:16rem; max-width:100%;"
+                                               placeholder="Qué pasó y quién lo tenía" />
+                                        <button type="submit" class="btn-secundario py-1.5 text-sm">
+                                            Declarar extraviado
+                                        </button>
+                                    </form>
+                                }
+                                else if (bulto.Estado == "Extraviado" && Model.PuedeGestionarDeposito)
+                                {
+                                    <form method="post"
+                                          asp-page-handler="ReaparecerBulto"
+                                          asp-route-id="@envio.Id">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="identificacion" value="@bulto.Identificacion" />
+                                        <button type="submit" class="primario py-1.5 text-sm">
+                                            Reaparecer
+                                        </button>
+                                    </form>
+                                }
+                            }
                         </td>
                     </tr>
                 }
@@ -146,7 +190,8 @@
 
             <p class="nota">
                 El envío queda fuera de la operación hasta que reaparezca en el depósito.
-                Si tiene una parada activa en una hoja de ruta, se libera.
+                Queda registrado a nombre de quien tiene la sesión, con su justificación, y
+                libera la parada de la hoja de ruta, si la tiene.
             </p>
 
             <form method="post" asp-page-handler="DeclararExtravio" asp-route-id="@envio.Id">
@@ -155,11 +200,6 @@
                 <div class="modal-campo">
                     <label for="justificacionExtravio">Justificación</label>
                     <textarea id="justificacionExtravio" name="justificacion" maxlength="1000" rows="3" required></textarea>
-                </div>
-
-                <div class="modal-campo">
-                    <label for="responsableExtravio">Responsable</label>
-                    <input type="text" id="responsableExtravio" name="responsable" maxlength="150" required />
                 </div>
 
                 <button type="submit" class="peligro">
@@ -171,24 +211,19 @@
 
     @if (Model.PuedeRegistrarReaparicion)
     {
-        <section class="mt-6">
+        <section class="mt-6" id="reaparicion">
             <h2>Registrar reaparición</h2>
 
             <p class="nota">
-                Confirmá todos los bultos extraviados que aparecieron en el depósito.
-                El envío vuelve a quedar en depósito.
+                Marcá los bultos encontrados en el depósito; al confirmar el envío vuelve
+                al depósito y los que no aparecieron siguen extraviados.
             </p>
 
-            <form method="post" asp-page-handler="RegistrarReaparicion" asp-route-id="@envio.Id">
+            <form method="post" asp-page-handler="Reaparicion" asp-route-id="@envio.Id">
                 @Html.AntiForgeryToken()
 
-                <div class="modal-campo">
-                    <label for="responsableReaparicion">Responsable de recepción</label>
-                    <input type="text" id="responsableReaparicion" name="responsable" maxlength="150" required />
-                </div>
-
                 <fieldset>
-                    <legend>Bultos escaneados</legend>
+                    <legend>Bultos encontrados</legend>
 
                     @foreach (var bulto in envio.Bultos.Where(b => b.Estado == "Extraviado"))
                     {

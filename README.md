@@ -11,15 +11,15 @@ Equipo: Juliana Méndez, Martina Castro, Matías Alfaro y Cecilia Méndez.
 
 | Aplicación | Tecnología | Estado |
 |---|---|---|
-| Backoffice del operador | ASP.NET Core Razor Pages | listado de envíos |
-| Portal del comercio | Blazor InteractiveServer | alta de envíos |
-| API | Minimal API + OpenAPI | 4 endpoints, dos instancias |
-| Aplicación del repartidor | .NET MAUI (MVVM) | lee operadores y envíos |
-| Seguimiento público | Blazor SSR | pendiente |
-| Procesamiento en segundo plano | Worker .NET | pendiente |
+| Backoffice del operador | ASP.NET Core Razor Pages | envíos, rutas, personal, vehículos, tarifas, reglas, reportes |
+| Portal del comercio | Blazor InteractiveServer | altas, importación, seguimiento, devoluciones, retiros |
+| API | Minimal API + OpenAPI | interna y pública (`/api/v1`), dos instancias |
+| Aplicación del repartidor | .NET MAUI (MVVM), Android | ruta del día, entregas y retiros sin conexión |
+| Seguimiento público | Blazor SSR | consulta del estado con un enlace |
+| Procesamiento en segundo plano | Worker .NET | mensajería, avisos a comercios y reintentos |
 
 Monolito modular en .NET 10 para API y web, más el worker desplegado de forma independiente
-que se comunicará solo de manera asíncrona a través de la cola de mensajes.
+que se comunica con la API solo de manera asíncrona, a través de la cola de mensajes.
 
 ## Cómo levantarlo
 
@@ -35,7 +35,8 @@ docker compose up --build
 | Backoffice del operador | http://backoffice.localhost:8000 |
 | API | http://api.localhost:8000/api/envios |
 | Salud de la API | http://api.localhost:8000/health · `/ready` · `/live` |
-| Contrato OpenAPI | http://api.localhost:8000/openapi/v1.json |
+| Documentación de la API pública (Scalar) | http://api.localhost:8000/docs |
+| Contrato OpenAPI interno | http://api.localhost:8000/openapi/v1.json (requiere una sesión iniciada en el Backoffice) |
 | Grafana: tablero técnico, trazas y logs | http://grafana.localhost:8000 |
 | Panel de RabbitMQ | http://rabbit.localhost:8000 |
 | Panel de Traefik | http://localhost:8081 |
@@ -45,19 +46,20 @@ Los navegadores resuelven `*.localhost` a la propia máquina, no hay que tocar e
 
 ### Qué levanta el compose
 
-Once contenedores: `traefik` (único proxy inverso, TLS, balanceo y rate limit), `postgres`,
-`redis`, `rabbitmq`, `otel-collector`, `lgtm` (Grafana con Prometheus, Tempo y Loki), `inicializador`,
-**dos réplicas de `api`**, `portal` y `backoffice`.
+Catorce contenedores: `traefik` (único proxy inverso, balanceo y rate limit), `postgres`,
+`redis`, `rabbitmq`, `otel-collector`, `lgtm` (Grafana con Prometheus, Tempo y Loki),
+`inicializador`, **dos réplicas de `api`**, `worker`, `portal`, `backoffice`,
+`receptor-avisos` (comercio de prueba que recibe los avisos firmados) y `mailpit` (correo de
+prueba).
 
-`redis` todavía no lo consume ningún código: está declarado para que el caché (22/10) entre sin tocar
-infraestructura. `rabbitmq` recibe los eventos que la API publica por el outbox; el Worker que los
-consume entra el 29/10.
+`redis` guarda el caché, los locks y el límite de tasa compartido entre réplicas. `rabbitmq`
+recibe los eventos que la API publica por el outbox y los consume el Worker.
 
-El servicio **`inicializador`** crea el esquema y siembra los datos de demostración una sola
-vez y termina; las réplicas de la API arrancan recién cuando salió bien
-(`service_completed_successfully`) y no inicializan nada. Con dos réplicas sembrando en
-paralelo contra una base vacía se viola el índice único, y ahí es donde entra `MigrateAsync`
-el 15/10.
+El servicio **`inicializador`** aplica las migraciones y siembra los datos de demostración una
+sola vez y termina; las réplicas de la API arrancan recién cuando salió bien
+(`service_completed_successfully`) y no inicializan nada. Así no compiten dos réplicas por
+migrar la misma base. El arranque en frío tarda varios minutos: esperar a que todos estén
+`healthy` antes de usar el sistema.
 
 ## Compilar y probar sin Docker
 
@@ -65,6 +67,11 @@ el 15/10.
 dotnet build UltimaMilla.slnx
 dotnet test UltimaMilla.slnx
 ```
+
+Las pruebas de integración necesitan un PostgreSQL y la variable de entorno
+`ULTIMAMILLA_INTEGRATION_CONNECTION` apuntando a una base llamada `ultimamilla_integracion`
+(nunca usan otra). Sin la variable, esas pruebas fallan. La cobertura se verifica con
+`scripts/verificar-cobertura.sh`.
 
 La app MAUI es una solución aparte y no está en `UltimaMilla.slnx` ni en el CI:
 
@@ -88,12 +95,14 @@ según con qué operador los cargue ([ADR-002](Docs/Decisiones/ADR-002-estrategi
 
 ## Guion de la demo
 
-1. `docker compose ps`: los once contenedores arriba, `inicializador` en `Exited (0)` y dos
+1. `docker compose ps`: los catorce contenedores arriba, `inicializador` en `Exited (0)` y dos
    de `api`.
-2. Portal: elegir **Tienda Norte → RapiEnvíos** y dar de alta un envío.
-3. Backoffice: el envío aparece en estado **Admitido**.
-4. Portal: otro envío con **Tienda Norte → Logística Sur**.
-5. Backoffice: filtrar por operador; cada uno ve solo el suyo.
+2. Portal: iniciar sesión como **Tienda Norte**, elegir su cuenta con **RapiEnvíos** y dar de
+   alta un envío.
+3. Backoffice: entrar como administrador de RapiEnvíos; el envío aparece en estado
+   **Admitido**.
+4. Portal: otro envío con la cuenta de **Tienda Norte** con **Logística Sur**.
+5. Backoffice: entrar como administrador de cada operador; cada uno ve solo sus envíos.
 6. Repetir la misma referencia en la misma cuenta: la API responde 409 (importación
    idempotente, RF 7).
 7. `docker stop <una réplica de api>` con el Backoffice recargando: el servicio no se corta
@@ -116,22 +125,20 @@ referencia repetida.
 ## Documentación
 
 - [Letra del laboratorio](Docs/Letra-Laboratorio.md) — requerimientos y cronograma
-- [Decisiones](Docs/Decisiones/) — ADR-001 (estilo arquitectónico), ADR-002 (multitenancy)
+- [Decisiones](Docs/Decisiones/) — ADR-001 a ADR-008 (arquitectura, multitenancy, sincronización,
+  cambio de requerimientos, caché, banderas, outbox y Blazor)
+- [Cambio de requerimientos](Docs/Cambio-Requerimientos.md)
 - [Modelado](Docs/Modelado/) — arquitectura lógica, despliegue, stack tecnológico
 - [Planificación](Docs/Planificacion/) — análisis y diseño, plan de trabajo
 
-## Pendientes conocidos
+## Pruebas de carga y resiliencia
 
-- **Migraciones (15/10):** hoy el esquema se crea con `EnsureCreated` en el servicio
-  `inicializador`. Generar la inicial con `dotnet tool restore` y
-  `dotnet ef migrations add Inicial -p src/UltimaMilla.Infrastructure -s src/UltimaMilla.Api`,
-  y cambiar `EnsureCreatedAsync` por `MigrateAsync`.
-- **Multitenancy real (15/10):** login con ASP.NET Core Identity, `ITenantContext`, filtros
-  globales de consulta e interceptor del `OperadorId`. Hoy el operador y la cuenta se eligen
-  en pantalla, y `GET /api/envios` sin `operadorId` devuelve los de todos los operadores.
-- Máquina de estados con Stateless (15/10); caché en Redis con su métrica (22/10); outbox con
-  MassTransit, Worker y avisos a comercios (29/10); Seguimiento público; observabilidad
-  completa con Serilog y OpenTelemetry; despliegue en la nube con OpenTofu (5/11).
-- Scalar para navegar la API: entra con el opcional de API pública.
-- La contraseña de PostgreSQL y la de RabbitMQ tienen valores de desarrollo; en la nube van en
-  `.env` (ver `.env.example`).
+- Carga (k6): [pruebas/carga/LEEME.md](pruebas/carga/LEEME.md).
+- Resiliencia: [Docs/Pruebas-Resiliencia.md](Docs/Pruebas-Resiliencia.md), con
+  `scripts/prueba-resiliencia.sh` y `scripts/prueba-caida-instancia.sh`.
+
+## Limitaciones conocidas
+
+El detalle de lo que no quedó completo y de lo que haríamos con más tiempo está en la
+sección 9 del informe técnico. Las contraseñas de PostgreSQL y de RabbitMQ tienen valores de
+desarrollo; en la nube van en `.env` (ver `.env.example`) y nunca se versionan.

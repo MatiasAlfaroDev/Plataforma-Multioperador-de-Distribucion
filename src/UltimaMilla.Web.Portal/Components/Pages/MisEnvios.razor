@@ -1,0 +1,357 @@
+
+@page "/mis-envios"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+@attribute [Authorize(Policy = "ComercioPortal")]
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+<PageTitle>Mis envíos - Última Milla</PageTitle>
+
+<div class="encabezado">
+    <div>
+        <h1>Mis envíos</h1>
+        <p>Consultá los envíos de tu comercio y su estado actual.</p>
+    </div>
+</div>
+
+@if (cargando)
+{
+    <p>Cargando envíos...</p>
+}
+else if (!string.IsNullOrWhiteSpace(error) && envios.Count == 0)
+{
+    <div class="aviso error" role="alert">@error</div>
+}
+else if (envios.Count == 0)
+{
+    <div class="tarjeta">
+        <p>Todavía no tenés envíos registrados.</p>
+    </div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="aviso error" role="alert">@error</div>
+    }
+
+    <p class="mb-2 text-sm text-suave">
+        @envios.Count envíos
+    </p>
+
+    <div style="width:100%; overflow-x:auto; border:1px solid #e5e7eb; border-radius:16px; background:white;">
+        <table style="width:100%; min-width:1350px; border-collapse:collapse; font-size:14px; white-space:nowrap;">
+            <thead>
+                <tr style="border-bottom:1px solid #e5e7eb; text-align:left;">
+                    <th style="padding:14px;">Referencia</th>
+                    <th style="padding:14px;">Operador</th>
+                    <th style="padding:14px;">Destinatario</th>
+                    <th style="padding:14px;">Dirección</th>
+                    <th style="padding:14px;">Bultos</th>
+                    <th style="padding:14px;">Peso (kg)</th>
+                    <th style="padding:14px;">Modalidad</th>
+                    <th style="padding:14px;">Estado</th>
+                    <th style="padding:14px;">Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var envio in envios)
+                {
+                    <tr @key="envio.Id"
+                        style="border-bottom:1px solid #e5e7eb;">
+
+                        <td style="padding:14px; font-weight:600;">
+                            @envio.ReferenciaExterna
+                        </td>
+
+                        <td style="padding:14px;">
+                            @envio.OperadorNombre
+                        </td>
+
+                        <td style="padding:14px;">
+                            @envio.DestinatarioNombre
+                        </td>
+
+                        <td style="padding:14px;">
+                            @envio.Direccion
+                        </td>
+
+                        <td style="padding:14px;">
+                            @envio.CantidadBultos
+                        </td>
+
+                        <td style="padding:14px;">
+                            @envio.PesoTotalKg
+                        </td>
+
+                        <td style="padding:14px;">
+                            @FormatearModalidad(envio.Modalidad)
+                        </td>
+
+                        <td style="padding:14px;">
+                            <span class="@ClaseEstado(envio.Estado)">
+                                @FormatearEstado(envio.Estado)
+                            </span>
+                        </td>
+
+                        <td style="padding:14px;">
+                            <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
+
+                                <button type="button"
+                                        class="rounded-xl border border-borde px-3 py-2 hover:bg-fondo"
+                                        @onclick="() => VerDetalleAsync(envio.Id)">
+                                    Ver detalle
+                                </button>
+
+                                <button type="button"
+                                        class="rounded-xl border border-borde px-3 py-2 hover:bg-fondo"
+                                        @onclick="() => ImprimirEtiquetaAsync(envio)">
+                                    Imprimir etiqueta
+                                </button>
+
+                            </div>
+                        </td>
+                    </tr>
+
+                    @if (envioSeleccionado == envio.Id)
+                    {
+                        <tr>
+                            <td colspan="9"
+                                style="padding:20px; background:#f9fafb; white-space:normal;">
+
+                                @if (cargandoDetalle)
+                                {
+                                    <p>Cargando detalle...</p>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(errorDetalle))
+                                {
+                                    <div class="aviso error" role="alert">
+                                        @errorDetalle
+                                    </div>
+                                }
+                                else if (detalle is not null)
+                                {
+                                    <h3 class="mb-3 font-semibold">
+                                        Detalle del envío
+                                    </h3>
+
+                                    <p>
+                                        <strong>Referencia:</strong>
+                                        @detalle.ReferenciaExterna
+                                    </p>
+
+                                    <p>
+                                        <strong>Estado:</strong>
+                                        @FormatearEstado(detalle.Estado)
+                                    </p>
+
+                                    <h4 class="mt-4 font-semibold">Bultos</h4>
+
+                                    @foreach (var bulto in detalle.Bultos)
+                                    {
+                                        <p>
+                                            @bulto.Identificacion —
+                                            @bulto.Estado
+                                        </p>
+                                    }
+                                }
+
+                                <button type="button"
+                                        class="mt-4 rounded-xl border border-borde px-4 py-2"
+                                        @onclick="CerrarDetalle">
+                                    Cerrar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<EnvioDto> envios = new();
+    private DetalleEnvioDto? detalle;
+
+    private Guid? envioSeleccionado;
+
+    private bool cargando = true;
+    private bool cargandoDetalle;
+
+    private string? error;
+    private string? errorDetalle;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        cargando = true;
+        error = null;
+
+        try
+        {
+            envios = await JS.InvokeAsync<List<EnvioDto>>(
+                "autenticacionPortal.listarEnvios") ?? new();
+        }
+        catch (JSException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task VerDetalleAsync(Guid envioId)
+    {
+        envioSeleccionado = envioId;
+        detalle = null;
+        errorDetalle = null;
+        cargandoDetalle = true;
+
+        try
+        {
+            detalle = await JS.InvokeAsync<DetalleEnvioDto>(
+                "autenticacionPortal.obtenerDetalleEnvio",
+                envioId);
+        }
+        catch (JSException ex)
+        {
+            errorDetalle = ex.Message;
+        }
+        finally
+        {
+            cargandoDetalle = false;
+        }
+    }
+
+    private void CerrarDetalle()
+    {
+        envioSeleccionado = null;
+        detalle = null;
+        errorDetalle = null;
+    }
+
+    private async Task ImprimirEtiquetaAsync(EnvioDto envio)
+    {
+        error = null;
+
+        try
+        {
+            var detalleEnvio = await JS.InvokeAsync<DetalleEnvioDto>(
+                "autenticacionPortal.obtenerDetalleEnvio",
+                envio.Id);
+
+            if (detalleEnvio.Bultos.Count == 0)
+            {
+                error = "El envío no tiene bultos para imprimir.";
+                return;
+            }
+
+            var datos = new
+            {
+                operador = envio.OperadorNombre,
+                referencia = detalleEnvio.ReferenciaExterna,
+                destinatario = detalleEnvio.Destinatario,
+                direccion = detalleEnvio.Direccion,
+                modalidad = FormatearModalidad(detalleEnvio.Modalidad),
+                bultos = detalleEnvio.Bultos.Select(b => new
+                {
+                    identificacion = b.Identificacion
+                }).ToArray()
+            };
+
+            await JS.InvokeVoidAsync(
+                "etiquetasPortal.imprimir",
+                datos);
+        }
+        catch (JSException ex)
+        {
+            error = $"No se pudo generar la etiqueta: {ex.Message}";
+        }
+    }
+
+    private static string FormatearEstado(string estado) => estado switch
+    {
+        "AsignadoARuta" => "Asignado a ruta",
+        "EnTransito" => "En tránsito",
+        "Entregado" => "Entregado",
+        "NoEntregado" => "No entregado",
+        "Reprogramado" => "Reprogramado",
+        "EnDevolucion" => "En devolución",
+        "Devuelto" => "Devuelto",
+        "Pendiente" => "Pendiente",
+        _ => estado
+    };
+
+    private static string FormatearModalidad(string modalidad) => modalidad switch
+    {
+        "Estandar" => "Estándar",
+        "Urgente" => "Urgente",
+        _ => modalidad
+    };
+
+    private static string ClaseEstado(string estado)
+    {
+        const string baseCss =
+            "inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ";
+
+        var color = estado switch
+        {
+            "Entregado" or "Devuelto" or "AsignadoARuta" =>
+                "bg-green-100 text-green-700",
+
+            "EnTransito" =>
+                "bg-orange-100 text-orange-700",
+
+            "Reprogramado" or "NoEntregado" =>
+                "bg-yellow-100 text-yellow-700",
+
+            "EnDevolucion" =>
+                "bg-red-100 text-red-700",
+
+            _ => "bg-gray-100 text-gray-700"
+        };
+
+        return baseCss + color;
+    }
+
+    private sealed class EnvioDto
+    {
+        public Guid Id { get; set; }
+        public string ReferenciaExterna { get; set; } = "";
+        public string OperadorNombre { get; set; } = "";
+        public string DestinatarioNombre { get; set; } = "";
+        public string Direccion { get; set; } = "";
+        public string Estado { get; set; } = "";
+        public int CantidadBultos { get; set; }
+        public DateTimeOffset FechaAlta { get; set; }
+        public decimal PesoTotalKg { get; set; }
+        public string Modalidad { get; set; } = "";
+    }
+
+    private sealed class DetalleEnvioDto
+    {
+        public string ReferenciaExterna { get; set; } = "";
+        public string Estado { get; set; } = "";
+        public List<BultoDto> Bultos { get; set; } = new();
+        public string Destinatario { get; set; } = "";
+        public string Direccion { get; set; } = "";
+        public string Modalidad { get; set; } = "";
+    }
+
+    private sealed class BultoDto
+    {
+        public string Identificacion { get; set; } = "";
+        public string Estado { get; set; } = "";
+    }
+}

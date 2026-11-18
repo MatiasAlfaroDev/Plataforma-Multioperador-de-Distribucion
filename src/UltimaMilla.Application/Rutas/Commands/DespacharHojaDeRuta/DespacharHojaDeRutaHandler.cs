@@ -54,6 +54,9 @@ public sealed class DespacharHojaDeRutaHandler(
             Envio Envio,
             VersionReglasOperativas Reglas)>();
         
+        var retirosPreparados = new List<Retiro>();
+        var entregasRetirosPreparadas = new List<Retiro>();
+        
         foreach (var parada in paradas)
         {
             switch (parada.TipoOperacion)
@@ -123,25 +126,28 @@ public sealed class DespacharHojaDeRutaHandler(
                             "El retiro pertenece a otro operador.");
 
                     if (parada.TipoOperacion == TipoOperacionRuta.Retiro)
-                    {
-                        if (retiro.HojaDeRutaId != hoja.Id ||
-                            retiro.Estado != EstadoRetiro.AsignadoARuta)
                         {
-                            throw new InvalidOperationException(
-                                "El retiro no está correctamente asignado.");
-                        }
-                    }
-                    else
-                    {
-                        if (retiro.Estado != EstadoRetiro.EnDeposito ||
-                            retiro.Bultos.Count == 0)
-                        {
-                            throw new InvalidOperationException(
-                                "El retiro no está disponible para entregar al comercio.");
-                        }
+                            if (retiro.HojaDeRutaId != hoja.Id ||
+                                retiro.Estado != EstadoRetiro.AsignadoARuta)
+                            {
+                                throw new InvalidOperationException(
+                                    "El retiro no está correctamente asignado.");
+                            }
 
-                        // Permanece EnDeposito.
-                    }
+                            retirosPreparados.Add(retiro);
+                        }
+                    else
+                    
+                        {
+                            if (retiro.Estado != EstadoRetiro.AsignadoARutaComercio ||
+                                retiro.Bultos.Count == 0)
+                            {
+                                throw new InvalidOperationException(
+                                    "El retiro no está asignado a una ruta de entrega al comercio.");
+                            }
+
+                            entregasRetirosPreparadas.Add(retiro);
+                        }
 
                     break;
                 }
@@ -166,13 +172,25 @@ public sealed class DespacharHojaDeRutaHandler(
                 hoja.RepartidorId.ToString());
         }
 
-        // Permite despachar hojas con entregas, retiros o ambos.
+        // Primera distribución: recogida en domicilio.
+        foreach (var retiro in retirosPreparados)
+        {
+            retiro.Despachar();
+        }
+
+        // Segunda distribución: entrega al comercio.
+        foreach (var retiro in entregasRetirosPreparadas)
+        {
+            retiro.DespacharAlComercio();
+        }
+
+        // La hoja se despacha una sola vez.
         hoja.MarcarDespachada(ahora);
 
+        // Todos los cambios se guardan juntos.
         await unitOfWork.GuardarCambiosAsync(ct);
 
-        // Se conserva el contrato actual: cantidad de envíos
-        // cuyo estado fue actualizado.
+        // Se conserva el contrato actual del handler.
         return enviosPreparados.Count;
-    }
+            }
 }

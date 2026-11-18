@@ -164,6 +164,7 @@ public class HojaDeRutaTests
             ahora);
 
         retiro.AsignarARuta(Guid.NewGuid());
+        retiro.Despachar();
         retiro.RegistrarRetiro(
             ahora,
             "foto-retiro",
@@ -609,6 +610,8 @@ public class HojaDeRutaTests
         ruta.AgregarEntregaRetiroComercio(retiro);
         ruta.MarcarDespachada(ahora);
 
+        retiro.AsignarARutaComercio();
+        retiro.DespacharAlComercio();
         retiro.EntregarAlComercio();
 
         ruta.FinalizarParadaEntregaRetiroComercio(
@@ -814,6 +817,8 @@ public class HojaDeRutaTests
 
         ruta.AgregarEntregaRetiroComercio(retiro);
         ruta.MarcarDespachada(ahora);
+        retiro.AsignarARutaComercio();
+        retiro.DespacharAlComercio();
         retiro.EntregarAlComercio();
         ruta.FinalizarParadaEntregaRetiroComercio(retiro, ahora);
 

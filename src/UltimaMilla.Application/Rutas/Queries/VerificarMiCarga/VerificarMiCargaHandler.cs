@@ -96,7 +96,7 @@ public sealed class VerificarMiCargaHandler(
                         continue;
 
                     var retiro = await retiros.ObtenerAsync(retiroId, ct);
-                    if (retiro is not null && retiro.OperadorId == operadorId && retiro.Estado == EstadoRetiro.EnDeposito)
+                    if (retiro is not null && retiro.OperadorId == operadorId && retiro.Estado == EstadoRetiro.EnTransitoComercio)
                         esperados.AddRange(retiro.Bultos.Select(b => b.Identificacion));
 
                     break;

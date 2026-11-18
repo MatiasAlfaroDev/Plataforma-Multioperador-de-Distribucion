@@ -340,9 +340,15 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
 
         if (envio.Modalidad == "EntregaRetiroComercio")
         {
-            await _dialogos.AvisarAsync("Entrega al comercio", "La entrega del retiro al comercio la confirma el depósito en el Backoffice.");
+            await EntregarRetiroAlComercioAsync(envio);
             return;
         }
+        if (envio.Modalidad == "DevolucionComercio")
+        {
+            await DevolverAlComercioAsync(envio);
+            return;
+        }
+        
 
         // RF 32: se escanean los bultos que se entregan. Si quedan bultos sin entregar (entrega parcial),
         // para cada uno se elige un motivo del catálogo y se saca una foto de evidencia.
@@ -404,6 +410,14 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         if (!envio.PuedeRegistrar)
             return;
 
+                if (envio.Modalidad == "DevolucionComercio")
+        {
+            await _dialogos.AvisarAsync(
+                "Devolución al comercio",
+                "Esta parada corresponde a una devolución. Debés confirmar la recepción de los bultos en el comercio.");
+            return;
+        }
+
         if (envio.EsRetiro)
         {
             await NoRetiradoAsync(envio);
@@ -438,10 +452,195 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         });
     }
 
+
     /// <summary>
     /// RF 40: retiro en domicilio sin conexión. Se escanean los bultos (todos: el retiro no es parcial),
     /// firma quien los entrega y se saca una foto de su estado; se guarda en la misma cola que las entregas.
     /// </summary>
+    private async Task EntregarRetiroAlComercioAsync(EnvioRuta parada)
+{
+    var bultos = await _ruta.ListarBultosAsync(parada.Id);
+
+    var seleccion = await _elegirBultos.ElegirAsync(
+        parada.ReferenciaExterna,
+        bultos,
+        esRetiro: true);
+
+    if (seleccion is null)
+        return;
+
+    if (seleccion.NoEntregados.Count > 0)
+    {
+        await _dialogos.AvisarAsync(
+            "Entrega al comercio",
+            "Debés escanear todos los bultos. No se permite confirmar una entrega incompleta.");
+        return;
+    }
+
+    var receptor = await _dialogos.PedirTextoAsync(
+        "Entrega al comercio",
+        "¿Quién recibe los bultos en el comercio?");
+
+    if (string.IsNullOrWhiteSpace(receptor))
+        return;
+
+    var documento = await _dialogos.PedirTextoAsync(
+        "Entrega al comercio",
+        $"Documento de {receptor}:");
+
+    if (string.IsNullOrWhiteSpace(documento))
+        return;
+
+    var id = Guid.NewGuid();
+
+    var firma = await _firma.PedirFirmaAsync(id, receptor);
+
+    if (firma is null)
+    {
+        await _dialogos.AvisarAsync(
+            "Entrega al comercio",
+            "La entrega necesita la firma de quien recibe.");
+        return;
+    }
+
+    var foto = await _captura.SacarFotoAsync(id);
+
+    if (foto is null)
+    {
+        await _dialogos.AvisarAsync(
+            "Entrega al comercio",
+            "La entrega necesita una fotografía.");
+        return;
+    }
+
+    var ubicacion = await _captura.ObtenerUbicacionAsync();
+
+    if (ubicacion is null)
+    {
+        await _dialogos.AvisarAsync(
+            "Entrega al comercio",
+            "No se pudo obtener la ubicación del dispositivo.");
+        return;
+    }
+
+    await RegistrarAsync(new EventoPendiente
+    {
+        Id = id,
+        EnvioId = parada.Id,
+        Tipo = "EntregadoAlComercio",
+        Receptor = receptor,
+        DocumentoReceptor = documento,
+        ReferenciaFirma = firma,
+        ReferenciaFoto = foto,
+        BultosEntregados = seleccion.Entregados.Select(b => b.Id).ToList(),
+        FechaHora = DateTimeOffset.UtcNow,
+        Latitud = ubicacion.Value.Latitud,
+        Longitud = ubicacion.Value.Longitud
+    });
+}
+
+/// <summary>
+/// Confirma la devolución de un envío al comercio.
+/// Requiere escanear todos los bultos y registrar
+/// receptor, documento, firma, fotografía y ubicación.
+/// El evento se guarda localmente para permitir
+/// la sincronización cuando haya conexión.
+/// </summary>
+private async Task DevolverAlComercioAsync(EnvioRuta envio)
+{
+    const string titulo = "Devolución al comercio";
+
+    var bultos = await _ruta.ListarBultosAsync(envio.Id);
+
+    if (bultos.Count == 0)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "No hay bultos disponibles para escanear.");
+        return;
+    }
+
+    var seleccion = await _elegirBultos.ElegirAsync(
+        envio.ReferenciaExterna,
+        bultos,
+        esRetiro: true);
+
+    if (seleccion is null)
+        return;
+
+    if (seleccion.NoEntregados.Count > 0 ||
+        seleccion.Entregados.Count != bultos.Count)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "Debés escanear todos los bultos. No se permiten devoluciones parciales.");
+        return;
+    }
+
+    var receptor = await _dialogos.PedirTextoAsync(
+        titulo,
+        "¿Quién recibe los bultos en el comercio?");
+
+    if (string.IsNullOrWhiteSpace(receptor))
+        return;
+
+    var documento = await _dialogos.PedirTextoAsync(
+        titulo,
+        $"Documento de {receptor}:");
+
+    if (string.IsNullOrWhiteSpace(documento))
+        return;
+
+    var id = Guid.NewGuid();
+
+    var firma = await _firma.PedirFirmaAsync(id, receptor);
+
+    if (firma is null)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "La devolución necesita la firma de quien recibe.");
+        return;
+    }
+
+    var foto = await _captura.SacarFotoAsync(id);
+
+    if (foto is null)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "La devolución necesita una fotografía.");
+        return;
+    }
+
+    var ubicacion = await _captura.ObtenerUbicacionAsync();
+
+    if (ubicacion is null)
+    {
+        await _dialogos.AvisarAsync(
+            titulo,
+            "No se pudo obtener la ubicación del dispositivo.");
+        return;
+    }
+
+    await RegistrarAsync(new EventoPendiente
+    {
+        Id = id,
+        EnvioId = envio.Id,
+        Tipo = "DevueltoAlComercio",
+        Receptor = receptor.Trim(),
+        DocumentoReceptor = documento.Trim(),
+        ReferenciaFirma = firma,
+        ReferenciaFoto = foto,
+        BultosDevueltos = seleccion.Entregados
+            .Select(b => b.Id)
+            .ToList(),
+        FechaHora = DateTimeOffset.UtcNow,
+        Latitud = ubicacion.Value.Latitud,
+        Longitud = ubicacion.Value.Longitud
+    });
+}
+
     private async Task RetirarAsync(EnvioRuta parada)
     {
         var bultos = await _ruta.ListarBultosAsync(parada.Id);

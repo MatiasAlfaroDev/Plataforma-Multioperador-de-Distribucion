@@ -40,6 +40,24 @@ public sealed class AgregarEnvioARutaHandler(
             ct)
             ?? throw new NoEncontradoException(
                 "La hoja de ruta no existe.");
+            
+            // La fecha se calcula en el horario de Uruguay,
+            // no en UTC, para evitar errores cerca de medianoche.
+            var zonaUruguay = TimeZoneInfo.FindSystemTimeZoneById(
+                "America/Montevideo");
+
+            var ahoraUruguay = TimeZoneInfo.ConvertTime(
+                reloj.GetUtcNow(),
+                zonaUruguay);
+
+            var hoy = DateOnly.FromDateTime(ahoraUruguay.DateTime);
+
+            // No permitir agregar envíos urgentes a hojas de días anteriores.
+           if (hoja.Fecha < hoy)
+            {
+                throw new InvalidOperationException(
+                    "Solo se pueden agregar envíos urgentes a hojas de ruta del día actual.");
+            }
 
         hoja.VerificarEditable();
 

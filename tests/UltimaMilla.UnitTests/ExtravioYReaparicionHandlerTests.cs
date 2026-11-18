@@ -2,6 +2,8 @@
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravioBulto;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicionBulto;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
@@ -262,21 +264,164 @@ public class ExtravioYReaparicionHandlerTests
     }
 
     [Fact]
-    public async Task ReaparicionConBultoFaltante_EsRechazada()
+    public async Task ReaparicionParcial_DejaExtraviadosLosQueNoAparecieron()
     {
         var envio = CrearEnvio(cantidadBultos: 2);
         await DeclararExtravio(envio);
 
-        var codigo = envio.Bultos.First().Identificacion;
+        var encontrado = envio.Bultos.First();
+        var perdido = envio.Bultos.Last();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            CrearHandlerReaparicion().Handle(
-                new RegistrarReaparicionCommand(
-                    _operadorId, envio.Id, [codigo], "Deposito"),
-                CancellationToken.None));
+        await CrearHandlerReaparicion().Handle(
+            new RegistrarReaparicionCommand(
+                _operadorId, envio.Id, [encontrado.Identificacion], "Deposito"),
+            CancellationToken.None);
+
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+        Assert.Equal(EstadoBulto.Pendiente, encontrado.Estado);
+        Assert.Equal(EstadoBulto.Extraviado, perdido.Estado);
+        Assert.Equal(2, _unidad.Guardados);
+    }
+
+    private DeclararExtravioBultoHandler CrearHandlerExtravioBulto() =>
+        new(
+            new EnviosEnMemoria(_envios),
+            _hojas,
+            new ReglasEnMemoria(_versiones),
+            _unidad,
+            new RelojFijo(Ahora.AddHours(1)));
+
+    private RegistrarReaparicionBultoHandler CrearHandlerReaparicionBulto() =>
+        new(
+            new EnviosEnMemoria(_envios),
+            _unidad,
+            new RelojFijo(Ahora.AddHours(2)));
+
+    [Fact]
+    public async Task ExtravioDeUnBulto_DejaElEnvioConLosDemas()
+    {
+        var envio = CrearEnvio(cantidadBultos: 2);
+        var perdido = envio.Bultos.First();
+        var otro = envio.Bultos.Last();
+
+        await CrearHandlerExtravioBulto().Handle(
+            new DeclararExtravioBultoCommand(
+                _operadorId, envio.Id, perdido.Identificacion,
+                "Se cayó del carro", "Despachador"),
+            CancellationToken.None);
+
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+        Assert.Equal(EstadoBulto.Extraviado, perdido.Estado);
+        Assert.Equal(EstadoBulto.Pendiente, otro.Estado);
+        Assert.Contains(envio.EventosBulto, e =>
+            e.BultoId == perdido.Id &&
+            e.Resultado == ResultadoBulto.Extraviado);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task ExtravioDelUltimoBulto_ExtraviaElEnvio()
+    {
+        var envio = CrearEnvio();
+
+        await CrearHandlerExtravioBulto().Handle(
+            new DeclararExtravioBultoCommand(
+                _operadorId, envio.Id, envio.Bultos.Single().Identificacion,
+                "No apareció", "Despachador"),
+            CancellationToken.None);
 
         Assert.Equal(EstadoEnvio.Extraviado, envio.Estado);
+        Assert.Equal(EstadoBulto.Extraviado, envio.Bultos.Single().Estado);
+    }
+
+    [Fact]
+    public async Task ExtravioDeUnBulto_ConEnvioEnRuta_MantieneLaParada()
+    {
+        var envio = CrearEnvio(cantidadBultos: 2);
+        var hoja = CrearHoja(envio);
+        var perdido = envio.Bultos.First();
+
+        await CrearHandlerExtravioBulto().Handle(
+            new DeclararExtravioBultoCommand(
+                _operadorId, envio.Id, perdido.Identificacion,
+                "Se perdió en tránsito", "Despachador"),
+            CancellationToken.None);
+
+        Assert.Equal(EstadoBulto.Extraviado, perdido.Estado);
+        Assert.Equal(EstadoEnvio.AsignadoARuta, envio.Estado);
+        Assert.True(hoja.Paradas.Single(p => p.EnvioId == envio.Id).Activa);
         Assert.Equal(1, _unidad.Guardados);
+        Assert.Equal(0, _unidad.Transacciones);
+    }
+
+    [Fact]
+    public async Task ExtravioDelUltimoBulto_ConEnvioEnRuta_LiberaLaParada()
+    {
+        var envio = CrearEnvio();
+        var hoja = CrearHoja(envio);
+
+        await CrearHandlerExtravioBulto().Handle(
+            new DeclararExtravioBultoCommand(
+                _operadorId, envio.Id, envio.Bultos.Single().Identificacion,
+                "Se perdió en tránsito", "Despachador"),
+            CancellationToken.None);
+
+        Assert.Equal(EstadoEnvio.Extraviado, envio.Estado);
+        Assert.False(hoja.Paradas.Single(p => p.EnvioId == envio.Id).Activa);
+        Assert.Equal(1, _unidad.Transacciones);
+    }
+
+    [Fact]
+    public async Task ExtravioDeBulto_SinJustificacion_EsRechazado()
+    {
+        var envio = CrearEnvio();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            CrearHandlerExtravioBulto().Handle(
+                new DeclararExtravioBultoCommand(
+                    _operadorId, envio.Id, envio.Bultos.Single().Identificacion,
+                    " ", "Despachador"),
+                CancellationToken.None));
+
+        Assert.Equal(EstadoBulto.Pendiente, envio.Bultos.Single().Estado);
+    }
+
+    [Fact]
+    public async Task ReaparicionDeUnBulto_LoDejaPendiente()
+    {
+        var envio = CrearEnvio(cantidadBultos: 2);
+        var perdido = envio.Bultos.First();
+
+        await CrearHandlerExtravioBulto().Handle(
+            new DeclararExtravioBultoCommand(
+                _operadorId, envio.Id, perdido.Identificacion,
+                "Se cayó del carro", "Despachador"),
+            CancellationToken.None);
+
+        await CrearHandlerReaparicionBulto().Handle(
+            new RegistrarReaparicionBultoCommand(
+                _operadorId, envio.Id, perdido.Identificacion, "Operario"),
+            CancellationToken.None);
+
+        Assert.Equal(EstadoBulto.Pendiente, perdido.Estado);
+        Assert.Equal(EstadoEnvio.EnDeposito, envio.Estado);
+        Assert.Contains(envio.EventosBulto, e =>
+            e.BultoId == perdido.Id &&
+            e.Resultado == ResultadoBulto.Reaparecido);
+    }
+
+    [Fact]
+    public async Task ReaparicionDeBulto_QueNoEstaExtraviado_EsRechazada()
+    {
+        var envio = CrearEnvio();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            CrearHandlerReaparicionBulto().Handle(
+                new RegistrarReaparicionBultoCommand(
+                    _operadorId, envio.Id, envio.Bultos.Single().Identificacion, "Operario"),
+                CancellationToken.None));
+
+        Assert.Equal(0, _unidad.Guardados);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ namespace UltimaMilla.Mobile.Data;
 /// - Sin la clave, el archivo repartidor.db3 es ilegible aunque alguien lo copie del teléfono.
 /// </summary>
 public sealed class BaseDeDatosLocal
+
 {
     private readonly SemaphoreSlim _inicializacion = new(1, 1);
     private string? _cadenaDeConexion;
@@ -79,7 +80,8 @@ public sealed class BaseDeDatosLocal
                     documento    TEXT,
                     firma        TEXT,
                     bultos_entregados    TEXT,
-                    bultos_no_entregados TEXT
+                    bultos_no_entregados TEXT,
+                    bultos_devueltos     TEXT
 
                 );
                 """;
@@ -116,6 +118,7 @@ public sealed class BaseDeDatosLocal
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "firma", "TEXT");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_entregados", "TEXT");
             await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_no_entregados", "TEXT");
+            await AgregarColumnaSiFaltaAsync(conexion, "eventos_pendientes", "bultos_devueltos", "TEXT");
 
             _cadenaDeConexion = cadena;
         }

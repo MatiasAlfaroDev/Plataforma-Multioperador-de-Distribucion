@@ -7,6 +7,7 @@ using UltimaMilla.Domain.Envios;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Application.Abstractions.Caching;
 using UltimaMilla.Application.Seguridad;
+using UltimaMilla.Domain.Rutas;
 
 namespace UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
 
@@ -48,9 +49,21 @@ public sealed class RegistrarEventoMovilHandler(
                 $"{entregaPrevia.Receptor} " +
                 $"({entregaPrevia.OcurridoEn:dd/MM/yyyy HH:mm} UTC).");
 
-        if (envio.Estado != EstadoEnvio.EnTransito)
+        var esDevolucion = Enum.TryParse<TipoEventoMovil>(
+            command.Tipo, true, out var tipoSolicitado)
+            && tipoSolicitado == TipoEventoMovil.DevueltoAlComercio;
+
+        if (esDevolucion)
+        {
+            if (envio.Estado != EstadoEnvio.EnDevolucion)
+                throw new InvalidOperationException(
+                    "El envío debe estar en devolución para confirmar su recepción.");
+        }
+        else if (envio.Estado != EstadoEnvio.EnTransito)
+        {
             throw new InvalidOperationException(
                 "El envío debe estar en tránsito para registrar una entrega o intento fallido.");
+        }
 
         // Letra 3.3: solo el repartidor que tiene el envío en su hoja de ruta registra la entrega.
         var hoja = await hojasDeRuta.ObtenerPorEnvioActivoAsync(
@@ -60,6 +73,25 @@ public sealed class RegistrarEventoMovilHandler(
             ?? throw new InvalidOperationException(
                 "El envío no tiene una parada activa en ninguna hoja de ruta.");
 
+        if (hoja.Estado != EstadoHojaDeRuta.Despachada)
+            throw new InvalidOperationException(
+                "La hoja de ruta debe estar despachada.");
+
+        var paradaActiva = hoja.Paradas.SingleOrDefault(p =>
+            p.EnvioId == envio.Id && p.Activa);
+
+        if (paradaActiva is null)
+            throw new InvalidOperationException(
+                "No existe una parada activa para el envío.");
+
+        var tipoOperacionEsperado = esDevolucion
+            ? TipoOperacionRuta.DevolucionComercio
+            : TipoOperacionRuta.Entrega;
+
+        if (paradaActiva.TipoOperacion != tipoOperacionEsperado)
+            throw new InvalidOperationException(
+                "La operación no corresponde al tipo de parada asignada.");
+                
         var usuarioId = sesion.UsuarioId
             ?? throw new UnauthorizedAccessException("Hay que iniciar sesión.");
 
@@ -90,9 +122,12 @@ public sealed class RegistrarEventoMovilHandler(
             command.Motivo,
             command.Receptor,
             command.FechaHora,
-            reloj.GetUtcNow());
+            reloj.GetUtcNow(),
+            command.DocumentoReceptor,
+            command.ReferenciaFirma,
+            command.ReferenciaFotografia);
 
-        var ocurridoEn = evento.OcurridoEn;
+                var ocurridoEn = evento.OcurridoEn;
 
         if (tipo == TipoEventoMovil.Entregado)
         {
@@ -227,6 +262,44 @@ public sealed class RegistrarEventoMovilHandler(
                 "Mobile",
                 motivoNoEntrega: motivo,
                 evidenciaFallo: command.EvidenciaFallo,
+                latitud: command.Latitud,
+                longitud: command.Longitud);
+        }
+        else if (tipo == TipoEventoMovil.DevueltoAlComercio)
+        {
+            var esperados = envio.Bultos
+                .Where(b => b.Estado == EstadoBulto.EnDevolucion)
+                .Select(b => b.Id)
+                .ToHashSet();
+
+            var escaneados = command.BultosDevueltos?
+                .ToList() ?? [];
+
+            if (esperados.Count == 0 ||
+                escaneados.Count != esperados.Count ||
+                escaneados.Distinct().Count() != escaneados.Count ||
+                !esperados.SetEquals(escaneados))
+            {
+                throw new InvalidOperationException(
+                    "Los bultos escaneados no coinciden con los pendientes de devolución.");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.Receptor) ||
+                string.IsNullOrWhiteSpace(command.ReferenciaFotografia))
+            {
+                throw new ArgumentException(
+                    "La devolución requiere receptor y constancia fotográfica.");
+            }
+
+            envio.Aplicar(
+                DisparadorEnvio.ConfirmarDevolucion,
+                reglas,
+                ocurridoEn,
+                "Mobile",
+                usuarioId.ToString(),
+                modalidadDevolucion: ModalidadDevolucion.EntregaDirecta,
+                receptorDevolucion: command.Receptor,
+                referenciaConstanciaDevolucion: command.ReferenciaFotografia,
                 latitud: command.Latitud,
                 longitud: command.Longitud);
         }

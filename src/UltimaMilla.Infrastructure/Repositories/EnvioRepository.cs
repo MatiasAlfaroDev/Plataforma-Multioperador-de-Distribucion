@@ -18,6 +18,7 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
             .Include(e => e.Intentos)
                 .ThenInclude(i => i.ResultadosBultos)
             .Include(e => e.Eventos)
+            .Include(e => e.EventosBulto)
             .AsSplitQuery()
             .FirstOrDefaultAsync(e => e.Id == id, ct);
 
@@ -110,6 +111,7 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
             .Include(e => e.Intentos)
                 .ThenInclude(i => i.ResultadosBultos)
             .Include(e => e.Eventos)
+            .Include(e => e.EventosBulto)
             .AsSplitQuery()
             .FirstOrDefaultAsync(e =>
                 e.Id == envioId &&

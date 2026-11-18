@@ -3,6 +3,15 @@
 
 @{
     ViewData["Title"] = "Hojas de ruta";
+
+    // Fecha actual en Uruguay.
+    var zonaUruguay = TimeZoneInfo.FindSystemTimeZoneById(
+        "America/Montevideo");
+
+    var hoy = DateOnly.FromDateTime(
+        TimeZoneInfo.ConvertTime(
+            DateTimeOffset.UtcNow,
+            zonaUruguay).DateTime);
 }
 
 <div class="encabezado">
@@ -261,6 +270,7 @@
                             <th>Seleccionar</th>
                             <th>Referencia</th>
                             <th>Localidad del comercio</th>
+                            <th>Estado</th>
                             <th>Peso</th>
                         </tr>
                     </thead>
@@ -269,11 +279,14 @@
                         {
                             <tr>
                                 <td>
-                                    <input type="checkbox" name="Formulario.DevolucionesIds" value="@devolucion.Id"
+                                    <input type="checkbox"
+                                           name="Formulario.DevolucionesIds"
+                                           value="@devolucion.Id"
                                            checked="@(Model.Formulario.DevolucionesIds.Contains(devolucion.Id))" />
                                 </td>
-                                <td><i class="ph ph-arrow-u-up-left"></i> @devolucion.ReferenciaExterna</td>
+                                <td class="codigo">@devolucion.ReferenciaExterna</td>
                                 <td>@devolucion.Localidad</td>
+                                <td>@devolucion.Estado</td>
                                 <td class="num">@devolucion.PesoKg kg</td>
                             </tr>
                         }
@@ -413,35 +426,60 @@
                                     <span class="estado-despachada">
                                         Despachada
                                     </span>
-                                    <span class="nota">En ruta: el repartidor rinde desde la app al volver.</span>
 
-                                    @* Reasignación urgente (letra 6.11): un envío del depósito se suma a la hoja que ya salió. *@
-                                    @if (Model.Envios.Count > 0)
+                                    @if (hoja.Fecha < hoy)
+                                    {
+                                        <p class="nota">
+                                            Hoja de ruta de una fecha anterior.
+                                            No admite nuevos envíos urgentes.
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        <span class="nota">
+                                            En ruta: el repartidor rinde desde la app al volver.
+                                        </span>
+                                    }
+
+                                    @* Solo se permiten envíos urgentes en hojas despachadas de hoy. *@
+                                    @if (hoja.Fecha == hoy && Model.Envios.Count > 0)
                                     {
                                         <form method="post"
-                                              asp-page-handler="AgregarUrgente"
-                                              asp-route-hojaId="@hoja.Id"
-                                              class="mt-1.5 flex flex-wrap items-center gap-2">
+                                            asp-page-handler="AgregarUrgente"
+                                            asp-route-hojaId="@hoja.Id"
+                                            class="mt-1.5 flex flex-wrap items-center gap-2">
 
                                             @Html.AntiForgeryToken()
 
-                                            <select name="envioUrgenteId" aria-label="Envío urgente">
+                                            <select name="envioUrgenteId"
+                                                    aria-label="Envío urgente">
                                                 <option value="">Envío urgente…</option>
+
                                                 @foreach (var envio in Model.Envios)
                                                 {
-                                                    <option value="@envio.Id">@envio.ReferenciaExterna (@envio.Localidad)</option>
+                                                    <option value="@envio.Id">
+                                                        @envio.ReferenciaExterna (@envio.Localidad)
+                                                    </option>
                                                 }
                                             </select>
 
-                                            <select name="franjaUrgente" aria-label="Franja">
+                                            <select name="franjaUrgente"
+                                                    aria-label="Franja">
                                                 @foreach (var franja in Model.Franjas)
                                                 {
-                                                    var valor = $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
-                                                    <option value="@valor">@franja.HoraDesde.ToString("HH:mm") - @franja.HoraHasta.ToString("HH:mm")</option>
+                                                    var valor =
+                                                        $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
+
+                                                    <option value="@valor">
+                                                        @franja.HoraDesde.ToString("HH:mm")
+                                                        -
+                                                        @franja.HoraHasta.ToString("HH:mm")
+                                                    </option>
                                                 }
                                             </select>
 
-                                            <button type="submit" class="btn-secundario">
+                                            <button type="submit"
+                                                    class="btn-secundario">
                                                 Agregar urgente
                                             </button>
                                         </form>
@@ -449,42 +487,99 @@
                                 }
                                 else
                                 {
-                                    <form method="post"
-                                        asp-page-handler="Despachar"
-                                        asp-route-hojaId="@hoja.Id">
+                                    @* Hoja todavía no despachada *@
 
-                                        @Html.AntiForgeryToken()
-
-                                        <button type="button"
-                                                class="btn-primario"
-                                                onclick="abrirConfirmacionDespacho(this)">
-                                            Despachar
-                                        </button>
-                                    </form>
-
-                                    @* RF 39: mientras la hoja está en preparación se le puede sumar un retiro del mismo día. *@
-                                    var retirosDelDia = Model.Retiros.Where(r => r.Fecha == hoja.Fecha).ToList();
-                                    @if (Model.RetiroHabilitado && retirosDelDia.Count > 0)
+                                    @if (hoja.Fecha < hoy)
                                     {
+                                        <p class="nota">
+                                            Hoja de ruta de una fecha anterior.
+                                            No admite nuevos envíos.
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        @if (Model.Envios.Count > 0)
+                                        {
+                                            <form method="post"
+                                                asp-page-handler="AgregarEnvio"
+                                                asp-route-hojaId="@hoja.Id"
+                                                class="mt-1.5 flex flex-wrap items-center gap-2">
+
+                                                @Html.AntiForgeryToken()
+
+                                                <select name="envioId"
+                                                        aria-label="Envío a agregar"
+                                                        required>
+                                                    <option value="">Seleccionar envío…</option>
+
+                                                    @foreach (var envio in Model.Envios)
+                                                    {
+                                                        <option value="@envio.Id">
+                                                            @envio.ReferenciaExterna (@envio.Localidad)
+                                                        </option>
+                                                    }
+                                                </select>
+
+                                                <select name="franjaSeleccionada"
+                                                        aria-label="Franja horaria"
+                                                        required>
+                                                    @foreach (var franja in Model.Franjas)
+                                                    {
+                                                        var valor =
+                                                            $"{franja.HoraDesde:HH:mm}|{franja.HoraHasta:HH:mm}";
+
+                                                        <option value="@valor">
+                                                            @franja.HoraDesde.ToString("HH:mm")
+                                                            -
+                                                            @franja.HoraHasta.ToString("HH:mm")
+                                                        </option>
+                                                    }
+                                                </select>
+
+                                                <button type="submit" class="btn-secundario">
+                                                    Agregar envío
+                                                </button>
+                                            </form>
+                                        }
+
                                         <form method="post"
-                                              asp-page-handler="AgregarRetiro"
-                                              asp-route-hojaId="@hoja.Id"
-                                              class="mt-1.5 flex flex-wrap items-center gap-2">
+                                            asp-page-handler="Despachar"
+                                            asp-route-hojaId="@hoja.Id"
+                                            class="mt-2">
 
                                             @Html.AntiForgeryToken()
 
-                                            <select name="retiroId" aria-label="Retiro" required>
-                                                <option value="">Retiro…</option>
-                                                @foreach (var retiro in retirosDelDia)
-                                                {
-                                                    <option value="@retiro.Id">@retiro.Motivo (@retiro.Localidad, @retiro.HoraDesde a @retiro.HoraHasta)</option>
-                                                }
-                                            </select>
-
-                                            <button type="submit" class="btn-secundario">
-                                                Agregar retiro
+                                            <button type="button"
+                                                    class="btn-primario"
+                                                    onclick="abrirConfirmacionDespacho(this)">
+                                                Despachar
                                             </button>
                                         </form>
+
+                                        @* RF 39: mientras la hoja está en preparación se le puede sumar un retiro del mismo día. *@
+                                        var retirosDelDia = Model.Retiros.Where(r => r.Fecha == hoja.Fecha).ToList();
+                                        @if (Model.RetiroHabilitado && retirosDelDia.Count > 0)
+                                        {
+                                            <form method="post"
+                                                  asp-page-handler="AgregarRetiro"
+                                                  asp-route-hojaId="@hoja.Id"
+                                                  class="mt-1.5 flex flex-wrap items-center gap-2">
+
+                                                @Html.AntiForgeryToken()
+
+                                                <select name="retiroId" aria-label="Retiro" required>
+                                                    <option value="">Retiro…</option>
+                                                    @foreach (var retiro in retirosDelDia)
+                                                    {
+                                                        <option value="@retiro.Id">@retiro.Motivo (@retiro.Localidad, @retiro.HoraDesde a @retiro.HoraHasta)</option>
+                                                    }
+                                                </select>
+
+                                                <button type="submit" class="btn-secundario">
+                                                    Agregar retiro
+                                                </button>
+                                            </form>
+                                        }
                                     }
                                 }
                             </td>
@@ -501,7 +596,7 @@
     </p>
 
     <p class="nota">
-        Los envíos asignados pasarán al estado En tránsito.
+        Las entregas normales pasarán a En tránsito; las devoluciones conservarán su estado EnDevolucion hasta completar la devolución al comercio.
     </p>
 
     <div class="acciones-modal">

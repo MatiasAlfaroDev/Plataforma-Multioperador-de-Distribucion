@@ -38,6 +38,8 @@ using UltimaMilla.Application.Rutas.Queries.VerificarMiCarga;
 using UltimaMilla.Application.Rutas.Commands.AgregarEnvioUrgente;
 using UltimaMilla.Application.Rutas.Commands.RegistrarPosiciones;
 using UltimaMilla.Application.Envios.Commands.DeclararExtravio;
+using UltimaMilla.Application.Envios.Commands.DeclararExtravioBulto;
+using UltimaMilla.Application.Envios.Commands.RegistrarReaparicionBulto;
 using UltimaMilla.Application.Envios.Commands.RegistrarReaparicion;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -69,6 +71,7 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
 using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
+using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerCuentaCorriente;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
 using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
@@ -91,6 +94,9 @@ using UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
 using Microsoft.AspNetCore.SignalR;
 using Serilog;
 using Serilog.Events;
+using System.Security.Claims;
+using UltimaMilla.Application.Envios.Queries.ConsultarDisponibilidadReprogramacionPublica;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -229,8 +235,15 @@ builder.Services.AddScoped<ITenantContext>(
 
 builder.Services.AddScoped<IOperadorActivo>(
     sp => sp.GetRequiredService<HttpTenantContext>());
+
+builder.Services.AddScoped<IContextoSeguimientoPublico>(
+    sp => sp.GetRequiredService<HttpTenantContext>());
+
+builder.Services.AddScoped<ConsultarDisponibilidadReprogramacionPublicaHandler>();
 // Caché distribuida con Redis
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
+
+builder.Services.AddScoped<LimiteReprogramacionPublica>();
 
 var app = builder.Build();
 
@@ -297,6 +310,7 @@ app.MapHub<TableroHub>("/api/hubs/tablero")
 app.MapAutenticacionEndpoints();
 app.MapVinculacionesComercialesEndpoints();
 app.MapPersonalEndpoints();
+app.MapVehiculosEndpoints();
 app.MapBanderasEndpoints();
 
 
@@ -349,6 +363,89 @@ api.MapGet("/seguimiento/{token}", async (
 })
 .AllowAnonymous();
 
+api.MapPost("/seguimiento/{token}/reprogramacion", async (
+    string token,
+    IContextoSeguimientoPublico contextoPublico,
+    IEnvioRepository envios,
+    SolicitarReprogramacionHandler handler,
+    LimiteReprogramacionPublica limite,
+    CancellationToken ct) =>
+{
+    var operadorId = await contextoPublico
+        .ValidarTokenYSeleccionarOperadorAsync(token, ct);
+
+    if (!operadorId.HasValue)
+        return Results.NotFound();
+
+    var tokenBytes = Convert.FromHexString(token);
+
+    var tokenHash = Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(tokenBytes));
+
+    if (await limite.ExcedidoAsync(tokenHash))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status429TooManyRequests,
+            title: "Demasiadas solicitudes.",
+            detail: "Esperá un momento antes de volver a intentar.");
+    }
+
+    var envio = await envios.ObtenerPorTokenSeguimientoAsync(
+        tokenHash, ct);
+
+    if (envio is null || envio.OperadorId != operadorId.Value)
+        return Results.NotFound();
+
+    try
+    {
+        await handler.Handle(
+            new SolicitarReprogramacionCommand(envio.Id),
+            ct);
+
+        return Results.Ok(new
+        {
+            mensaje = "Tu solicitud de reprogramación fue registrada correctamente."
+        });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = ex.Message
+        });
+    }
+})
+.AllowAnonymous();
+
+api.MapGet("/seguimiento/{token}/reprogramacion/disponibilidad", async (
+    string token,
+    IContextoSeguimientoPublico contextoPublico,
+    IEnvioRepository envios,
+    ConsultarDisponibilidadReprogramacionPublicaHandler handler,
+    CancellationToken ct) =>
+{
+    var operadorId = await contextoPublico
+        .ValidarTokenYSeleccionarOperadorAsync(token, ct);
+
+    if (!operadorId.HasValue)
+        return Results.NotFound();
+
+    var tokenHash = Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(
+            Convert.FromHexString(token)));
+
+    var envio = await envios.ObtenerPorTokenSeguimientoAsync(
+        tokenHash, ct);
+
+    if (envio is null || envio.OperadorId != operadorId.Value)
+        return Results.NotFound();
+
+    var disponibilidad = await handler.Handle(envio.Id, ct);
+
+    return Results.Ok(disponibilidad);
+})
+.AllowAnonymous();
+
 api.MapGet("/operadores", async (ListarOperadoresHandler handler, CancellationToken ct) =>
     Results.Ok(await handler.Handle(new ListarOperadoresQuery(), ct)))
     .RequireAuthorization();
@@ -365,6 +462,25 @@ api.MapGet("/cuentas-comerciales", async (
               context.User.HasClaim("perfil_comercio", "AdministradorComercio") ||
               context.User.HasClaim("perfil_comercio", "Comercio") ||
               Perfiles.PersonalOperador.Any(context.User.IsInRole)));
+
+// GET /api/cuenta-corriente?desde=2026-11-01&hasta=2026-11-30 → cuenta corriente y liquidaciones
+// del comercio autenticado (Portal). Sin fechas: desde el primer día de hace 5 meses hasta hoy.
+api.MapGet("/cuenta-corriente", async (
+    DateOnly? desde,
+    DateOnly? hasta,
+    ObtenerCuentaCorrienteHandler handler,
+    CancellationToken ct) =>
+{
+    var hoy = DateOnly.FromDateTime(DateTime.UtcNow);
+    var fin = hasta ?? hoy;
+    var inicio = desde ?? new DateOnly(fin.Year, fin.Month, 1).AddMonths(-5);
+
+    if (fin < inicio || fin == DateOnly.MaxValue)
+        return Results.BadRequest("Rango de fechas no válido.");
+
+    return Results.Ok(await handler.Handle(inicio, fin, ct));
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.PersonalComercio));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
 api.MapPost("/envios", async (
@@ -696,7 +812,8 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                         b.BultoId,
                         b.Motivo,
                         b.Evidencia))
-                    .ToArray()), ct);
+                    .ToArray(),
+                request.BultosDevueltos), ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
@@ -704,21 +821,42 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
 api.MapPost("/envios/{envioId:guid}/recepcion",
     async (
         Guid envioId,
-        RecibirEnDepositoRequest request,
+        RegistrarRecepcionRequest request,
+        HttpContext context,
+        UserManager<Usuario> userManager,
         RecibirEnDepositoHandler handler,
         CancellationToken ct) =>
     {
+        var usuarioId = context.User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(usuarioId))
+            return Results.Unauthorized();
+
+        var usuario = await userManager.FindByIdAsync(usuarioId);
+
+        if (usuario is null || !usuario.Activo)
+            return Results.Unauthorized();
+
+        var responsable = usuario.NombreCompleto.Trim();
+
+        if (string.IsNullOrWhiteSpace(responsable))
+            return Results.BadRequest(new
+            {
+                mensaje = "El usuario no tiene un nombre registrado."
+            });
+
         var resultado = await handler.Handle(
             new RecibirEnDepositoCommand(
                 envioId,
                 request.IdentificacionesEscaneadas,
-                request.Responsable),
+                responsable),
             ct);
 
-        // RF 10: 200 con el detalle; "recibido: false" indica que faltan bultos declarados.
         return Results.Ok(resultado);
-})
-.RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
+    })
+    .RequireAuthorization(policy =>
+        policy.RequireRole(Perfiles.Deposito));
 
 api.MapGet("/envios/{envioId:guid}/discrepancias-recepcion",
     async (
@@ -1087,6 +1225,83 @@ api.MapPost("/envios/{envioId:guid}/reaparicion",
                 operadorId,
                 envioId,
                 request.IdentificacionesEscaneadas,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Deposito));
+
+// Declarar extraviado un solo bulto de un envío.
+api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/extravio",
+    async (
+        Guid envioId,
+        string identificacion,
+        DeclararExtravioBultoRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        DeclararExtravioBultoHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new DeclararExtravioBultoCommand(
+                operadorId,
+                envioId,
+                identificacion,
+                request.Justificacion,
+                request.Responsable),
+            ct);
+
+        return Results.NoContent();
+    })
+    .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
+
+// Registrar la reaparición de un solo bulto extraviado.
+api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/reaparicion",
+    async (
+        Guid envioId,
+        string identificacion,
+        ReaparicionBultoRequest request,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        ITenantContext tenant,
+        RegistrarReaparicionBultoHandler handler,
+        CancellationToken ct) =>
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido");
+        }
+
+        if (tenant.OperadorId is not Guid operadorId)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Operador no identificado");
+        }
+
+        await handler.Handle(
+            new RegistrarReaparicionBultoCommand(
+                operadorId,
+                envioId,
+                identificacion,
                 request.Responsable),
             ct);
 
@@ -1884,8 +2099,24 @@ public partial class Program { }
 
 public sealed record BultoNoEntregadoRequest( Guid BultoId, string Motivo, string Evidencia);
 
-public sealed record EventoMovilRequest( Guid IdEvento, string Tipo, string? Motivo, string? Receptor, DateTimeOffset FechaHora, string? DocumentoReceptor = null, string? ReferenciaFirma = null, string? ReferenciaFotografia = null, decimal? Latitud = null, decimal? Longitud = null, string? EvidenciaFallo = null, IReadOnlyCollection<Guid>? BultosEntregados = null,
-    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null);public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record EventoMovilRequest(
+    Guid IdEvento,
+    string Tipo,
+    string? Motivo,
+    string? Receptor,
+    DateTimeOffset FechaHora,
+    string? DocumentoReceptor = null,
+    string? ReferenciaFirma = null,
+    string? ReferenciaFotografia = null,
+    decimal? Latitud = null,
+    decimal? Longitud = null,
+    string? EvidenciaFallo = null,
+    IReadOnlyCollection<Guid>? BultosEntregados = null,
+    IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null,
+    IReadOnlyCollection<Guid>? BultosDevueltos = null);
+public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record RegistrarRecepcionRequest(
+    IReadOnlyList<string> IdentificacionesEscaneadas);
 public sealed record ConfirmarReprogramacionRequest( string Responsable);
 public sealed record QuitarEnvioDeRutaRequest(string Responsable);
 public sealed record AgregarEnvioARutaRequest( Guid EnvioId, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta);
@@ -1905,6 +2136,8 @@ public sealed record VerificarMiCargaRequest(IReadOnlyList<string>? BultosEscane
 public sealed record CancelarRetiroRequest(string Motivo);
 public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
 public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record DeclararExtravioBultoRequest(string Justificacion, string Responsable);
+public sealed record ReaparicionBultoRequest(string Responsable);
 public sealed record IniciarDevolucionRequest( string Responsable);
 
 public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);

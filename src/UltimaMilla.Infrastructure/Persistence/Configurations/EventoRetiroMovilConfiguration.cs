@@ -27,6 +27,11 @@ public sealed class EventoRetiroMovilConfiguration
 
         builder.Property(e => e.ReferenciaFirma)
             .HasMaxLength(500);
+        builder.Property(e => e.Receptor)
+            .HasMaxLength(150);
+
+        builder.Property(e => e.DocumentoReceptor)
+            .HasMaxLength(50);
 
         builder.Property(e => e.IdentificacionesBultos)
             .HasColumnType("text[]");

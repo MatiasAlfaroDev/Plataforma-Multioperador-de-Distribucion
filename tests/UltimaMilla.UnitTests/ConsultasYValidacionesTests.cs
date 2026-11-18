@@ -461,6 +461,12 @@ public class ConsultasYValidacionesTests
         public Guid? ComercioConsultado { get; private set; }
         public Guid? OperadorConsultado { get; private set; }
 
+        public Task<CuentaComercial?> ObtenerPorComercioAsync(
+    Guid cuentaComercialId,
+    Guid comercioId,
+    CancellationToken ct) =>
+    Task.FromResult<CuentaComercial?>(null);
+
         public Task<CuentaComercial?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult<CuentaComercial?>(null);
 

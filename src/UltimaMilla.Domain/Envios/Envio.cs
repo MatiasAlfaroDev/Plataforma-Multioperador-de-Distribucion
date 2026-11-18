@@ -306,7 +306,8 @@ public class Envio : AuditableEntity, ITenantEntity
             bultosNoEntregados = null,
         ModalidadDevolucion? modalidadDevolucion = null,
         string? receptorDevolucion = null,
-        string? referenciaConstanciaDevolucion = null)
+        string? referenciaConstanciaDevolucion = null,
+        IReadOnlyCollection<string>? identificacionesReaparecidas = null)
 
     {
         ArgumentNullException.ThrowIfNull(reglas);
@@ -613,7 +614,12 @@ public class Envio : AuditableEntity, ITenantEntity
                 break;
 
             case DisparadorEnvio.Reaparecer:
-                AplicarABultos(_bultos.Where(b => b.Estado == EstadoBulto.Extraviado),
+                // Reaparecen los bultos indicados; si no se indican, todos los extraviados.
+                AplicarABultos(
+                    _bultos.Where(b => b.Estado == EstadoBulto.Extraviado &&
+                        (identificacionesReaparecidas is null ||
+                         identificacionesReaparecidas.Contains(
+                             b.Identificacion, StringComparer.OrdinalIgnoreCase))),
                     MaquinaEstadosBulto.Disparador.Reaparecer, ocurridoEn);
                 break;
         }
@@ -658,6 +664,91 @@ public class Envio : AuditableEntity, ITenantEntity
         }
         _eventos.Add(evento);
     }
+
+    /// <summary>
+    /// Se pierde un solo bulto: el envío sigue con los demás. Si ya no queda ningún bulto
+    /// a cargo del operador, quien llama declara el envío extraviado.
+    /// </summary>
+    public void DeclararBultoExtraviado(
+        string identificacion,
+        string justificacion,
+        string responsable,
+        DateTimeOffset ocurridoEn)
+    {
+        if (string.IsNullOrWhiteSpace(justificacion))
+            throw new ArgumentException(
+                "Debe justificarse la declaración de extravío.");
+
+        if (justificacion.Trim().Length > 1000)
+            throw new ArgumentException(
+                "La justificación no puede superar los 1000 caracteres.");
+
+        if (string.IsNullOrWhiteSpace(responsable))
+            throw new ArgumentException(
+                "Debe identificarse al responsable.");
+
+        ExigirEstadoParaMovimientoDeBulto();
+
+        var bulto = BuscarBulto(identificacion);
+        var anterior = bulto.Estado;
+
+        bulto.Aplicar(MaquinaEstadosBulto.Disparador.DeclararExtraviado);
+
+        var motivo = $"{responsable.Trim()}: {justificacion.Trim()}";
+        if (motivo.Length > 200)
+            motivo = motivo[..200];
+
+        _eventosBulto.Add(EventoBulto.Crear(
+            this, bulto, anterior, ResultadoBulto.Extraviado, motivo, ocurridoEn));
+    }
+
+    /// <summary>Reaparece un bulto extraviado y vuelve a quedar pendiente.</summary>
+    public void ReaparecerBulto(
+        string identificacion,
+        string responsable,
+        DateTimeOffset ocurridoEn)
+    {
+        if (string.IsNullOrWhiteSpace(responsable))
+            throw new ArgumentException(
+                "Debe identificarse al responsable.");
+
+        ExigirEstadoParaMovimientoDeBulto();
+
+        var bulto = BuscarBulto(identificacion);
+        var anterior = bulto.Estado;
+
+        bulto.Aplicar(MaquinaEstadosBulto.Disparador.Reaparecer);
+
+        _eventosBulto.Add(EventoBulto.Crear(
+            this, bulto, anterior, ResultadoBulto.Reaparecido,
+            $"Recibido por {responsable.Trim()}", ocurridoEn));
+    }
+
+    // Un bulto puede perderse o reaparecer con el envío en depósito, en ruta,
+    // no entregado o parcialmente entregado.
+    private void ExigirEstadoParaMovimientoDeBulto()
+    {
+        if (Estado is EstadoEnvio.EnDeposito or
+            EstadoEnvio.NoEntregado or
+            EstadoEnvio.EntregadoParcialmente or
+            EstadoEnvio.AsignadoARuta or
+            EstadoEnvio.EnTransito)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Un bulto solo puede declararse extraviado o reaparecer si el envío " +
+            "está en depósito, en ruta, no entregado o parcialmente entregado.");
+    }
+
+    private Bulto BuscarBulto(string identificacion) =>
+        _bultos.FirstOrDefault(b => string.Equals(
+            b.Identificacion,
+            identificacion?.Trim(),
+            StringComparison.OrdinalIgnoreCase))
+        ?? throw new ArgumentException(
+            "El bulto no pertenece al envío.");
 
     private void AplicarABultos(
         IEnumerable<Bulto> bultos,

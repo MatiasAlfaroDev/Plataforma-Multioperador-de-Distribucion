@@ -40,6 +40,7 @@ public sealed class GestionarRetiroHandlerTests
             ahora);
 
         _retiro.AsignarARuta(Guid.NewGuid());
+        _retiro.Despachar();
         _retiro.RegistrarRetiro(ahora, "foto.jpg", "firma.png");
         _retiro.RecibirEnDeposito();
 
@@ -53,6 +54,8 @@ public sealed class GestionarRetiroHandlerTests
             _operadorId, repartidor, vehiculo, fecha, 10);
 
         _hoja.AgregarEntregaRetiroComercio(_retiro);
+        _retiro.AsignarARutaComercio();
+        _retiro.DespacharAlComercio();
 
         var repositorioRetiros = new RetirosEnMemoria(_retiro);
 
@@ -96,7 +99,7 @@ public sealed class GestionarRetiroHandlerTests
                 _retiro.Id,
                 CancellationToken.None));
 
-        Assert.Equal(EstadoRetiro.EnDeposito, _retiro.Estado);
+        Assert.Equal(EstadoRetiro.EnTransitoComercio, _retiro.Estado);
         Assert.True(Assert.Single(_hoja.Paradas).Activa);
         Assert.Equal(0, _unidad.Guardados);
     }

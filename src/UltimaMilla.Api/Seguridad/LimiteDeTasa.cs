@@ -26,7 +26,16 @@ public static class LimiteDeTasa
         !app.ApplicationServices.GetRequiredService<OpcionesSeguridadWeb>().LimitarTasa ? app : app.Use(async (context, next) =>
         {
             var ruta = context.Request.Path.Value ?? string.Empty;
-            var regla = Reglas.FirstOrDefault(r => ruta.StartsWith(r.Prefijo, StringComparison.OrdinalIgnoreCase));
+
+            var esSolicitudReprogramacion =
+                HttpMethods.IsPost(context.Request.Method) &&
+                ruta.StartsWith("/api/seguimiento/", StringComparison.OrdinalIgnoreCase) &&
+                ruta.EndsWith("/reprogramacion", StringComparison.OrdinalIgnoreCase);
+
+            var regla = esSolicitudReprogramacion
+                ? (Prefijo: "/api/seguimiento/reprogramacion-post", PorMinuto: 5)
+                : Reglas.FirstOrDefault(
+                    r => ruta.StartsWith(r.Prefijo, StringComparison.OrdinalIgnoreCase));
 
             if (regla.Prefijo is not null && await Excedido(context, regla.Prefijo, regla.PorMinuto))
             {

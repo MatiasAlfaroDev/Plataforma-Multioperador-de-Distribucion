@@ -73,6 +73,7 @@ public sealed class RegistrarEventoRetiroHandlerTests
         _hoja.ConfigurarHoraSalida(new TimeOnly(14, 0));
         _hoja.AgregarRetiro(_retiro);
         _retiro.AsignarARuta(_hoja.Id);
+        _retiro.Despachar();
         _hoja.MarcarDespachada(Ahora.AddHours(-1));
 
         _retiros.Lista.Add(_retiro);
@@ -191,7 +192,7 @@ public sealed class RegistrarEventoRetiroHandlerTests
                 CancellationToken.None));
 
         Assert.Equal(
-            EstadoRetiro.AsignadoARuta,
+            EstadoRetiro.EnTransito,
             _retiro.Estado);
 
         Assert.Empty(_eventos.Lista);
@@ -211,7 +212,7 @@ public sealed class RegistrarEventoRetiroHandlerTests
                 comando, CancellationToken.None));
 
         Assert.Equal(
-            EstadoRetiro.AsignadoARuta,
+            EstadoRetiro.EnTransito,
             _retiro.Estado);
 
         Assert.Contains(
@@ -326,7 +327,13 @@ public sealed class RegistrarEventoRetiroHandlerTests
             Guid retiroId,
             CancellationToken ct)
         {
-            return Task.FromResult<HojaDeRuta?>(null);
+            return Task.FromResult(
+                Lista.FirstOrDefault(h =>
+                    h.OperadorId == operadorId &&
+                    h.Paradas.Any(p =>
+                        p.RetiroId == retiroId &&
+                        p.TipoOperacion == TipoOperacionRuta.EntregaRetiroComercio &&
+                        p.Activa)));
         }
     }
 

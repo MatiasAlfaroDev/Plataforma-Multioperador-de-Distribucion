@@ -1,0 +1,88 @@
+@page
+@model UltimaMilla.Web.Backoffice.Pages.VehiculosModel
+
+@{
+    ViewData["Title"] = "Vehículos";
+}
+
+<div class="encabezado">
+    <div>
+        <h1>Vehículos</h1>
+        <p>Flota del operador y su capacidad de carga. Las hojas de ruta solo ofrecen los vehículos activos.</p>
+    </div>
+</div>
+
+@if (TempData["Mensaje"] is string mensaje)
+{
+    <p class="aviso ok" role="status">@mensaje</p>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <p class="aviso error" role="alert">@Model.Error</p>
+}
+
+<section>
+    <h2>Flota</h2>
+
+    @if (Model.Vehiculos.Count == 0)
+    {
+        <p class="nota">Todavía no hay vehículos dados de alta.</p>
+    }
+    else
+    {
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr><th>Matrícula</th><th>Peso (kg)</th><th>Volumen (m³)</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in Model.Vehiculos)
+                    {
+                        <tr>
+                            <td>@v.Matricula</td>
+                            <td>@v.CapacidadPesoKg.ToString("0.##")</td>
+                            <td>@v.CapacidadVolumenM3.ToString("0.##")</td>
+                            <td>@(v.Activo ? "Activo" : "Inactivo")</td>
+                            <td>
+                                <form method="post" asp-page-handler="Estado">
+                                    <input type="hidden" name="id" value="@v.Id" />
+                                    <input type="hidden" name="activo" value="@((!v.Activo).ToString().ToLowerInvariant())" />
+                                    <button type="submit">@(v.Activo ? "Dar de baja" : "Reactivar")</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section>
+    <h2>Dar de alta</h2>
+
+    <form method="post">
+        <div asp-validation-summary="All" class="error"></div>
+
+        <div class="campos">
+            <div>
+                <label asp-for="Formulario.Matricula">Matrícula</label>
+                <input asp-for="Formulario.Matricula" />
+                <span asp-validation-for="Formulario.Matricula" class="error"></span>
+            </div>
+            <div>
+                <label asp-for="Formulario.CapacidadPesoKg">Capacidad de peso (kg)</label>
+                <input asp-for="Formulario.CapacidadPesoKg" type="number" step="0.01" min="0.01" />
+                <span asp-validation-for="Formulario.CapacidadPesoKg" class="error"></span>
+            </div>
+            <div>
+                <label asp-for="Formulario.CapacidadVolumenM3">Capacidad de volumen (m³)</label>
+                <input asp-for="Formulario.CapacidadVolumenM3" type="number" step="0.01" min="0.01" />
+                <span asp-validation-for="Formulario.CapacidadVolumenM3" class="error"></span>
+            </div>
+        </div>
+
+        <button type="submit" class="primario"><i class="ph ph-truck"></i>Dar de alta</button>
+    </form>
+</section>

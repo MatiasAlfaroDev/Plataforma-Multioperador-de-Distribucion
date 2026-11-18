@@ -29,6 +29,23 @@ public sealed record EnvioRutaApiDto(
     TimeOnly? HoraHasta,
     bool TieneCompromiso);
 
+public sealed record OpcionesHojaRutaApiDto(
+    List<RepartidorRutaApiDto> Repartidores,
+    List<VehiculoRutaApiDto> Vehiculos,
+    List<EnvioRutaApiDto> Envios,
+    List<FranjaRutaApiDto> Franjas,
+    List<RetiroRutaApiDto>? Retiros = null,
+    List<EntregaRetiroRutaApiDto>? EntregasRetiros = null,
+    List<DevolucionRutaApiDto>? Devoluciones = null);
+
+public sealed record DevolucionRutaApiDto(
+    Guid Id,
+    string ReferenciaExterna,
+    string Localidad,
+    string Estado,
+    decimal PesoKg,
+    decimal VolumenM3);
+
 // RF 39: paradas de retiro (se suben bultos) y de entrega de retiros al comercio (se bajan).
 public sealed record RetiroRutaApiDto(
     Guid Id,
@@ -48,24 +65,6 @@ public sealed record EntregaRetiroRutaApiDto(
     string Estado,
     decimal PesoKg,
     decimal VolumenM3);
-
-// Envío en devolución: la parada lo lleva a la dirección de recepción de la cuenta comercial.
-public sealed record DevolucionRutaApiDto(
-    Guid Id,
-    string ReferenciaExterna,
-    string Localidad,
-    string Estado,
-    decimal PesoKg,
-    decimal VolumenM3);
-
-public sealed record OpcionesHojaRutaApiDto(
-    List<RepartidorRutaApiDto> Repartidores,
-    List<VehiculoRutaApiDto> Vehiculos,
-    List<EnvioRutaApiDto> Envios,
-    List<FranjaRutaApiDto> Franjas,
-    List<RetiroRutaApiDto>? Retiros = null,
-    List<EntregaRetiroRutaApiDto>? EntregasRetiros = null,
-    List<DevolucionRutaApiDto>? Devoluciones = null);
 
 public sealed record HojaRutaApiDto(
     Guid Id,
@@ -209,6 +208,42 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
         return await respuesta.Content.ReadFromJsonAsync<ResultadoRendicionApiDto>(cancellationToken: ct)
             ?? throw new InvalidOperationException("La API no devolvió el resultado de la rendición.");
     }
+
+    /// <summary>
+/// Agrega un envío a una hoja de ruta que todavía no fue despachada.
+/// </summary>
+public async Task AgregarEnvioARutaAsync(
+    Guid hojaId,
+    Guid envioId,
+    TimeOnly horaDesde,
+    TimeOnly horaHasta,
+    CancellationToken ct)
+{
+    using var solicitud = await CrearSolicitudProtegidaAsync(
+        HttpMethod.Post,
+        $"api/hojas-de-ruta/{hojaId}/envios",
+        JsonContent.Create(new
+        {
+            envioId,
+            horaEntregaDesde = horaDesde,
+            horaEntregaHasta = horaHasta
+        }),
+        ct);
+
+    using var respuesta = await http.SendAsync(solicitud, ct);
+
+    if (!respuesta.IsSuccessStatusCode)
+    {
+        var detalle = await respuesta.Content.ReadAsStringAsync(ct);
+
+        throw new HttpRequestException(
+            string.IsNullOrWhiteSpace(detalle)
+                ? $"No se pudo agregar el envío (HTTP {(int)respuesta.StatusCode})."
+                : $"La API respondió: {detalle}",
+            null,
+            respuesta.StatusCode);
+    }
+}
 
     /// <summary>Reasignación urgente: suma un envío del depósito a una hoja que ya salió (el repartidor recibe un push).</summary>
     public async Task AgregarEnvioUrgenteAsync(

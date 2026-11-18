@@ -34,6 +34,7 @@ public static class TiposAviso
     // Avisos de retiros a domicilio (RF41).
     public const string RetiroSolicitado = "retiro.solicitado";
     public const string RetiroAsignadoARuta = "retiro.asignado_a_ruta";
+    public const string RetiroEnTransito = "retiro.en_transito";
     public const string RetiroRetirado = "retiro.retirado";
     public const string RetiroNoRetirado = "retiro.no_retirado";
     public const string RetiroEnDeposito = "retiro.en_deposito";
@@ -59,6 +60,7 @@ public static class TiposAviso
         EnvioExtraviado,
         RetiroSolicitado,
         RetiroAsignadoARuta,
+        RetiroEnTransito,
         RetiroRetirado,
         RetiroNoRetirado,
         RetiroEnDeposito,
@@ -112,6 +114,9 @@ public static class TiposAviso
 
         EstadoRetiro.AsignadoARuta =>
             RetiroAsignadoARuta,
+
+        EstadoRetiro.EnTransito =>
+            RetiroEnTransito,
 
         EstadoRetiro.Retirado =>
             RetiroRetirado,
