@@ -53,6 +53,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 });
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
 builder.Services.AddHostedService<ReintentoDeAvisos>();
+builder.Services.AddHostedService<CierreDiarioDeOperacion>();
 
 // Apagado controlado: los mensajes en curso terminan antes de cerrar; los que no llegan, RabbitMQ los reentrega.
 builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));

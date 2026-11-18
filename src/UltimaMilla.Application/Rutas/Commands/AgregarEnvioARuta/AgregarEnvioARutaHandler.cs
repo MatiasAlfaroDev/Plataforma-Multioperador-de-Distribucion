@@ -43,8 +43,7 @@ public sealed class AgregarEnvioARutaHandler(
             
             // La fecha se calcula en el horario de Uruguay,
             // no en UTC, para evitar errores cerca de medianoche.
-            var zonaUruguay = TimeZoneInfo.FindSystemTimeZoneById(
-                "America/Montevideo");
+            var zonaUruguay = HoraUruguay.Zona;
 
             var ahoraUruguay = TimeZoneInfo.ConvertTime(
                 reloj.GetUtcNow(),
@@ -214,8 +213,7 @@ public sealed class AgregarEnvioARutaHandler(
         }
         else
         {
-            var zonaHoraria = TimeZoneInfo.FindSystemTimeZoneById(
-                "America/Montevideo");
+            var zonaHoraria = HoraUruguay.Zona;
 
             var fechaLocal = DateTime.SpecifyKind(
                 hoja.Fecha.ToDateTime(command.HoraEntregaDesde),

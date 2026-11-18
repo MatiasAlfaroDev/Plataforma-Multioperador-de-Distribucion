@@ -99,10 +99,11 @@ public class CuentaCorrienteTests
     [Fact]
     public void ElUltimoDiaDelPeriodo_EntraCompleto()
     {
+        // El día es el de Uruguay (UTC-3): el 30/11 termina a las 03:00 UTC del 1/12.
         var cargos = new[]
         {
-            new CargoCuenta(CuentaA, new DateTimeOffset(2026, 11, 30, 23, 59, 0, TimeSpan.Zero), "Envio", Guid.NewGuid(), "R1", "Admitido", 10m),
-            new CargoCuenta(CuentaA, new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.Zero), "Envio", Guid.NewGuid(), "R2", "Admitido", 20m)
+            new CargoCuenta(CuentaA, new DateTimeOffset(2026, 11, 30, 23, 59, 0, TimeSpan.FromHours(-3)), "Envio", Guid.NewGuid(), "R1", "Admitido", 10m),
+            new CargoCuenta(CuentaA, new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.FromHours(-3)), "Envio", Guid.NewGuid(), "R2", "Admitido", 20m)
         };
 
         var cuenta = Assert.Single(CalculadoraCuentaCorriente.Calcular([Cuenta(CuentaA, "A")], cargos, Desde, Hasta).Cuentas);

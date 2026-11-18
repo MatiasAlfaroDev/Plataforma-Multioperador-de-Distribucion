@@ -1,4 +1,5 @@
 
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Domain.Configuracion;
 using UltimaMilla.Domain.Envios;
@@ -203,8 +204,7 @@ public sealed class CrearHojaDeRutaHandler(
             else
             {
                 var zonaHoraria =
-                    TimeZoneInfo.FindSystemTimeZoneById(
-                        "America/Montevideo");
+                    HoraUruguay.Zona;
 
                 var fechaHoraLocal = DateTime.SpecifyKind(
                     command.Fecha.ToDateTime(

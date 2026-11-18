@@ -58,6 +58,8 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
 using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
+using UltimaMilla.Application.Reportes.Commands.CerrarDia;
+using UltimaMilla.Application.Reportes.Queries.ListarCierresDiarios;
 using UltimaMilla.Application.Envios.Queries.ObtenerDetalleEnvio;
 using UltimaMilla.Application.Retiros.Commands.CrearRetiro;
 using UltimaMilla.Application.Configuracion.Commands.CrearTarifa;
@@ -159,6 +161,8 @@ public static class DependencyInjection
         services.AddScoped<ObtenerCumplimientoHandler>();
         services.AddScoped<ObtenerDetalleLiquidacionHandler>();
         services.AddScoped<ObtenerPuntualidadHandler>();
+        services.AddScoped<CerrarDiaHandler>();
+        services.AddScoped<ListarCierresDiariosHandler>();
         services.AddScoped<ConfigurarDireccionRecepcionHandler>();
         services.AddScoped<ObtenerDireccionRecepcionHandler>();
         services.AddScoped<ListarDiscrepanciasRecepcionHandler>();

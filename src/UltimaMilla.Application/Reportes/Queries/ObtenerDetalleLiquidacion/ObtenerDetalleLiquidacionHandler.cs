@@ -1,4 +1,5 @@
 
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 
 namespace UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
@@ -23,15 +24,9 @@ public sealed class ObtenerDetalleLiquidacionHandler(
         if (hasta < desde || hasta == DateOnly.MaxValue)
             throw new ArgumentException("Rango de fechas no válido.");
 
-        var inicio = new DateTimeOffset(
-            desde.ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var inicio = HoraUruguay.InicioDelDia(desde);
 
-        var fin = new DateTimeOffset(
-            hasta.AddDays(1).ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var fin = HoraUruguay.InicioDelDia(hasta.AddDays(1));
 
         var comercios =
             await repositorio.ObtenerDetalleLiquidacionAsync(

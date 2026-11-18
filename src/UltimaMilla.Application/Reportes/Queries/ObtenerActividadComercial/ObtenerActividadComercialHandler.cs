@@ -1,4 +1,5 @@
 
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 
 namespace UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
@@ -26,15 +27,9 @@ public sealed class ObtenerActividadComercialHandler(
             throw new ArgumentException(
                 "El rango de fechas no es válido.");
 
-        var inicio = new DateTimeOffset(
-            desde.ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var inicio = HoraUruguay.InicioDelDia(desde);
 
-        var fin = new DateTimeOffset(
-            hasta.AddDays(1).ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Utc));
+        var fin = HoraUruguay.InicioDelDia(hasta.AddDays(1));
 
         var volumen = await repositorio.ObtenerVolumenDiarioAsync(
             operadorId, inicio, fin, ct);

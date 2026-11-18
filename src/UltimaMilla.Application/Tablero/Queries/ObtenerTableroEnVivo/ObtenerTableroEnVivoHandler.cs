@@ -1,3 +1,4 @@
+using UltimaMilla.Application.Common;
 using UltimaMilla.Application.Abstractions;
 
 namespace UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
@@ -27,7 +28,7 @@ public sealed class ObtenerTableroEnVivoHandler(ITableroRepository tablero, Time
     // Solo las posiciones recientes: un repartidor que no reporta hace horas no está en la calle.
     private static readonly TimeSpan AntiguedadFlota = TimeSpan.FromHours(2);
 
-    private static readonly TimeZoneInfo ZonaHoraria = TimeZoneInfo.FindSystemTimeZoneById("America/Montevideo");
+    private static readonly TimeZoneInfo ZonaHoraria = HoraUruguay.Zona;
 
     public async Task<TableroEnVivoDto> Handle(CancellationToken ct)
     {

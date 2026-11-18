@@ -73,6 +73,7 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerCuentaCorriente;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
+using UltimaMilla.Application.Reportes.Queries.ListarCierresDiarios;
 using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
 using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
 using UltimaMilla.Application.Envios.Queries.ObtenerDetalleEnvio;
@@ -813,6 +814,13 @@ api.MapGet("/reportes/puntualidad", async (
 })
 .RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
+// GET /api/reportes/cierres?desde=2026-11-01&hasta=2026-11-30: cierres diarios que guarda el Worker.
+api.MapGet("/reportes/cierres", async (
+    DateOnly desde,
+    DateOnly hasta,
+    ListarCierresDiariosHandler handler,
+    CancellationToken ct) => Results.Ok(await handler.Handle(desde, hasta, ct)))
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.Despacho));
 
 
 api.MapPost("/envios/importar-csv", async (

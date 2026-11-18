@@ -61,6 +61,7 @@ public sealed class AppDbContext(
     public DbSet<UltimaMilla.Domain.Plataforma.CambioBandera> CambiosBandera => Set<UltimaMilla.Domain.Plataforma.CambioBandera>();
     public DbSet<BultoRetiro> BultosRetiro => Set<BultoRetiro>();
     public DbSet<EventoRetiroMovil> EventosRetiroMovil => Set<EventoRetiroMovil>();
+    public DbSet<UltimaMilla.Domain.Reportes.CierreDiario> CierresDiarios => Set<UltimaMilla.Domain.Reportes.CierreDiario>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configuración de las tablas de ASP.NET Core Identity.
@@ -164,6 +165,11 @@ public sealed class AppDbContext(
                 r.OperadorId == OperadorActualId);
 
         modelBuilder.Entity<EventoRetiroMovil>()
+            .HasQueryFilter(x =>
+                AccesoInicializacion ||
+                x.OperadorId == OperadorActualId);
+
+        modelBuilder.Entity<UltimaMilla.Domain.Reportes.CierreDiario>()
             .HasQueryFilter(x =>
                 AccesoInicializacion ||
                 x.OperadorId == OperadorActualId);
