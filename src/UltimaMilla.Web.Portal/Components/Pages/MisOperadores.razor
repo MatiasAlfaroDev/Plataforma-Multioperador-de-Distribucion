@@ -1,5 +1,6 @@
 @page "/mis-operadores"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.JSInterop
 @attribute [Authorize(Policy = "ComercioPortal")]
 @inject IJSRuntime JS
@@ -86,6 +87,14 @@ else
             {
                 <p>Estado: Pendiente de aprobación</p>
             }
+            else if (cuenta.Estado == EstadoVinculacion.Rechazada)
+            {
+                <p>Estado: Solicitud rechazada</p>
+            }
+            else
+            {
+                <p>Estado: Vinculación inactiva</p>
+            }
 
             @if (cuenta is not null && cuenta.Estado != EstadoVinculacion.Rechazada)
             {
@@ -112,14 +121,6 @@ else
                         </button>
                     }
                 </AuthorizeView>
-            }
-            else if (cuenta.Estado == EstadoVinculacion.Rechazada)
-            {
-                <p>Estado: Solicitud rechazada</p>
-            }
-            else
-            {
-                <p>Estado: Vinculación inactiva</p>
             }
         </div>
     }
