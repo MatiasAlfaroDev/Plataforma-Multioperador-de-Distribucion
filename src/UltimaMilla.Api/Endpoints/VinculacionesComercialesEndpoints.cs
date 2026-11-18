@@ -6,6 +6,7 @@ using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.ConfigurarDireccionRecepcion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerDireccionRecepcion;
+using UltimaMilla.Application.CuentasComerciales.Gestion;
 
 namespace UltimaMilla.Api.Endpoints;
 
@@ -235,7 +236,122 @@ public static class VinculacionesComercialesEndpoints
         }
     });
 
+        // ----- Gestión de comercios por el administrador del operador (RF 1) -----
+
+        grupo.MapGet("/comercios", async (
+            ListarComerciosDelOperadorHandler handler,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await handler.Handle(
+                    new ListarComerciosDelOperadorQuery(), ct));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Results.Forbid();
+            }
+        });
+
+        grupo.MapPost("/{id:guid}/baja", async (
+            Guid id,
+            CambiarActividadComercioHandler handler,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            CancellationToken ct) =>
+            await CambiarActividadAsync(id, false, handler, context, antiforgery, ct));
+
+        grupo.MapPost("/{id:guid}/reactivar", async (
+            Guid id,
+            CambiarActividadComercioHandler handler,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            CancellationToken ct) =>
+            await CambiarActividadAsync(id, true, handler, context, antiforgery, ct));
+
+        grupo.MapPut("/{id:guid}/datos-comercio", async (
+            Guid id,
+            ConfigurarDireccionRecepcionRequest request,
+            ModificarDireccionComercioHandler handler,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            CancellationToken ct) =>
+        {
+            if (!await antiforgery.IsRequestValidAsync(context))
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Token de seguridad inválido.");
+            }
+
+            try
+            {
+                await handler.Handle(
+                    new ModificarDireccionComercioCommand(
+                        id,
+                        request.Calle,
+                        request.Numero,
+                        request.Localidad,
+                        request.Departamento),
+                    ct);
+
+                return Results.Ok(new { Mensaje = "Comercio actualizado correctamente." });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Results.Forbid();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Results.NotFound(new { mensaje = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { mensaje = ex.Message });
+            }
+        });
+
         return app;
+    }
+
+    private static async Task<IResult> CambiarActividadAsync(
+        Guid id,
+        bool activa,
+        CambiarActividadComercioHandler handler,
+        HttpContext context,
+        IAntiforgery antiforgery,
+        CancellationToken ct)
+    {
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Token de seguridad inválido.");
+        }
+
+        try
+        {
+            await handler.Handle(new CambiarActividadComercioCommand(id, activa), ct);
+
+            return Results.Ok(new
+            {
+                Mensaje = activa
+                    ? "Comercio reactivado correctamente."
+                    : "Comercio dado de baja correctamente."
+            });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { mensaje = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { mensaje = ex.Message });
+        }
     }
 }
 

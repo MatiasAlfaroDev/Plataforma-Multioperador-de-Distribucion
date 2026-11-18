@@ -96,7 +96,8 @@ using Serilog;
 using Serilog.Events;
 using System.Security.Claims;
 using UltimaMilla.Application.Envios.Queries.ConsultarDisponibilidadReprogramacionPublica;
-
+using UltimaMilla.Application.Operadores.Commands.ActualizarColorOperador;
+using UltimaMilla.Api.Contratos;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -109,7 +110,12 @@ var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplication();
 // El único consumidor de la API: el del tablero en vivo, que necesita el hub de SignalR (RNF 6.10).
-builder.Services.AddInfrastructure(connectionString, rabbitMq, x => x.AddConsumer<TableroConsumer>());
+builder.Services.AddInfrastructure(
+    connectionString,
+    rabbitMq,
+    x => x.AddConsumer<TableroConsumer>(),
+    usarTransporteEnMemoria:
+        builder.Environment.IsEnvironment("Testing"));
 
 // Con X-Api-Key autentica la clave del comercio (RF 37); si no, la cookie de siempre.
 const string CookieOClave = "CookieOClaveApi";
@@ -192,10 +198,18 @@ builder.Services.AddOpenTelemetry()
     .UseOtlpExporter();
 builder.Services.AddScoped<CrearZonaHandler>();
 builder.Services.AddScoped<ConsultarSeguimientoPublicoHandler>();
+builder.Services.AddScoped<ActualizarColorOperadorHandler>();
 var soloInicializar = builder.Configuration.GetValue<bool>(
     "Inicializacion:SoloInicializar");
-
+var entornoPruebas = builder.Environment.IsEnvironment("Testing");
+// SignalR se registra siempre que la API atienda solicitudes.
+// Redis se utiliza únicamente como backplane distribuido.
 if (!soloInicializar)
+{
+    builder.Services.AddSignalR();
+}
+
+if (!soloInicializar && !entornoPruebas)
 {
     var redisConnectionString =
         builder.Configuration.GetConnectionString("Redis")
@@ -220,10 +234,13 @@ if (!soloInicializar)
     // Tablero en vivo (RNF 6.10): con dos réplicas, el backplane de Redis lleva cada mensaje a las
     // conexiones de las dos. El cliente usa WebSockets directo, así no hace falta afinidad en Traefik.
     builder.Services.AddSignalR().AddStackExchangeRedis(o =>
-    {
-        o.Configuration.ChannelPrefix = RedisChannel.Literal("UltimaMilla:SignalR");
-        o.ConnectionFactory = _ => Task.FromResult<IConnectionMultiplexer>(redis);
-    });
+{
+    o.Configuration.ChannelPrefix =
+        RedisChannel.Literal("UltimaMilla:SignalR");
+
+    o.ConnectionFactory = _ =>
+        Task.FromResult<IConnectionMultiplexer>(redis);
+});
 }
 
 builder.Services.AddHttpContextAccessor();
@@ -330,6 +347,75 @@ app.MapGet("/api/antiforgery/token", (
 .RequireAuthorization();
 
 var api = app.MapGroup("/api");
+
+
+
+api.MapGet("/operadores/mi-operador", async (
+    HttpContext context,
+    IOperadorRepository operadores,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    var operador = await operadores.ObtenerAsync(operadorId, ct);
+
+    if (operador is null)
+        return Results.NotFound();
+
+    return Results.Ok(new
+    {
+        operador.Id,
+        operador.Nombre,
+        operador.ColorPrimario
+    });
+})
+.RequireAuthorization(policy =>
+    policy.RequireRole("AdministradorOperador"));
+
+
+
+api.MapPut("/operadores/mi-operador/color", async (
+    HttpContext context,
+    ActualizarColorOperadorHandler handler,
+    ActualizarColorOperadorRequest request,
+    CancellationToken ct) =>
+{
+    if (!Guid.TryParse(
+            context.User.FindFirst("operador_id")?.Value,
+            out var operadorId) ||
+        operadorId == Guid.Empty)
+    {
+        return Results.Forbid();
+    }
+
+    if (string.IsNullOrWhiteSpace(request.ColorPrimario) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            request.ColorPrimario,
+            @"^#[0-9A-Fa-f]{6}$"))
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = "El color debe tener formato hexadecimal #RRGGBB."
+        });
+    }
+
+    var actualizado = await handler.Handle(
+        operadorId,
+        request.ColorPrimario,
+        ct);
+
+    return actualizado
+        ? Results.NoContent()
+        : Results.NotFound();
+})
+.RequireAuthorization(policy =>
+    policy.RequireRole("AdministradorOperador"));
 
 // GET /api/seguimiento/{token}
 // Consulta pública de seguimiento para destinatarios.

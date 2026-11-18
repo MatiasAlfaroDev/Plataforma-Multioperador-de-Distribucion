@@ -24,4 +24,19 @@ public class Operador : AuditableEntity
             EmailContacto = emailContacto
         };
     }
+
+    public void ActualizarColorPrimario(string nuevoColor)
+{
+    if (string.IsNullOrWhiteSpace(nuevoColor) ||
+        !System.Text.RegularExpressions.Regex.IsMatch(
+            nuevoColor,
+            @"^#[0-9A-Fa-f]{6}$"))
+    {
+        throw new ArgumentException(
+            "El color debe tener formato hexadecimal #RRGGBB.",
+            nameof(nuevoColor));
+    }
+
+    ColorPrimario = nuevoColor.ToUpperInvariant();
+}
 }

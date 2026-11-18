@@ -1,3 +1,4 @@
+
 using System.Security.Cryptography;
 using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Abstractions.Caching;
@@ -6,13 +7,13 @@ namespace UltimaMilla.Application.Envios.Queries.ConsultarSeguimientoPublico;
 
 public sealed class ConsultarSeguimientoPublicoHandler(
     IEnvioRepository envios,
+    IOperadorRepository operadores,
     ICacheService cache)
 {
     public async Task<SeguimientoPublicoDto?> Handle(
         string token,
         CancellationToken ct)
     {
-        // El token debe ser hexadecimal y tener 64 caracteres.
         if (string.IsNullOrWhiteSpace(token) ||
             token.Length != 64)
         {
@@ -30,22 +31,50 @@ public sealed class ConsultarSeguimientoPublicoHandler(
             return null;
         }
 
-        // Calculamos el mismo hash utilizado al crear el envío.
         var tokenHash = Convert.ToHexString(
             SHA256.HashData(tokenBytes));
 
-        // Aclaración 3.1: el caso de uso con más volumen. Lo invalida el Worker al procesar cada evento del envío.
         var clave = ClavesCache.Seguimiento(tokenHash);
-        if (await cache.ObtenerAsync<SeguimientoPublicoDto>(clave, ct) is { } enCache)
-            return enCache;
+
+        // Consultar Redis.
+        var seguimientoCacheado =
+            await cache.ObtenerAsync<SeguimientoPublicoDto>(
+                clave, ct);
+
+        if (seguimientoCacheado is not null)
+        {
+            // La identidad visual se obtiene actualizada.
+            if (seguimientoCacheado.OperadorId is Guid operadorId)
+            {
+                var operadorActual =
+                    await operadores.ObtenerAsync(operadorId, ct);
+
+                if (operadorActual is null)
+                    return null;
+
+                return seguimientoCacheado with
+                {
+                    OperadorNombre = operadorActual.Nombre,
+                    OperadorColorPrimario = operadorActual.ColorPrimario
+                };
+            }
+
+            // Compatibilidad con entradas anteriores al cambio:
+            // volver a construir el seguimiento.
+            await cache.EliminarAsync(clave, ct);
+        }
 
         var envio = await envios.ObtenerPorTokenSeguimientoAsync(
             tokenHash, ct);
 
         if (envio is null)
-        {
             return null;
-        }
+
+        var operador = await operadores.ObtenerAsync(
+            envio.OperadorId, ct);
+
+        if (operador is null)
+            return null;
 
         var historial = envio.Eventos
             .Select(e => new MovimientoSeguimientoDto(
@@ -68,9 +97,17 @@ public sealed class ConsultarSeguimientoPublicoHandler(
             envio.FranjaReprogramada,
             historial,
             envio.CantidadBultos,
-            envio.BultosEntregados);
+            envio.BultosEntregados,
+            OperadorNombre: operador.Nombre,
+            OperadorColorPrimario: operador.ColorPrimario,
+            OperadorId: envio.OperadorId);
 
-        await cache.GuardarAsync(clave, seguimiento, ClavesCache.DuracionSeguimiento, ct);
+        await cache.GuardarAsync(
+            clave,
+            seguimiento,
+            ClavesCache.DuracionSeguimiento,
+            ct);
+
         return seguimiento;
     }
 }

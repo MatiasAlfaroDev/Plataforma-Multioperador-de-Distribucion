@@ -27,7 +27,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         string connectionString,
         string rabbitMq,
-        Action<IBusRegistrationConfigurator>? consumidores = null)
+        Action<IBusRegistrationConfigurator>? consumidores = null,
+        bool usarTransporteEnMemoria = false)
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AuditableEntityInterceptor>();
@@ -59,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IEventoMovilRepository, EventoMovilRepository>();
         services.AddScoped<IDiscrepanciaRecepcionRepository, DiscrepanciaRecepcionRepository>();
         services.AddScoped<ICuentaComercialRepository, CuentaComercialRepository>();
+        services.AddScoped<IComerciosDelOperadorLectura, ComerciosDelOperadorLectura>();
         services.AddScoped<IVersionTarifariaRepository, VersionTarifariaRepository>();
         services.AddScoped<IVersionReglasOperativasRepository, VersionReglasOperativasRepository>();
         services.AddScoped<IMotivoNoEntregaRepository, MotivoNoEntregaRepository>();
@@ -100,26 +102,40 @@ public static class DependencyInjection
         // El outbox (RNF 6.8) guarda el mensaje en la misma transacción y un servicio en segundo plano
         // de cada réplica lo entrega a RabbitMQ; UsePostgres hace que las dos réplicas no se pisen (bloqueo por fila).
         services.AddMassTransit(x =>
+{
+    if (!usarTransporteEnMemoria)
+    {
+        x.AddEntityFrameworkOutbox<AppDbContext>(o =>
         {
-            x.AddEntityFrameworkOutbox<AppDbContext>(o =>
-            {
-                o.UsePostgres();
-                o.UseBusOutbox();
-            });
+            o.UsePostgres();
+            o.UseBusOutbox();
+        });
+    }
 
-            consumidores?.Invoke(x);
+    consumidores?.Invoke(x);
             
             // Sin RabbitMQ la API sigue sirviendo y acumula en el outbox, así que el bus no entra en /ready (Traefik la sacaría del pool); queda en /health.
             x.ConfigureHealthCheckOptions(o => o.Tags.Remove("ready"));
             
-            x.UsingRabbitMq((ctx, cfg) =>
+            if (usarTransporteEnMemoria)
             {
-                cfg.Host(new Uri(rabbitMq));
-                // Identificador de correlación (RNF 6.12): sale en cada mensaje publicado y se retoma al consumir.
-                cfg.UsePublishFilter(typeof(CorrelacionAlPublicar<>), ctx);
-                cfg.UseConsumeFilter(typeof(CorrelacionAlConsumir<>), ctx);
-                cfg.ConfigureEndpoints(ctx);
-            });
+                x.UsingInMemory((ctx, cfg) =>
+                {
+                    cfg.ConfigureEndpoints(ctx);
+                });
+            }
+            else
+            {
+                x.UsingRabbitMq((ctx, cfg) =>
+                {
+                    cfg.Host(new Uri(rabbitMq));
+                    cfg.UsePublishFilter(
+                        typeof(CorrelacionAlPublicar<>), ctx);
+                    cfg.UseConsumeFilter(
+                        typeof(CorrelacionAlConsumir<>), ctx);
+                    cfg.ConfigureEndpoints(ctx);
+                });
+            }
         });
 
         return services;

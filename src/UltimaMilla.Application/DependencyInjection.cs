@@ -102,6 +102,9 @@ public static class DependencyInjection
         services.AddScoped<AceptarVinculacionHandler>();
         services.AddScoped<RechazarVinculacionHandler>();
         services.AddScoped<ListarSolicitudesPendientesHandler>();
+        services.AddScoped<UltimaMilla.Application.CuentasComerciales.Gestion.ListarComerciosDelOperadorHandler>();
+        services.AddScoped<UltimaMilla.Application.CuentasComerciales.Gestion.CambiarActividadComercioHandler>();
+        services.AddScoped<UltimaMilla.Application.CuentasComerciales.Gestion.ModificarDireccionComercioHandler>();
         services.AddScoped<ListarOperadoresHandler>();
         services.AddScoped<ActualizarTarifaHandler>();
         services.AddScoped<ObtenerTarifaVigenteHandler>();

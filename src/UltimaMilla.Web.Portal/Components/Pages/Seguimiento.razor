@@ -33,6 +33,40 @@
     }
     else
     {
+
+@if (!string.IsNullOrWhiteSpace(seguimiento.OperadorNombre))
+{
+    <div class="card shadow-sm mb-4"
+         style="border-top: 5px solid @ColorOperador;">
+
+        <div class="card-body d-flex align-items-center gap-3">
+
+            <div style="background-color: @ColorOperador;
+                        width: 52px;
+                        height: 52px;
+                        border-radius: 12px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: 25px;">
+                🚚
+            </div>
+
+            <div>
+                <h4 class="mb-1">
+                    @seguimiento.OperadorNombre
+                </h4>
+
+                <span class="text-muted">
+                    Operador responsable de tu envío
+                </span>
+            </div>
+
+        </div>
+    </div>
+}
+
         <div class="card shadow-sm mb-4">
             <div class="card-body">
 
@@ -42,9 +76,10 @@
 
                 <p>
                     <strong>Estado actual:</strong>
-                    <span class="badge bg-primary">
-                        @seguimiento.Estado
-                    </span>
+                    <span class="badge"
+                    style="background-color: @ColorOperador;">
+                    @seguimiento.Estado
+                </span>
                 </p>
 
                 @if (seguimiento.BultosTotales > 1 && seguimiento.BultosEntregados > 0)
@@ -145,7 +180,8 @@
                 {
                     @foreach (var movimiento in seguimiento.Historial)
                     {
-                        <div class="border-start border-primary border-3 ps-3 mb-4">
+                        <div class="border-start border-3 ps-3 mb-4"
+     style="border-color: @ColorOperador !important;">
                             <strong>@movimiento.Estado</strong>
 
                             <div class="text-muted small">
@@ -199,6 +235,21 @@
         finally
         {
             cargando = false;
+        }
+    }
+
+    private string ColorOperador
+    {
+        get
+        {
+            var color = seguimiento?.OperadorColorPrimario;
+
+            return !string.IsNullOrWhiteSpace(color) &&
+                System.Text.RegularExpressions.Regex.IsMatch(
+                    color,
+                    @"^#[0-9A-Fa-f]{6}$")
+                ? color
+                : "#0D6EFD";
         }
     }
 
