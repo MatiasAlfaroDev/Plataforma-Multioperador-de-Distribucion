@@ -136,7 +136,7 @@ public sealed class ReporteEnviosRepository(
             .ToListAsync(ct);
 
         // Se agrupa por día de Uruguay, igual que el rango.
-        // ponytail: agrupa en memoria (una fecha por envío); pasarlo a SQL con AT TIME ZONE si el volumen lo pide.
+        // Agrupa en memoria (una fecha por envío); pasarlo a SQL con AT TIME ZONE si el volumen lo pide.
         return altas
             .GroupBy(HoraUruguay.Fecha)
             .OrderBy(g => g.Key)

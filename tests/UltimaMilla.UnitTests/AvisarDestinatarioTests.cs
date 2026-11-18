@@ -102,6 +102,9 @@ public class AvisarDestinatarioTests
 
         public Task<Operador?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(id == operador.Id ? operador : null);
+
+        public Task<Operador?> ObtenerParaActualizarAsync(Guid id, CancellationToken ct) =>
+            ObtenerAsync(id, ct);
     }
 
     private sealed class EnviosEnMemoria(Envio envio) : IEnvioRepository
