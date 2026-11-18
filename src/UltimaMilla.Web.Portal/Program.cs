@@ -8,6 +8,12 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using StackExchange.Redis;
+using System.Globalization;
+
+var cultura = new CultureInfo("es-UY");
+
+CultureInfo.DefaultThreadCurrentCulture = cultura;
+CultureInfo.DefaultThreadCurrentUICulture = cultura;
 
 var builder = WebApplication.CreateBuilder(args);// Compartir las claves de autenticación con la API.
 var redisConnectionString =
