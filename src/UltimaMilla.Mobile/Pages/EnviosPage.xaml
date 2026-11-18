@@ -211,6 +211,19 @@
                                     <Label Grid.Column="1" Text="{Binding DetalleBultos}" Style="{StaticResource Secundario}" />
                                 </Grid>
 
+                                <!-- Navegación entre paradas (letra 4): abre la dirección en Google Maps o Waze -->
+                                <Button Text="Cómo llegar" Style="{StaticResource BotonSecundario}" ContentLayout="Left,8"
+                                        HorizontalOptions="Start" Padding="18,6"
+                                        IsVisible="{Binding PuedeRegistrar}"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EnviosViewModel}}, Path=ComoLlegarCommand}"
+                                        CommandParameter="{Binding .}">
+                                    <Button.ImageSource>
+                                        <FontImageSource FontFamily="Iconos" Glyph="{x:Static app:Iconos.Mapa}"
+                                                         Size="18"
+                                                         Color="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
+                                    </Button.ImageSource>
+                                </Button>
+
                                 <!-- ¿Ya llegó al servidor? -->
                                 <Label Text="{Binding TextoSincronizacion}" TextColor="{Binding ColorSincronizacion}"
                                        FontSize="12" FontFamily="TextoMedio" IsVisible="{Binding MostrarSincronizacion}" />

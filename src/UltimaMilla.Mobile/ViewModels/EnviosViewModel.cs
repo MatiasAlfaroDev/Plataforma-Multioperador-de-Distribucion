@@ -268,6 +268,35 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     [RelayCommand]
     private Task IrARendicionAsync() => Shell.Current.GoToAsync("rendicion");
 
+    /// <summary>
+    /// Letra 4, navegación entre paradas: abre la dirección en Google Maps o Waze. Los enlaces https
+    /// abren la app si está instalada y, si no, el navegador; por eso no hace falta declarar
+    /// &lt;queries&gt; en el manifiesto de Android.
+    /// </summary>
+    [RelayCommand]
+    private async Task ComoLlegarAsync(EnvioRuta parada)
+    {
+        // ponytail: la parada solo guarda la dirección en texto ("calle, localidad"); con coordenadas, mandar lat,lng.
+        var app = await _dialogos.ElegirAsync($"Cómo llegar a {parada.Direccion}", ["Google Maps", "Waze"]);
+        if (app is null)
+            return;
+
+        var destino = Uri.EscapeDataString($"{parada.Direccion}, Uruguay");
+        var enlace = app == "Waze"
+            ? $"https://waze.com/ul?q={destino}&navigate=yes"
+            : $"https://www.google.com/maps/dir/?api=1&destination={destino}";
+
+        try
+        {
+            if (!await Launcher.OpenAsync(new Uri(enlace)))
+                await _dialogos.AvisarAsync("Cómo llegar", "No se encontró una aplicación para abrir el mapa.");
+        }
+        catch (Exception ex)
+        {
+            await _dialogos.AvisarAsync("Cómo llegar", $"No se pudo abrir el mapa: {ex.Message}");
+        }
+    }
+
     /// <summary>Resultado de la pantalla de bultos para la entrega: completa, parcial o cancelada.</summary>
     private sealed record ResultadoBultos(
         bool Cancelado, bool EsParcial, IReadOnlyList<Guid>? Entregados, IReadOnlyList<BultoNoEntregado>? NoEntregados)
