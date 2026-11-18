@@ -609,6 +609,12 @@ public class MisHojasDeRutaTests
             Guid id, CancellationToken ct) =>
             Task.FromResult<CuentaComercial?>(null);
 
+            public Task<CuentaComercial?> ObtenerPorComercioAsync(
+    Guid cuentaComercialId,
+    Guid comercioId,
+    CancellationToken ct) =>
+    throw new NotSupportedException();
+
         public Task<IReadOnlyList<UltimaMilla.Application.CuentasComerciales.CuentaComercialDto>>
             ListarResumenAsync(
                 Guid operadorId,

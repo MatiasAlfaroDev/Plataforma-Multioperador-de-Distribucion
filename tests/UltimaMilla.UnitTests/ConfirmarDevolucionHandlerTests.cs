@@ -217,6 +217,16 @@ public sealed class ConfirmarDevolucionHandlerTests
             Task.FromResult<CuentaComercial?>(
                 cuenta.Id == id ? cuenta : null);
 
+                public Task<CuentaComercial?> ObtenerPorComercioAsync(
+    Guid cuentaComercialId,
+    Guid comercioId,
+    CancellationToken ct) =>
+    Task.FromResult<CuentaComercial?>(
+        cuenta.Id == cuentaComercialId &&
+        cuenta.ComercioId == comercioId
+            ? cuenta
+            : null);
+
         public Task<IReadOnlyList<CuentaComercialDto>> ListarResumenAsync(
             Guid operadorId, Guid? cuentaId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<CuentaComercialDto>>([]);
