@@ -89,4 +89,14 @@ public class CuentaComercial : AuditableEntity, ITenantEntity
     {
         Activa = false;
     }
+
+    /// <summary>Revierte una baja: solo aplica a vinculaciones ya confirmadas.</summary>
+    public void Reactivar()
+    {
+        if (Estado != EstadoCuentaComercial.Confirmada)
+            throw new InvalidOperationException(
+                "Solo se puede reactivar una vinculación confirmada.");
+
+        Activa = true;
+    }
 }
