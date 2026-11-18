@@ -9,13 +9,16 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\UltimaMilla.Domain\UltimaMilla.Domain.csproj" />
     <ProjectReference Include="..\..\src\UltimaMilla.Infrastructure\UltimaMilla.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\UltimaMilla.Api\UltimaMilla.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector">

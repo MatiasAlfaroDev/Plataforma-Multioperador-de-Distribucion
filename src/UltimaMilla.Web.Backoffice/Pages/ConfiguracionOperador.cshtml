@@ -1,0 +1,107 @@
+
+@page
+@model UltimaMilla.Web.Backoffice.Pages.ConfiguracionOperadorModel
+
+@{
+    ViewData["Title"] = "Identidad visual";
+}
+
+<div class="mx-auto max-w-3xl space-y-6">
+
+    <div>
+        <h1 class="font-display text-3xl font-bold">
+            Identidad visual
+        </h1>
+
+        <p class="mt-2 text-suave">
+            Configurá el color que identifica a tu operador
+            en el seguimiento público de los envíos.
+        </p>
+    </div>
+
+    @if (TempData["MensajeExito"] is string mensaje)
+    {
+        <div class="rounded-lg border border-green-300 bg-green-50 p-4 text-green-800"
+             role="status">
+            @mensaje
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800"
+             role="alert">
+            @Model.Error
+        </div>
+    }
+
+    @if (Model.Operador is not null)
+    {
+        <div class="rounded-xl border border-borde bg-superficie p-6">
+
+            <h2 class="mb-5 text-xl font-semibold">
+                Configuración del operador
+            </h2>
+
+            <div class="mb-6">
+                <label class="mb-2 block text-sm font-medium">
+                    Nombre del operador
+                </label>
+
+                <div class="rounded-lg border border-borde p-3">
+                    @Model.Operador.Nombre
+                </div>
+            </div>
+
+            <form method="post" class="space-y-5">
+                @Html.AntiForgeryToken()
+
+                <div>
+                    <label asp-for="ColorPrimario"
+                           class="mb-2 block text-sm font-medium">
+                        Color principal
+                    </label>
+
+                    <div class="flex items-center gap-3">
+                        <input type="color"
+                               id="selectorColor"
+                               value="@Model.ColorPrimario"
+                               class="h-12 w-16 cursor-pointer rounded border border-borde" />
+
+                        <input asp-for="ColorPrimario"
+                               id="ColorPrimario"
+                               class="w-40 rounded-lg border border-borde bg-superficie p-3"
+                               maxlength="7" />
+                    </div>
+
+                    <span asp-validation-for="ColorPrimario"
+                          class="mt-2 block text-sm text-red-600"></span>
+                </div>
+
+                <button type="submit"
+                        class="rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700">
+                    Guardar cambios
+                </button>
+            </form>
+        </div>
+    }
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const selector = document.getElementById("selectorColor");
+        const campo = document.getElementById("ColorPrimario");
+
+        if (!selector || !campo) return;
+
+        selector.addEventListener("input", () => {
+            campo.value = selector.value.toUpperCase();
+        });
+
+        campo.addEventListener("input", () => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(campo.value)) {
+                selector.value = campo.value;
+            }
+        });
+    });
+</script>

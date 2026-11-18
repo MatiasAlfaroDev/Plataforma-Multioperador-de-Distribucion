@@ -19,7 +19,9 @@ public sealed record SeguimientoPublicoDto(
     IReadOnlyList<MovimientoSeguimientoDto> Historial,
     int BultosTotales = 0,
     int BultosEntregados = 0,
-    string Tipo = "Envio");
+    string Tipo = "Envio",
+    string? OperadorNombre = null,
+    string? OperadorColorPrimario = null);
 
 public sealed record DisponibilidadReprogramacionPublicaDto(
     bool PuedeSolicitar,

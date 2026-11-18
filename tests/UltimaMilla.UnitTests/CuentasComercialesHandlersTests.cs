@@ -303,6 +303,13 @@ public class CuentasComercialesHandlersTests
 
         public Task<Operador?> ObtenerAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Lista.FirstOrDefault(o => o.Id == id));
+
+        public Task<Operador?> ObtenerParaActualizarAsync(
+         Guid id,
+            CancellationToken ct)
+        {
+            return ObtenerAsync(id, ct);
+        }
     }
 
     private sealed class UnidadDeTrabajoEnMemoria : IUnitOfWork
