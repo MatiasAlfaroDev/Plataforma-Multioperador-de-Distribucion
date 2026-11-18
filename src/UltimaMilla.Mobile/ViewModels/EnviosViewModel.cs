@@ -276,7 +276,7 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
     [RelayCommand]
     private async Task ComoLlegarAsync(EnvioRuta parada)
     {
-        // ponytail: la parada solo guarda la dirección en texto ("calle, localidad"); con coordenadas, mandar lat,lng.
+        // La parada solo guarda la dirección en texto ("calle, localidad"); si algún día trae coordenadas, conviene mandar lat,lng.
         var app = await _dialogos.ElegirAsync($"Cómo llegar a {parada.Direccion}", ["Google Maps", "Waze"]);
         if (app is null)
             return;
@@ -293,7 +293,8 @@ public partial class EnviosViewModel : ObservableObject, IQueryAttributable
         }
         catch (Exception ex)
         {
-            await _dialogos.AvisarAsync("Cómo llegar", $"No se pudo abrir el mapa: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Cómo llegar: no se pudo abrir el mapa: {ex}");
+            await _dialogos.AvisarAsync("Cómo llegar", "No se pudo abrir el mapa. Probá de nuevo o buscá la dirección a mano.");
         }
     }
 
