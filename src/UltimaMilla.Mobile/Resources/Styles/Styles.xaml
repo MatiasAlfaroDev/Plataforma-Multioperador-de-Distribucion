@@ -452,12 +452,16 @@
         <Setter Property="Padding" Value="20" />
     </Style>
 
-    <!-- Recuadro de un contador dentro del resumen -->
+    <!-- Contador dentro del resumen: sin fondo; los separa una línea vertical (Divisor), como las cifras de la web -->
     <Style TargetType="Border" x:Key="Contador">
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FondoPagina}, Dark={StaticResource FondoPaginaOscuro}}" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
         <Setter Property="StrokeThickness" Value="0" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
-        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Padding" Value="0,2" />
+    </Style>
+
+    <Style TargetType="BoxView" x:Key="Divisor">
+        <Setter Property="Color" Value="{StaticResource Borde}" />
+        <Setter Property="WidthRequest" Value="1" />
     </Style>
 
     <!-- Etiqueta chica con fondo de color (el estado del envío) -->
@@ -477,12 +481,12 @@
         <Setter Property="Padding" Value="12,2" />
     </Style>
 
-    <!-- Escala tipográfica: 28 / 17 / 15 / 13, con saltos marcados.
-         Space Grotesk para títulos y cifras, IBM Plex Sans para todo lo demás. -->
+    <!-- Escala tipográfica: 26 / 17 / 15 / 13, con saltos marcados.
+         Work Sans para títulos y cifras, Source Sans 3 para todo lo demás (igual que la web). -->
     <Style TargetType="Label" x:Key="Titulo">
         <Setter Property="FontFamily" Value="Titulos" />
-        <Setter Property="FontSize" Value="28" />
-        <Setter Property="CharacterSpacing" Value="-0.6" />
+        <Setter Property="FontSize" Value="26" />
+        <Setter Property="CharacterSpacing" Value="-0.5" />
         <Setter Property="LineHeight" Value="1.05" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
     </Style>
@@ -516,7 +520,7 @@
     </Style>
 
     <Style TargetType="Label" x:Key="EtiquetaCampo">
-        <Setter Property="FontFamily" Value="TextoMedio" />
+        <Setter Property="FontFamily" Value="TextoFuerte" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
     </Style>
@@ -524,7 +528,7 @@
     <!-- Números grandes (contadores, progreso) y códigos de seguimiento -->
     <Style TargetType="Label" x:Key="Cifra">
         <Setter Property="FontFamily" Value="Titulos" />
-        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontSize" Value="24" />
         <Setter Property="CharacterSpacing" Value="-0.4" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextoPrincipal}, Dark={StaticResource TextoPrincipalOscuro}}" />
     </Style>

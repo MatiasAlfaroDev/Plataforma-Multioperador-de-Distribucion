@@ -1,16 +1,7 @@
 <svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
     <!-- Mismo dibujo que assets/marca/logo.svg, sin la baldosa (el fondo lo pone appicon.svg) -->
-    <defs>
-        <clipPath id="caja">
-            <path d="M32 8 L48 17 L48 35 L32 44 L16 35 L16 17 Z" />
-        </clipPath>
-    </defs>
-    <g transform="translate(228 228) scale(5) translate(-33 -33)">
-        <path d="M32 8 L48 17 L32 26 L16 17 Z" fill="#FFF7ED" />
-        <path d="M16 17 L32 26 L32 44 L16 35 Z" fill="#FFFFFF" />
-        <path d="M32 26 L48 17 L48 35 L32 44 Z" fill="#FFEDD5" />
-        <path d="M20 8.5 L40 19.75 L40 50" fill="none" stroke="#C2410C" stroke-width="3.5" stroke-linejoin="round" clip-path="url(#caja)" />
-        <path d="M12 52 Q30 57.5 46 51" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0.1 5.5" />
-        <circle cx="50.5" cy="49.5" r="3.5" fill="#FFFFFF" />
+    <g transform="translate(228 228) scale(5) translate(-32 -32)">
+        <circle cx="32" cy="32" r="18" fill="none" stroke="#FFFFFF" stroke-width="4.5" />
+        <circle cx="32" cy="32" r="6.5" fill="#FFFFFF" />
     </g>
 </svg>

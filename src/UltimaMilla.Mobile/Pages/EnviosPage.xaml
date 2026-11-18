@@ -57,21 +57,23 @@
                                 <Label Text="{Binding TextoProgreso}" Style="{StaticResource Secundario}" />
                             </VerticalStackLayout>
 
-                            <!-- Tres contadores -->
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <!-- Tres contadores separados por líneas verticales, sin fondo (como las cifras de la web) -->
+                            <Grid ColumnDefinitions="*,Auto,*,Auto,*" ColumnSpacing="16">
                                 <Border Style="{StaticResource Contador}">
                                     <VerticalStackLayout Spacing="0" HorizontalOptions="Start">
                                         <Label Text="{Binding PorEntregar}" Style="{StaticResource Cifra}" />
                                         <Label Text="Pendientes" Style="{StaticResource Secundario}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
-                                <Border Grid.Column="1" Style="{StaticResource Contador}">
+                                <BoxView Grid.Column="1" Style="{StaticResource Divisor}" />
+                                <Border Grid.Column="2" Style="{StaticResource Contador}">
                                     <VerticalStackLayout Spacing="0" HorizontalOptions="Start">
                                         <Label Text="{Binding Entregados}" Style="{StaticResource Cifra}" />
                                         <Label Text="Resueltas" Style="{StaticResource Secundario}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
-                                <Border Grid.Column="2" Style="{StaticResource Contador}">
+                                <BoxView Grid.Column="3" Style="{StaticResource Divisor}" />
+                                <Border Grid.Column="4" Style="{StaticResource Contador}">
                                     <VerticalStackLayout Spacing="0" HorizontalOptions="Start">
                                         <Label Text="{Binding NoEntregados}" Style="{StaticResource Cifra}" />
                                         <Label Text="No resueltas" Style="{StaticResource Secundario}" FontSize="12" />
@@ -175,12 +177,9 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:EnvioRuta">
                     <Border Style="{StaticResource Tarjeta}" Padding="0" Margin="0,6">
-                        <Grid ColumnDefinitions="4,*">
-
-                            <!-- Franja de color según el estado -->
-                            <BoxView Color="{Binding ColorEstado}" />
-
-                            <VerticalStackLayout Grid.Column="1" Padding="16,14" Spacing="10">
+                        <Grid>
+                            <!-- Sin franja de color al costado: el estado lo dice el chip, igual que en la web -->
+                            <VerticalStackLayout Padding="16,14" Spacing="10">
 
                                 <!-- Referencia + etiqueta de estado -->
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">

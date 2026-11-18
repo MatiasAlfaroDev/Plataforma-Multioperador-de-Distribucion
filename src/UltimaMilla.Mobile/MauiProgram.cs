@@ -19,12 +19,13 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
             {
-                // Texto: IBM Plex Sans. Títulos y cifras: Space Grotesk. Íconos: Phosphor (ver Iconos.cs).
-                fonts.AddFont("IBMPlexSans-Regular.ttf", "Texto");
-                fonts.AddFont("IBMPlexSans-Medium.ttf", "TextoMedio");
-                fonts.AddFont("IBMPlexSans-SemiBold.ttf", "TextoFuerte");
-                fonts.AddFont("SpaceGrotesk-Medium.ttf", "Cifras");
-                fonts.AddFont("SpaceGrotesk-Bold.ttf", "Titulos");
+                // Las mismas que Portal y Backoffice: Source Sans 3 en el texto, Work Sans en títulos y cifras.
+                // Íconos: Phosphor (ver Iconos.cs).
+                fonts.AddFont("SourceSans3-Regular.ttf", "Texto");
+                fonts.AddFont("SourceSans3-Medium.ttf", "TextoMedio");
+                fonts.AddFont("SourceSans3-SemiBold.ttf", "TextoFuerte");
+                fonts.AddFont("WorkSans-Medium.ttf", "Cifras");
+                fonts.AddFont("WorkSans-SemiBold.ttf", "Titulos");
                 fonts.AddFont("Phosphor.ttf", "Iconos");
             });
 

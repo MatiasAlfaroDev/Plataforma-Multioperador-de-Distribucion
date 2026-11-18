@@ -40,9 +40,9 @@ tailwindcss -i src/UltimaMilla.Web.Portal/Estilos/app.css -o src/UltimaMilla.Web
 tailwindcss -i src/UltimaMilla.Web.Backoffice/Estilos/app.css -o src/UltimaMilla.Web.Backoffice/wwwroot/app.css --minify
 ```
 
-Marca en `assets/marca/`: logo, fuentes e íconos Phosphor. Las webs usan Source Sans 3 (texto) y
-Work Sans (títulos y cifras); la app móvil sigue con IBM Plex Sans y Space Grotesk. Sin emojis en la
-interfaz; los íconos son `<i class="ph ph-...">` en web y `app:Iconos` en MAUI.
+Marca compartida con la app móvil en `assets/marca/`: logo, Source Sans 3 (texto), Work Sans (títulos
+y cifras) e íconos Phosphor; woff2 para las webs y ttf para MAUI. Todo va siempre en modo claro. Sin
+emojis en la interfaz; los íconos son `<i class="ph ph-...">` en web y `app:Iconos` en MAUI.
 
 Mensajes al usuario: toasts. En el Portal, `Services/Notificaciones` (scoped por circuito) y el layout
 los muestra. En el Backoffice, lo que una página deja en `TempData` (`Mensaje`, `MensajeExito`, `Exito`
