@@ -2,6 +2,7 @@ using UltimaMilla.Application.Tablero.Queries.ObtenerTableroEnVivo;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarCuentasComerciales;
+using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerCuentaCorriente;
 using UltimaMilla.Application.Envios.Commands.CrearEnvio;
 using UltimaMilla.Application.Envios.Commands.ImportarEnviosCsv;
 using UltimaMilla.Application.Envios.Commands.RegistrarEventoMovil;
@@ -93,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IniciarDevolucionHandler>();
         services.AddScoped<ConfirmarDevolucionHandler>();
         services.AddScoped<ListarCuentasComercialesHandler>();
+        services.AddScoped<ObtenerCuentaCorrienteHandler>();
         services.AddScoped<SolicitarVinculacionHandler>();
         services.AddScoped<AceptarVinculacionHandler>();
         services.AddScoped<RechazarVinculacionHandler>();

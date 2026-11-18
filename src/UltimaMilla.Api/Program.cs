@@ -71,6 +71,7 @@ using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResultadosRepartidores;
 using UltimaMilla.Application.Reportes.Queries.ObtenerCumplimiento;
 using UltimaMilla.Application.Reportes.Queries.ObtenerDetalleLiquidacion;
+using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerCuentaCorriente;
 using UltimaMilla.Application.Reportes.Queries.ObtenerPuntualidad;
 using UltimaMilla.Application.Envios.Commands.IniciarDevolucion;
 using UltimaMilla.Application.Envios.Commands.ConfirmarDevolucion;
@@ -458,6 +459,25 @@ api.MapGet("/cuentas-comerciales", async (
               context.User.HasClaim("perfil_comercio", "AdministradorComercio") ||
               context.User.HasClaim("perfil_comercio", "Comercio") ||
               Perfiles.PersonalOperador.Any(context.User.IsInRole)));
+
+// GET /api/cuenta-corriente?desde=2026-11-01&hasta=2026-11-30 → cuenta corriente y liquidaciones
+// del comercio autenticado (Portal). Sin fechas: desde el primer día de hace 5 meses hasta hoy.
+api.MapGet("/cuenta-corriente", async (
+    DateOnly? desde,
+    DateOnly? hasta,
+    ObtenerCuentaCorrienteHandler handler,
+    CancellationToken ct) =>
+{
+    var hoy = DateOnly.FromDateTime(DateTime.UtcNow);
+    var fin = hasta ?? hoy;
+    var inicio = desde ?? new DateOnly(fin.Year, fin.Month, 1).AddMonths(-5);
+
+    if (fin < inicio || fin == DateOnly.MaxValue)
+        return Results.BadRequest("Rango de fechas no válido.");
+
+    return Results.Ok(await handler.Handle(inicio, fin, ct));
+})
+.RequireAuthorization(policy => policy.RequireRole(Perfiles.PersonalComercio));
 
 // POST /api/envios → alta de envío desde el Portal del comercio.
 api.MapPost("/envios", async (
