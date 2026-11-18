@@ -66,26 +66,29 @@ public class ConsultasYValidacionesTests
     }
 
     [Fact]
-    public async Task El_comercio_lista_los_retiros_de_sus_cuentas_activas_ordenados_por_fecha()
+    public async Task El_comercio_lista_los_retiros_de_sus_cuentas_aceptadas_ordenados_por_fecha()
     {
         var otroOperador = Guid.NewGuid();
         var cuentaA = Cuenta(Guid.NewGuid(), IdOperador);
         var cuentaB = Cuenta(Guid.NewGuid(), otroOperador);
-        var cuentaInactiva = Cuenta(Guid.NewGuid(), Guid.NewGuid(), activa: false);
-        _cuentas.PorComercio.AddRange([cuentaA, cuentaB, cuentaInactiva]);
+        // RF 1: una cuenta dada de baja sigue mostrando sus retiros; una solicitud pendiente no.
+        var dadaDeBaja = Cuenta(Guid.NewGuid(), Guid.NewGuid(), activa: false);
+        var pendiente = Cuenta(Guid.NewGuid(), Guid.NewGuid(), activa: false, EstadoCuentaComercial.Pendiente);
+        _cuentas.PorComercio.AddRange([cuentaA, cuentaB, dadaDeBaja, pendiente]);
 
-        var viejo = NuevoRetiro(IdOperador, cuentaA.Id, Ahora);
+        var viejo = NuevoRetiro(IdOperador, cuentaA.Id, Ahora.AddMinutes(-5));
         var nuevo = NuevoRetiro(otroOperador, cuentaB.Id, Ahora.AddMinutes(5));
-        var deLaInactiva = NuevoRetiro(cuentaInactiva.OperadorId, cuentaInactiva.Id, Ahora);
-        _retiros.Lista.AddRange([viejo, nuevo, deLaInactiva]);
+        var deLaBaja = NuevoRetiro(dadaDeBaja.OperadorId, dadaDeBaja.Id, Ahora);
+        var deLaPendiente = NuevoRetiro(pendiente.OperadorId, pendiente.Id, Ahora);
+        _retiros.Lista.AddRange([viejo, nuevo, deLaBaja, deLaPendiente]);
 
         var resultado = await Consultas(Sesion(comercioId: IdComercio, perfil: Perfiles.Comercio))
             .ListarAsync(CancellationToken.None);
 
-        Assert.Equal(new[] { nuevo.Id, viejo.Id }, resultado.Select(r => r.Id).ToArray());
+        Assert.Equal(new[] { nuevo.Id, deLaBaja.Id, viejo.Id }, resultado.Select(r => r.Id).ToArray());
         Assert.Contains(IdOperador, _activo.Seleccionados);
         Assert.Contains(otroOperador, _activo.Seleccionados);
-        Assert.DoesNotContain(cuentaInactiva.OperadorId, _activo.Seleccionados);
+        Assert.DoesNotContain(pendiente.OperadorId, _activo.Seleccionados);
     }
 
     [Fact]

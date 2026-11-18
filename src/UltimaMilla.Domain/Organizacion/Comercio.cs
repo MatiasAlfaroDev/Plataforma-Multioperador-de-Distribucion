@@ -22,4 +22,16 @@ public class Comercio : AuditableEntity
 
         return new Comercio { Id = id, Rut = rut.Trim(), Nombre = nombre.Trim() };
     }
+
+    /// <summary>
+    /// RF 1: modificación de los datos del comercio. El RUT no se modifica: es la identidad
+    /// fiscal del comercio, única en la plataforma y compartida por todos sus operadores.
+    /// </summary>
+    public void Modificar(string nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre))
+            throw new ArgumentException("El nombre del comercio es obligatorio.", nameof(nombre));
+
+        Nombre = nombre.Trim();
+    }
 }

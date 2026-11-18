@@ -10,6 +10,19 @@ public sealed record SolicitudComercialItem(
     DateTimeOffset CreadoEn
 );
 
+// Estado: 0 Pendiente, 1 Confirmada, 2 Rechazada (EstadoCuentaComercial serializado como número).
+public sealed record CuentaComercialItem(
+    Guid Id,
+    Guid ComercioId,
+    string ComercioNombre,
+    string? ComercioRut,
+    bool Activa,
+    int Estado,
+    string? DireccionRecepcion)
+{
+    public bool Aceptada => Estado == 1;
+}
+
 public sealed class VinculacionesApiClient(HttpClient http)
 {
     public async Task<IReadOnlyList<SolicitudComercialItem>> ListarPendientesAsync(
@@ -18,6 +31,20 @@ public sealed class VinculacionesApiClient(HttpClient http)
         return await http.GetFromJsonAsync<List<SolicitudComercialItem>>(
             "api/vinculaciones/pendientes", ct) ?? [];
     }
+
+    // Comercios del operador de la sesión (RF 1); la página se queda con los aceptados.
+    public async Task<IReadOnlyList<CuentaComercialItem>> ListarCuentasAsync(
+        CancellationToken ct = default)
+    {
+        return await http.GetFromJsonAsync<List<CuentaComercialItem>>(
+            "api/cuentas-comerciales", ct) ?? [];
+    }
+
+    public Task ModificarComercioAsync(Guid cuentaId, string nombre, CancellationToken ct = default) =>
+        EnviarAsync(HttpMethod.Put, $"api/vinculaciones/{cuentaId}/comercio", new { Nombre = nombre }, ct);
+
+    public Task CambiarEstadoAsync(Guid cuentaId, bool activa, CancellationToken ct = default) =>
+        EnviarAsync(HttpMethod.Put, $"api/vinculaciones/{cuentaId}/estado", new { Activa = activa }, ct);
 
     public async Task AceptarAsync(Guid id, CancellationToken ct = default)
     {
@@ -29,9 +56,16 @@ public sealed class VinculacionesApiClient(HttpClient http)
         await EjecutarAccionAsync(id, "rechazar", ct);
     }
 
-    private async Task EjecutarAccionAsync(
+    private Task EjecutarAccionAsync(
         Guid id,
         string accion,
+        CancellationToken ct) =>
+        EnviarAsync(HttpMethod.Post, $"api/vinculaciones/{id}/{accion}", null, ct);
+
+    private async Task EnviarAsync(
+        HttpMethod metodo,
+        string url,
+        object? contenido,
         CancellationToken ct)
     {
         // Obtener el token antiforgery de la API.
@@ -47,9 +81,10 @@ public sealed class VinculacionesApiClient(HttpClient http)
             throw new InvalidOperationException(
                 "La API no devolvió un token de seguridad.");
 
-        using var solicitud = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"api/vinculaciones/{id}/{accion}");
+        using var solicitud = new HttpRequestMessage(metodo, url)
+        {
+            Content = contenido is null ? null : JsonContent.Create(contenido)
+        };
 
         solicitud.Headers.Add("X-CSRF-TOKEN", datosToken.Token);
 

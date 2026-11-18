@@ -45,8 +45,8 @@ public sealed class ListarEnviosHandler(
                 comercioId, ct);
 
             var autorizadas = vinculaciones
+                // Sin exigir Activa: una cuenta dada de baja (RF 1) sigue viendo sus envíos.
                 .Where(c =>
-                    c.Activa &&
                     c.Estado == EstadoCuentaComercial.Confirmada)
                 .ToList();
 

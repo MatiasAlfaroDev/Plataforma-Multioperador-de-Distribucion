@@ -267,6 +267,34 @@ public class TarifasYOrganizacionTests
     }
 
     [Fact]
+    public void Solo_se_da_de_baja_o_reactiva_una_cuenta_aceptada()
+    {
+        var pendiente = CuentaComercial.Solicitar(Guid.NewGuid(), IdOperador, Guid.NewGuid());
+        var activa = CuentaComercial.Crear(Guid.NewGuid(), IdOperador, Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(() => pendiente.Desactivar());
+        Assert.Throws<InvalidOperationException>(() => pendiente.Reactivar());
+        Assert.Throws<InvalidOperationException>(() => activa.Reactivar());
+
+        activa.Desactivar();
+        Assert.Throws<InvalidOperationException>(() => activa.Desactivar());
+
+        activa.Reactivar();
+        Assert.True(activa.Activa);
+    }
+
+    [Fact]
+    public void Modificar_el_comercio_cambia_el_nombre_y_exige_uno()
+    {
+        var comercio = Comercio.Crear(Guid.NewGuid(), "211234560018", "Tienda");
+
+        comercio.Modificar(" Tienda Norte ");
+
+        Assert.Equal("Tienda Norte", comercio.Nombre);
+        Assert.Throws<ArgumentException>(() => comercio.Modificar(" "));
+    }
+
+    [Fact]
     public void Desactivar_deja_la_cuenta_inactiva_sin_cambiar_su_estado()
     {
         var cuenta = CuentaComercial.Crear(Guid.NewGuid(), IdOperador, Guid.NewGuid());

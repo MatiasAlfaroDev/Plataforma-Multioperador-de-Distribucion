@@ -48,7 +48,8 @@ public sealed class CuentaComercialRepository(AppDbContext db)
                 c.Estado,
                 c.DireccionRecepcion == null ? null
                     : c.DireccionRecepcion.Calle + " " + c.DireccionRecepcion.Numero + ", " +
-                      c.DireccionRecepcion.Localidad + ", " + c.DireccionRecepcion.Departamento)
+                      c.DireccionRecepcion.Localidad + ", " + c.DireccionRecepcion.Departamento,
+                m.Rut)
         ).ToListAsync(ct);
     }
 
@@ -116,7 +117,8 @@ public async Task<IReadOnlyList<CuentaComercialDto>> ListarPorComercioAsync(
             c.Estado,
             c.DireccionRecepcion == null ? null
                 : c.DireccionRecepcion.Calle + " " + c.DireccionRecepcion.Numero + ", " +
-                  c.DireccionRecepcion.Localidad + ", " + c.DireccionRecepcion.Departamento
+                  c.DireccionRecepcion.Localidad + ", " + c.DireccionRecepcion.Departamento,
+            m.Rut
         )
     ).ToListAsync(ct);
 }

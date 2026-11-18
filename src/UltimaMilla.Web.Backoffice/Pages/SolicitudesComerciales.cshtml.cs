@@ -12,6 +12,9 @@ public sealed class SolicitudesComercialesModel(
 {
     public IReadOnlyList<SolicitudComercialItem> Solicitudes { get; private set; } = [];
 
+    // RF 1: comercios ya aceptados, para modificarlos o darlos de baja.
+    public IReadOnlyList<CuentaComercialItem> Aceptados { get; private set; } = [];
+
     public string? Error { get; private set; }
 
     public string? Mensaje { get; private set; }
@@ -68,11 +71,50 @@ public sealed class SolicitudesComercialesModel(
         }
     }
 
+    public async Task<IActionResult> OnPostModificarAsync(
+        Guid id,
+        string nombre,
+        CancellationToken ct)
+    {
+        try
+        {
+            await api.ModificarComercioAsync(id, nombre, ct);
+            TempData["Mensaje"] = "Comercio modificado correctamente.";
+            return RedirectToPage();
+        }
+        catch (HttpRequestException ex)
+        {
+            Error = $"No se pudo modificar el comercio: {ex.Message}";
+            await CargarSolicitudesAsync(ct);
+            return Page();
+        }
+    }
+
+    public async Task<IActionResult> OnPostEstadoAsync(
+        Guid id,
+        bool activa,
+        CancellationToken ct)
+    {
+        try
+        {
+            await api.CambiarEstadoAsync(id, activa, ct);
+            TempData["Mensaje"] = activa ? "Comercio reactivado." : "Comercio dado de baja.";
+            return RedirectToPage();
+        }
+        catch (HttpRequestException ex)
+        {
+            Error = $"No se pudo cambiar el estado del comercio: {ex.Message}";
+            await CargarSolicitudesAsync(ct);
+            return Page();
+        }
+    }
+
     private async Task CargarSolicitudesAsync(CancellationToken ct)
     {
         try
         {
             Solicitudes = await api.ListarPendientesAsync(ct);
+            Aceptados = (await api.ListarCuentasAsync(ct)).Where(c => c.Aceptada).ToList();
         }
         catch (HttpRequestException ex)
         {

@@ -6,6 +6,9 @@ using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.ConfigurarDireccionRecepcion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerDireccionRecepcion;
+using UltimaMilla.Application.CuentasComerciales.Commands.ModificarComercio;
+using UltimaMilla.Application.CuentasComerciales.Commands.CambiarEstadoCuentaComercial;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Api.Endpoints;
 
@@ -235,9 +238,51 @@ public static class VinculacionesComercialesEndpoints
         }
     });
 
+        // RF 1: modificación y baja lógica de un comercio ya aceptado, por el mismo actor que acepta
+        // las solicitudes. Los errores los traduce ManejadorDeErrores.
+        grupo.MapPut("/{id:guid}/comercio", async (
+            Guid id,
+            ModificarComercioRequest request,
+            ModificarComercioHandler handler,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            CancellationToken ct) =>
+        {
+            if (!await antiforgery.IsRequestValidAsync(context))
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Token de seguridad inválido.");
+
+            await handler.Handle(new ModificarComercioCommand(id, request.Nombre), ct);
+            return Results.NoContent();
+        })
+        .RequireAuthorization(p => p.RequireRole(Perfiles.Configuracion));
+
+        grupo.MapPut("/{id:guid}/estado", async (
+            Guid id,
+            CambiarEstadoCuentaComercialRequest request,
+            CambiarEstadoCuentaComercialHandler handler,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            CancellationToken ct) =>
+        {
+            if (!await antiforgery.IsRequestValidAsync(context))
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Token de seguridad inválido.");
+
+            await handler.Handle(new CambiarEstadoCuentaComercialCommand(id, request.Activa), ct);
+            return Results.NoContent();
+        })
+        .RequireAuthorization(p => p.RequireRole(Perfiles.Configuracion));
+
         return app;
     }
 }
+
+public sealed record ModificarComercioRequest(string Nombre);
+
+public sealed record CambiarEstadoCuentaComercialRequest(bool Activa);
 
 public sealed record ConfigurarDireccionRecepcionRequest(
     string Calle,

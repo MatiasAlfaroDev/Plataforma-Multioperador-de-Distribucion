@@ -85,8 +85,31 @@ public class CuentaComercial : AuditableEntity, ITenantEntity
         Activa = false;
     }
 
+    /// <summary>
+    /// RF 1: baja lógica de la vinculación. La cuenta queda confirmada pero inactiva: no admite
+    /// envíos ni retiros nuevos, y lo ya creado sigue su curso y se puede consultar.
+    /// </summary>
     public void Desactivar()
     {
+        if (Estado != EstadoCuentaComercial.Confirmada)
+            throw new InvalidOperationException(
+                "Solo se pueden dar de baja comercios aceptados.");
+        if (!Activa)
+            throw new InvalidOperationException(
+                "El comercio ya está dado de baja.");
+
         Activa = false;
+    }
+
+    public void Reactivar()
+    {
+        if (Estado != EstadoCuentaComercial.Confirmada)
+            throw new InvalidOperationException(
+                "Solo se pueden reactivar comercios aceptados.");
+        if (Activa)
+            throw new InvalidOperationException(
+                "El comercio ya está activo.");
+
+        Activa = true;
     }
 }

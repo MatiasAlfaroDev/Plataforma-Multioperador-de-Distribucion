@@ -2,13 +2,13 @@
 @model UltimaMilla.Web.Backoffice.Pages.SolicitudesComercialesModel
 
 @{
-    ViewData["Title"] = "Solicitudes de comercios";
+    ViewData["Title"] = "Comercios";
 }
 
 <div class="encabezado">
     <div>
-        <h1>Solicitudes de comercios</h1>
-        <p>Gestioná las solicitudes de vinculación de comercios con tu operador logístico.</p>
+        <h1>Comercios</h1>
+        <p>Gestioná las solicitudes de vinculación y los comercios que ya trabajan con tu operador logístico.</p>
     </div>
 </div>
 
@@ -25,6 +25,9 @@
         @Model.Error
     </p>
 }
+
+<section>
+<h2>Solicitudes pendientes</h2>
 
 @if (Model.Solicitudes.Count == 0)
 {
@@ -92,3 +95,71 @@ else
         </table>
     </div>
 }
+</section>
+
+<section>
+    <h2>Comercios aceptados</h2>
+
+    @if (Model.Aceptados.Count == 0)
+    {
+        <p class="nota">Todavía no hay comercios aceptados.</p>
+    }
+    else
+    {
+        <div class="tabla">
+            <table>
+                <thead>
+                    <tr><th>Comercio</th><th>RUT</th><th>Dirección de recepción</th><th>Estado</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var cuenta in Model.Aceptados)
+                    {
+                        <tr>
+                            <td>@cuenta.ComercioNombre</td>
+                            <td>@cuenta.ComercioRut</td>
+                            <td>@(cuenta.DireccionRecepcion ?? "Sin configurar")</td>
+                            <td>
+                                @if (cuenta.Activa)
+                                {
+                                    <span class="chip chip-exito">Activo</span>
+                                }
+                                else
+                                {
+                                    <span class="chip chip-peligro">Dado de baja</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <details>
+                                        <summary><i class="ph ph-pencil-simple"></i> Modificar</summary>
+                                        <form method="post" asp-page-handler="Modificar" class="mt-2 flex flex-wrap items-center gap-2">
+                                            <input type="hidden" name="id" value="@cuenta.Id" />
+                                            <input aria-label="Nombre del comercio" name="nombre" value="@cuenta.ComercioNombre" required maxlength="200" />
+                                            <button type="submit" class="primario">Guardar</button>
+                                        </form>
+                                    </details>
+
+                                    <form method="post" asp-page-handler="Estado" class="inline">
+                                        <input type="hidden" name="id" value="@cuenta.Id" />
+                                        <input type="hidden" name="activa" value="@((!cuenta.Activa).ToString().ToLowerInvariant())" />
+                                        @if (cuenta.Activa)
+                                        {
+                                            <button type="submit" class="peligro"
+                                                    onclick="return confirm('¿Dar de baja este comercio? No podrá crear envíos ni retiros nuevos con tu operador; los que ya tiene siguen su curso.');">
+                                                <i class="ph ph-prohibit"></i> Dar de baja
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="submit"><i class="ph ph-arrow-counter-clockwise"></i> Reactivar</button>
+                                        }
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

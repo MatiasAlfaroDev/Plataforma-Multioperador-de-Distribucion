@@ -86,6 +86,11 @@ else
             {
                 <p>Estado: Pendiente de aprobación</p>
             }
+            else if (cuenta.Estado == EstadoVinculacion.Confirmada)
+            {
+                <p>Estado: Dado de baja por el operador</p>
+                <p class="nota">No podés crear envíos ni retiros nuevos con este operador; los que ya tenés siguen visibles.</p>
+            }
 
             @if (cuenta is not null && cuenta.Estado != EstadoVinculacion.Rechazada)
             {

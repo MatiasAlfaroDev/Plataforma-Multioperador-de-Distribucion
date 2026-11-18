@@ -2,11 +2,14 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.CuentasComerciales;
 using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Commands.CambiarEstadoCuentaComercial;
+using UltimaMilla.Application.CuentasComerciales.Commands.ModificarComercio;
 using UltimaMilla.Application.CuentasComerciales.Commands.ConfigurarDireccionRecepcion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
 using UltimaMilla.Application.Seguridad;
+using FluentValidation;
 using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.UnitTests;
@@ -243,7 +246,121 @@ public class CuentasComercialesHandlersTests
         Assert.Equal(0, _unidad.Guardados);
     }
 
+    // ----- Baja y reactivación (RF 1) -----
+
+    private CuentaComercial Aceptada()
+    {
+        var cuenta = Pendiente();
+        cuenta.Confirmar();
+        return cuenta;
+    }
+
+    private CambiarEstadoCuentaComercialHandler CambiarEstado(ITenantContext sesion) =>
+        new(_cuentas, _unidad, sesion);
+
+    [Fact]
+    public async Task Dar_de_baja_desactiva_la_cuenta_sin_cambiar_su_estado()
+    {
+        var cuenta = Aceptada();
+
+        await CambiarEstado(AdminOperador()).Handle(
+            new CambiarEstadoCuentaComercialCommand(cuenta.Id, Activa: false), CancellationToken.None);
+
+        Assert.False(cuenta.Activa);
+        Assert.Equal(EstadoCuentaComercial.Confirmada, cuenta.Estado);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Reactivar_vuelve_a_activar_una_cuenta_dada_de_baja()
+    {
+        var cuenta = Aceptada();
+        cuenta.Desactivar();
+
+        await CambiarEstado(AdminOperador()).Handle(
+            new CambiarEstadoCuentaComercialCommand(cuenta.Id, Activa: true), CancellationToken.None);
+
+        Assert.True(cuenta.Activa);
+    }
+
+    [Fact]
+    public async Task Dar_de_baja_exige_administrador_del_operador_y_cuenta_propia()
+    {
+        var cuenta = Aceptada();
+        var despachador = new SesionFalsa(OperadorId, null, Perfiles.Despachador, autenticado: true);
+        var comando = new CambiarEstadoCuentaComercialCommand(cuenta.Id, Activa: false);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            CambiarEstado(despachador).Handle(comando, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            CambiarEstado(AdminComercio()).Handle(comando, CancellationToken.None));
+        await Assert.ThrowsAsync<NoEncontradoException>(() =>
+            CambiarEstado(AdminOperador(Guid.NewGuid())).Handle(comando, CancellationToken.None));
+        Assert.True(cuenta.Activa);
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task No_se_da_de_baja_una_solicitud_pendiente()
+    {
+        var solicitud = Pendiente();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            CambiarEstado(AdminOperador()).Handle(
+                new CambiarEstadoCuentaComercialCommand(solicitud.Id, Activa: false), CancellationToken.None));
+    }
+
+    // ----- Modificar comercio (RF 1) -----
+
+    private readonly ComerciosEnMemoria _comercios = new();
+
+    private ModificarComercioHandler Modificar(ITenantContext sesion) =>
+        new(_cuentas, _comercios, _unidad, sesion, new ModificarComercioValidator());
+
+    [Fact]
+    public async Task Modificar_cambia_el_nombre_y_conserva_el_rut()
+    {
+        var cuenta = Aceptada();
+        var comercio = Comercio.Crear(ComercioId, "211234560018", "Tienda");
+        _comercios.Lista.Add(comercio);
+
+        await Modificar(AdminOperador()).Handle(
+            new ModificarComercioCommand(cuenta.Id, " Tienda Norte "), CancellationToken.None);
+
+        Assert.Equal("Tienda Norte", comercio.Nombre);
+        Assert.Equal("211234560018", comercio.Rut);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Modificar_valida_actor_nombre_y_estado_de_la_cuenta()
+    {
+        var aceptada = Aceptada();
+        var pendiente = CuentaComercial.Solicitar(Guid.NewGuid(), OperadorId, Guid.NewGuid());
+        _cuentas.Lista.Add(pendiente);
+        _comercios.Lista.Add(Comercio.Crear(ComercioId, "211234560018", "Tienda"));
+        var despachador = new SesionFalsa(OperadorId, null, Perfiles.Despachador, autenticado: true);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Modificar(despachador).Handle(new ModificarComercioCommand(aceptada.Id, "Otro"), CancellationToken.None));
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            Modificar(AdminOperador()).Handle(new ModificarComercioCommand(aceptada.Id, " "), CancellationToken.None));
+        await Assert.ThrowsAsync<NoEncontradoException>(() =>
+            Modificar(AdminOperador(Guid.NewGuid())).Handle(new ModificarComercioCommand(aceptada.Id, "Otro"), CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Modificar(AdminOperador()).Handle(new ModificarComercioCommand(pendiente.Id, "Otro"), CancellationToken.None));
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
     // ----- Dobles de prueba -----
+
+    private sealed class ComerciosEnMemoria : IComercioRepository
+    {
+        public List<Comercio> Lista { get; } = [];
+
+        public Task<Comercio?> ObtenerAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(Lista.FirstOrDefault(c => c.Id == id));
+    }
 
     private sealed class SesionFalsa(Guid? operadorId, Guid? comercioId, string? perfil, bool autenticado)
         : ITenantContext

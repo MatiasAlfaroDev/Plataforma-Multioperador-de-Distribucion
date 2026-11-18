@@ -139,7 +139,6 @@ public sealed class ConsultarRetirosHandler(
         return vinculaciones
             .Where(c =>
                 c.ComercioId == comercioId &&
-                c.Activa &&
                 c.Estado == EstadoCuentaComercial.Confirmada)
             .ToList();
     }
