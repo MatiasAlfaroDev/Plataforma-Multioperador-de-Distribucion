@@ -51,6 +51,7 @@ using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
 using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Commands.ModificarComercio;
 using UltimaMilla.Application.Reportes.Queries.ObtenerResumenEnvios;
 using UltimaMilla.Application.Reportes.Queries.ObtenerMotivosNoEntrega;
 using UltimaMilla.Application.Reportes.Queries.ObtenerActividadComercial;
@@ -104,6 +105,7 @@ public static class DependencyInjection
         services.AddScoped<SolicitarVinculacionHandler>();
         services.AddScoped<AceptarVinculacionHandler>();
         services.AddScoped<RechazarVinculacionHandler>();
+        services.AddScoped<ModificarComercioHandler>();
         services.AddScoped<ListarSolicitudesPendientesHandler>();
         services.AddScoped<UltimaMilla.Application.CuentasComerciales.Gestion.ListarComerciosDelOperadorHandler>();
         services.AddScoped<UltimaMilla.Application.CuentasComerciales.Gestion.CambiarActividadComercioHandler>();

@@ -25,6 +25,23 @@ else
             <p class="vacio">No hay operadores disponibles.</p>
         }
 
+        <AuthorizeView Policy="AdministradorComercio" Context="admin">
+            <section class="tarjeta">
+                <h2 class="titulo-tarjeta">Datos del comercio</h2>
+                <form @onsubmit="GuardarNombreAsync" @onsubmit:preventDefault>
+                    <div class="campo">
+                        <label for="nombre-comercio">Nombre</label>
+                        <input id="nombre-comercio" @bind="nombreComercio" required maxlength="200" />
+                    </div>
+                    <div class="acciones">
+                        <button type="submit" class="primario h-[44px]" disabled="@enviando">
+                            <i class="ph ph-floppy-disk"></i>Guardar nombre
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </AuthorizeView>
+
         <div class="grid items-start gap-[24px] xl:grid-cols-2">
             @foreach (var operador in operadores)
             {
@@ -54,9 +71,14 @@ else
                         }
                         else
                         {
-                            <span class="chip">Vinculación inactiva</span>
+                            <span class="chip">Dado de baja por el operador</span>
                         }
                     </div>
+
+                    @if (cuenta is { Estado: EstadoVinculacion.Confirmada, Activa: false })
+                    {
+                        <p class="nota">No podés crear envíos ni retiros nuevos con este operador; los que ya tenés siguen visibles.</p>
+                    }
 
                     @if (cuenta is null)
                     {
@@ -147,6 +169,9 @@ else
 
             cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
                 "autenticacionPortal.obtenerCuentasComerciales") ?? new();
+
+            // ponytail: el nombre sale de las cuentas; sin cuentas el campo arranca vacío.
+            nombreComercio = cuentas.FirstOrDefault()?.ComercioNombre ?? "";
         }
         catch (JSException ex)
         {
@@ -195,6 +220,33 @@ else
         catch (JSException ex)
         {
             Notificaciones.Error("No se pudo guardar la dirección", ex.Message);
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+
+    // RF 1: el comercio es global; solo su administrador cambia el nombre.
+    private string nombreComercio = "";
+
+    private async Task GuardarNombreAsync()
+    {
+        if (enviando)
+            return;
+
+        enviando = true;
+
+        try
+        {
+            await JS.InvokeVoidAsync("autenticacionPortal.modificarComercio", nombreComercio);
+            Notificaciones.Exito("Comercio actualizado", "Todos tus operadores ven el nombre nuevo.");
+            cuentas = await JS.InvokeAsync<List<CuentaComercialDto>>(
+                "autenticacionPortal.obtenerCuentasComerciales");
+        }
+        catch (JSException ex)
+        {
+            Notificaciones.Error("No se pudo guardar el nombre", ex.Message);
         }
         finally
         {

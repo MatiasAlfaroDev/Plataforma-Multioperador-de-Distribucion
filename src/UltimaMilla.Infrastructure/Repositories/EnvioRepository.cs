@@ -121,7 +121,6 @@ public sealed class EnvioRepository(AppDbContext db) : IEnvioRepository
                         c.Id == e.CuentaComercialId &&
                         c.OperadorId == e.OperadorId &&
                         c.ComercioId == comercioId &&
-                        c.Activa &&
                         c.Estado == EstadoCuentaComercial.Confirmada),
                 ct);
     }

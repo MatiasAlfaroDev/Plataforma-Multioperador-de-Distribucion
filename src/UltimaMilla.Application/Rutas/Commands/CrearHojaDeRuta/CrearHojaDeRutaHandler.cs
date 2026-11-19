@@ -295,7 +295,6 @@ public sealed class CrearHojaDeRutaHandler(
 
             if (cuenta.OperadorId != command.OperadorId ||
                 cuenta.Id != envio.CuentaComercialId ||
-                !cuenta.Activa ||
                 cuenta.Estado != EstadoCuentaComercial.Confirmada)
             {
                 throw new InvalidOperationException(

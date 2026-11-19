@@ -61,7 +61,7 @@ public sealed class CancelarRetiroHandler(
         if (Perfiles.PersonalComercio.Contains(tenant.Perfil) && tenant.ComercioId is Guid comercioId)
         {
             var vinculaciones = (await cuentas.ListarPorComercioAsync(comercioId, ct))
-                .Where(c => c.Activa && c.Estado == EstadoCuentaComercial.Confirmada);
+                .Where(c => c.Estado == EstadoCuentaComercial.Confirmada);
 
             foreach (var cuenta in vinculaciones)
             {

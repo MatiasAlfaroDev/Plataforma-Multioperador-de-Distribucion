@@ -2,11 +2,13 @@ using UltimaMilla.Application.Abstractions;
 using UltimaMilla.Application.Common;
 using UltimaMilla.Application.CuentasComerciales;
 using UltimaMilla.Application.CuentasComerciales.Commands.AceptarVinculacion;
+using UltimaMilla.Application.CuentasComerciales.Commands.ModificarComercio;
 using UltimaMilla.Application.CuentasComerciales.Commands.ConfigurarDireccionRecepcion;
 using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.SolicitarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ListarSolicitudesPendientes;
 using UltimaMilla.Application.Seguridad;
+using FluentValidation;
 using UltimaMilla.Domain.Organizacion;
 
 namespace UltimaMilla.UnitTests;
@@ -243,7 +245,64 @@ public class CuentasComercialesHandlersTests
         Assert.Equal(0, _unidad.Guardados);
     }
 
+    // ----- Modificar comercio (RF 1): solo su propio administrador -----
+
+    private readonly ComerciosEnMemoria _comercios = new();
+
+    private ModificarComercioHandler Modificar(ITenantContext sesion) =>
+        new(_comercios, _unidad, sesion, new ModificarComercioValidator());
+
+    [Fact]
+    public async Task El_administrador_del_comercio_cambia_su_nombre_y_conserva_el_rut()
+    {
+        var comercio = Comercio.Crear(ComercioId, "211234560018", "Tienda");
+        _comercios.Lista.Add(comercio);
+
+        await Modificar(AdminComercio()).Handle(
+            new ModificarComercioCommand(" Tienda Norte "), CancellationToken.None);
+
+        Assert.Equal("Tienda Norte", comercio.Nombre);
+        Assert.Equal("211234560018", comercio.Rut);
+        Assert.Equal(1, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Ni_el_operador_ni_un_usuario_comun_modifican_el_comercio()
+    {
+        var comercio = Comercio.Crear(ComercioId, "211234560018", "Tienda");
+        _comercios.Lista.Add(comercio);
+        var usuarioComun = new SesionFalsa(null, ComercioId, Perfiles.Comercio, autenticado: true);
+        var comando = new ModificarComercioCommand("Otro");
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Modificar(AdminOperador()).Handle(comando, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Modificar(usuarioComun).Handle(comando, CancellationToken.None));
+        Assert.Equal("Tienda", comercio.Nombre);
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
+    [Fact]
+    public async Task Modificar_el_comercio_valida_nombre_y_existencia()
+    {
+        _comercios.Lista.Add(Comercio.Crear(ComercioId, "211234560018", "Tienda"));
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            Modificar(AdminComercio()).Handle(new ModificarComercioCommand(" "), CancellationToken.None));
+        await Assert.ThrowsAsync<NoEncontradoException>(() =>
+            Modificar(AdminComercio(Guid.NewGuid())).Handle(new ModificarComercioCommand("Otro"), CancellationToken.None));
+        Assert.Equal(0, _unidad.Guardados);
+    }
+
     // ----- Dobles de prueba -----
+
+    private sealed class ComerciosEnMemoria : IComercioRepository
+    {
+        public List<Comercio> Lista { get; } = [];
+
+        public Task<Comercio?> ObtenerAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(Lista.FirstOrDefault(c => c.Id == id));
+    }
 
     private sealed class SesionFalsa(Guid? operadorId, Guid? comercioId, string? perfil, bool autenticado)
         : ITenantContext

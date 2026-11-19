@@ -70,7 +70,6 @@ public sealed class ConfirmarDevolucionHandler(
             c => c.Id == command.CuentaComercialId);
 
         if (vinculacion is null ||
-            !vinculacion.Activa ||
             vinculacion.Estado != EstadoCuentaComercial.Confirmada)
             throw new UnauthorizedAccessException(
                 "La cuenta comercial no está vinculada al comercio.");

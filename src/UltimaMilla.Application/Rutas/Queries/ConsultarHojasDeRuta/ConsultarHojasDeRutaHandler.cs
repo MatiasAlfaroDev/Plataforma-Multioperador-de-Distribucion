@@ -347,7 +347,6 @@ public sealed class ConsultarHojasDeRutaHandler(
 
             if (cuenta is null ||
                 cuenta.OperadorId != operadorId ||
-                !cuenta.Activa ||
                 cuenta.Estado != EstadoCuentaComercial.Confirmada ||
                 cuenta.DireccionRecepcion is null)
                 continue;

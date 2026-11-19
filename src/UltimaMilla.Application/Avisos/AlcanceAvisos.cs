@@ -22,7 +22,8 @@ public sealed record AlcanceAvisos(Guid? OperadorId, IReadOnlyDictionary<Guid, G
 
     /// <exception cref="UnauthorizedAccessException">Si no hay sesión o no tiene permisos.</exception>
     public static async Task<AlcanceAvisos> ResolverAsync(
-        ITenantContext sesion, ICuentaComercialRepository cuentas, CancellationToken ct)
+        ITenantContext sesion, ICuentaComercialRepository cuentas, CancellationToken ct,
+        bool incluirDadasDeBaja = false)
     {
         if (!sesion.EstaAutenticado)
             throw new UnauthorizedAccessException("Debe iniciar sesión.");
@@ -33,7 +34,8 @@ public sealed record AlcanceAvisos(Guid? OperadorId, IReadOnlyDictionary<Guid, G
                 ?? throw new UnauthorizedAccessException("No tiene un comercio seleccionado.");
 
             var confirmadas = (await cuentas.ListarPorComercioAsync(comercioId, ct))
-                .Where(c => c.Activa && c.Estado == EstadoCuentaComercial.Confirmada)
+                // RF 1: una cuenta dada de baja sigue consultando lo suyo, pero no crea ni reenvía nada.
+                .Where(c => (c.Activa || incluirDadasDeBaja) && c.Estado == EstadoCuentaComercial.Confirmada)
                 .ToDictionary(c => c.Id, c => c.OperadorId);
 
             return new AlcanceAvisos(null, confirmadas);

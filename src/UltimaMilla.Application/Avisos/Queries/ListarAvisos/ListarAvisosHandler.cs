@@ -13,7 +13,7 @@ public sealed class ListarAvisosHandler(
 {
     public async Task<IReadOnlyList<EntregaAvisoDto>> Handle(ListarAvisosQuery query, CancellationToken ct)
     {
-        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct);
+        var alcance = await AlcanceAvisos.ResolverAsync(sesion, cuentas, ct, incluirDadasDeBaja: true);
         return (await entregas.ListarAsync(alcance.Cuentas?.Keys.ToList(), query.Estado, ct))
             .Select(EntregaAvisoDto.Desde)
             .ToList();

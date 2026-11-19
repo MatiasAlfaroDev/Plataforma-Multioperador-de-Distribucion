@@ -7,6 +7,8 @@ using UltimaMilla.Application.CuentasComerciales.Commands.RechazarVinculacion;
 using UltimaMilla.Application.CuentasComerciales.Commands.ConfigurarDireccionRecepcion;
 using UltimaMilla.Application.CuentasComerciales.Queries.ObtenerDireccionRecepcion;
 using UltimaMilla.Application.CuentasComerciales.Gestion;
+using UltimaMilla.Application.CuentasComerciales.Commands.ModificarComercio;
+using UltimaMilla.Application.Seguridad;
 
 namespace UltimaMilla.Api.Endpoints;
 
@@ -311,6 +313,26 @@ public static class VinculacionesComercialesEndpoints
             }
         });
 
+        // RF 1: el administrador del comercio modifica su propio comercio (el de la sesión).
+        // El operador no puede: el comercio es global y lo ven todos sus operadores.
+        app.MapGroup("/api/comercio")
+            .RequireAuthorization(policy => policy.RequireRole(Perfiles.AdministradorComercio))
+            .MapPut("/datos", async (
+                ModificarComercioRequest request,
+                ModificarComercioHandler handler,
+                HttpContext context,
+                IAntiforgery antiforgery,
+                CancellationToken ct) =>
+            {
+                if (!await antiforgery.IsRequestValidAsync(context))
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status400BadRequest,
+                        title: "Token de seguridad inválido.");
+
+                await handler.Handle(new ModificarComercioCommand(request.Nombre), ct);
+                return Results.NoContent();
+            });
+
         return app;
     }
 
@@ -354,6 +376,8 @@ public static class VinculacionesComercialesEndpoints
         }
     }
 }
+
+public sealed record ModificarComercioRequest(string Nombre);
 
 public sealed record ConfigurarDireccionRecepcionRequest(
     string Calle,
