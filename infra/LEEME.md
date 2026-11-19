@@ -40,6 +40,8 @@ claves de la aplicación están en GitHub (secretos del repositorio). El deploy 
    gh secret set POSTGRES_PASSWORD
    gh secret set RABBITMQ_PASSWORD
    gh secret set GRAFANA_PASSWORD
+   gh secret set GMAIL_USUARIO          # cuenta de Gmail que manda el enlace de seguimiento
+   gh secret set GMAIL_APP_PASSWORD     # contraseña de aplicación de esa cuenta
    gh secret set FIREBASE_JSON < docker/secretos/firebase-cuenta-servicio.json   # opcional (push)
    gh variable set DESPLIEGUE_HABILITADO --body true
    ```
