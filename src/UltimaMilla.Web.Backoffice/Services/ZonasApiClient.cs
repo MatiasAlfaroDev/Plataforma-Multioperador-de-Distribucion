@@ -1,7 +1,6 @@
 
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 
 namespace UltimaMilla.Web.Backoffice.Services;
 
@@ -68,7 +67,7 @@ public sealed class ZonasApiClient(HttpClient http)
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var mensaje = await LeerErrorAsync(respuesta, ct);
+            var mensaje = await ErrorDeApi.LeerAsync(respuesta, "No se pudo guardar la zona", ct);
             throw new InvalidOperationException(mensaje);
         }
 
@@ -95,7 +94,7 @@ public sealed class ZonasApiClient(HttpClient http)
             return null;
 
         if (!respuesta.IsSuccessStatusCode)
-            throw new InvalidOperationException(await LeerErrorAsync(respuesta, ct));
+            throw new InvalidOperationException(await ErrorDeApi.LeerAsync(respuesta, "No se pudo guardar la zona", ct));
 
         return await respuesta.Content.ReadFromJsonAsync<ZonaDetalle>(cancellationToken: ct);
     }
@@ -111,47 +110,7 @@ public sealed class ZonasApiClient(HttpClient http)
             ct);
 
         if (!respuesta.IsSuccessStatusCode)
-            throw new InvalidOperationException(await LeerErrorAsync(respuesta, ct));
+            throw new InvalidOperationException(await ErrorDeApi.LeerAsync(respuesta, "No se pudo guardar la zona", ct));
     }
 
-    private static async Task<string> LeerErrorAsync(
-        HttpResponseMessage respuesta,
-        CancellationToken ct)
-    {
-        try
-        {
-            using var documento = JsonDocument.Parse(
-                await respuesta.Content.ReadAsStringAsync(ct));
-
-            var raiz = documento.RootElement;
-
-            if (raiz.TryGetProperty("errors", out var errores) &&
-                errores.ValueKind == JsonValueKind.Object)
-            {
-                var mensajes = errores.EnumerateObject()
-                    .SelectMany(x =>
-                        x.Value.ValueKind == JsonValueKind.Array
-                            ? x.Value.EnumerateArray()
-                                .Select(y => y.ToString())
-                            : [x.Value.ToString()])
-                    .ToArray();
-
-                if (mensajes.Length > 0)
-                    return string.Join(" ", mensajes);
-            }
-
-            if (raiz.TryGetProperty("detail", out var detalle) &&
-                !string.IsNullOrWhiteSpace(detalle.ToString()))
-                return detalle.ToString();
-
-            if (raiz.TryGetProperty("title", out var titulo))
-                return titulo.ToString();
-        }
-        catch (JsonException)
-        {
-            // Respuesta sin formato ProblemDetails.
-        }
-
-        return $"No se pudo guardar la zona. HTTP {(int)respuesta.StatusCode}.";
-    }
 }

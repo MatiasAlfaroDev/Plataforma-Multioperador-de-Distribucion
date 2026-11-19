@@ -153,11 +153,8 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
-
             throw new InvalidOperationException(
-                $"No se pudo despachar la hoja de ruta. " +
-                $"HTTP {(int)respuesta.StatusCode}: {contenido}");
+            await ErrorDeApi.LeerAsync(respuesta, "No se pudo despachar la hoja de ruta", ct));
         }
 
         var resultado = await respuesta.Content
@@ -175,9 +172,8 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
             throw new InvalidOperationException(
-                $"No se pudo consultar la rendición. HTTP {(int)respuesta.StatusCode}: {contenido}");
+            await ErrorDeApi.LeerAsync(respuesta, "No se pudo consultar la rendición", ct));
         }
 
         return await respuesta.Content.ReadFromJsonAsync<RendicionApiDto>(cancellationToken: ct)
@@ -200,9 +196,8 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
             throw new InvalidOperationException(
-                $"No se pudo rendir la hoja de ruta. HTTP {(int)respuesta.StatusCode}: {contenido}");
+            await ErrorDeApi.LeerAsync(respuesta, "No se pudo rendir la hoja de ruta", ct));
         }
 
         return await respuesta.Content.ReadFromJsonAsync<ResultadoRendicionApiDto>(cancellationToken: ct)
@@ -234,12 +229,8 @@ public async Task AgregarEnvioARutaAsync(
 
     if (!respuesta.IsSuccessStatusCode)
     {
-        var detalle = await respuesta.Content.ReadAsStringAsync(ct);
-
         throw new HttpRequestException(
-            string.IsNullOrWhiteSpace(detalle)
-                ? $"No se pudo agregar el envío (HTTP {(int)respuesta.StatusCode})."
-                : $"La API respondió: {detalle}",
+            await ErrorDeApi.LeerAsync(respuesta, "No se pudo agregar el envío", ct),
             null,
             respuesta.StatusCode);
     }
@@ -263,9 +254,8 @@ public async Task AgregarEnvioARutaAsync(
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
             throw new InvalidOperationException(
-                $"No se pudo agregar el envío urgente. HTTP {(int)respuesta.StatusCode}: {contenido}");
+            await ErrorDeApi.LeerAsync(respuesta, "No se pudo agregar el envío urgente", ct));
         }
     }
 
@@ -287,8 +277,8 @@ public async Task AgregarEnvioARutaAsync(
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var detalle = await respuesta.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"{mensaje}. HTTP {(int)respuesta.StatusCode}: {detalle}");
+            throw new InvalidOperationException(
+                await ErrorDeApi.LeerAsync(respuesta, mensaje, ct));
         }
     }
 
@@ -306,11 +296,8 @@ public async Task AgregarEnvioARutaAsync(
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var contenido = await respuesta.Content.ReadAsStringAsync(ct);
-
             throw new InvalidOperationException(
-                $"No se pudo crear la hoja de ruta. " +
-                $"HTTP {(int)respuesta.StatusCode}: {contenido}");
+            await ErrorDeApi.LeerAsync(respuesta, "No se pudo crear la hoja de ruta", ct));
         }
 
         var resultado = await respuesta.Content
