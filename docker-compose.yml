@@ -249,6 +249,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_SERVICE_NAME: "portal"
       ConnectionStrings__Redis: "redis:6379"
+      # Las páginas muestran las fechas con ToLocalTime(): sin esto salen en UTC.
+      TZ: "America/Montevideo"
     depends_on:
       api:
         condition: service_started

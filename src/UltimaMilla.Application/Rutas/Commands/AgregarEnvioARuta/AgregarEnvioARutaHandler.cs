@@ -260,7 +260,7 @@ public sealed class AgregarEnvioARutaHandler(
                     reglas,
                     ahora,
                     "Backoffice",
-                    "Despachador");
+                    command.Responsable);
 
                 await unitOfWork.GuardarCambiosAsync(
                     transaccionCt);

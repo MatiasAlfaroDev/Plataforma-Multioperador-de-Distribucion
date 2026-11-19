@@ -169,7 +169,7 @@ public sealed class DespacharHojaDeRutaHandler(
                 item.Reglas,
                 ahora,
                 "Backoffice",
-                hoja.RepartidorId.ToString());
+                command.Responsable);
         }
 
         // Primera distribución: recogida en domicilio.

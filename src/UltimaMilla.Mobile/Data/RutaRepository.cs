@@ -74,8 +74,11 @@ public sealed class RutaRepository(BaseDeDatosLocal db)
                     modalidad = excluded.modalidad,
                     bultos = excluded.bultos,
                     estado_servidor = excluded.estado_servidor,
-                    -- Lo registrado en el teléfono manda; si no hay nada, se toma el resultado que ya tiene el servidor.
-                    resultado_local = COALESCE(envios_ruta.resultado_local, excluded.resultado_local)
+                    -- Lo que falta subir manda; lo ya sincronizado lo decide el servidor. Así una parada nueva del
+                    -- mismo envío o retiro (segunda ruta, entrega del retiro al comercio) no hereda el resultado anterior.
+                    resultado_local = CASE WHEN envios_ruta.pendiente = 1
+                        THEN envios_ruta.resultado_local
+                        ELSE excluded.resultado_local END
                 """;
             upsert.Parameters.AddWithValue("$id", e.Id.ToString());
             upsert.Parameters.AddWithValue("$op", operadorId.ToString());

@@ -5,4 +5,6 @@ public sealed record AgregarEnvioARutaCommand(
     Guid HojaDeRutaId,
     Guid EnvioId,
     TimeOnly HoraEntregaDesde,
-    TimeOnly HoraEntregaHasta);
+    TimeOnly HoraEntregaHasta,
+    // El usuario de la sesión; lo completa la API.
+    string Responsable = "Despachador");

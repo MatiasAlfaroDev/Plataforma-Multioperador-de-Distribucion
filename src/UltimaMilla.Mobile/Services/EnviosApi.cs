@@ -38,7 +38,7 @@ public class EnviosApi : IEnviosApi
             .Select(p => new EnvioItem(
                 p.IdParada,
                 // El retiro no tiene referencia del comercio: el servidor manda su Id; se muestra corto.
-                p.RetiroId is Guid retiroId && p.TipoOperacion == "Retiro"
+                p.RetiroId is Guid retiroId
                     ? $"Retiro {retiroId.ToString()[..8].ToUpperInvariant()}"
                     : p.ReferenciaExterna,
                 operadorId,

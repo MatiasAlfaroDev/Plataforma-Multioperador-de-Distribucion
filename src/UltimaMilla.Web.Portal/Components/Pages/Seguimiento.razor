@@ -36,7 +36,7 @@ else
 
         <div class="cabecera-tarjeta">
             <h1 class="titulo-tarjeta">@(seguimiento.Tipo == "Retiro" ? seguimiento.Referencia : $"Envío {seguimiento.Referencia}")</h1>
-            <span class="chip border-transparent text-white" style="background-color: @ColorOperador">@seguimiento.Estado</span>
+            <span class="chip border-transparent text-white" style="background-color: @ColorOperador">@MisEnvios.FormatearEstado(seguimiento.Estado)</span>
         </div>
 
         @if (seguimiento.BultosTotales > 1 && seguimiento.BultosEntregados > 0)
@@ -47,7 +47,7 @@ else
         }
 
         <dl class="datos">
-            <dt>Fecha de creación</dt><dd>@seguimiento.FechaAlta.ToString("dd/MM/yyyy HH:mm")</dd>
+            <dt>Fecha de creación</dt><dd>@seguimiento.FechaAlta.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd>
             @if (seguimiento.FechaEntregaComprometida.HasValue)
             {
                 <dt>Entrega prevista</dt><dd>@seguimiento.FechaEntregaComprometida.Value.ToString("dd/MM/yyyy")</dd>
@@ -58,7 +58,7 @@ else
             }
             @if (seguimiento.FechaReprogramada.HasValue)
             {
-                <dt>Reprogramado para</dt><dd>@seguimiento.FechaReprogramada.Value.ToString("dd/MM/yyyy")</dd>
+                <dt>Reprogramado para</dt><dd>@seguimiento.FechaReprogramada.Value.ToLocalTime().ToString("dd/MM/yyyy")</dd>
             }
         </dl>
     </section>
@@ -103,8 +103,8 @@ else
                 @foreach (var movimiento in seguimiento.Historial)
                 {
                     <li class="border-l-[3px] pl-3" style="border-left-color: @ColorOperador">
-                        <b class="block">@movimiento.Estado</b>
-                        <span class="nota">@movimiento.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
+                        <b class="block">@MisEnvios.FormatearEstado(movimiento.Estado)</b>
+                        <span class="nota">@movimiento.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
                     </li>
                 }
             </ol>

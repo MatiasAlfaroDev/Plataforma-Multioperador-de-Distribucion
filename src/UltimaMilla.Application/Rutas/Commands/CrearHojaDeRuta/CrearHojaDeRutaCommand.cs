@@ -12,4 +12,6 @@ public sealed record CrearHojaDeRutaCommand(
     IReadOnlyList<Guid> EnviosIds,
     IReadOnlyList<Guid>? RetirosIds = null,
     IReadOnlyList<Guid>? DevolucionesIds = null,
-    IReadOnlyList<Guid>? EntregasRetirosIds = null);
+    IReadOnlyList<Guid>? EntregasRetirosIds = null,
+    // El usuario de la sesión; lo completa la API.
+    string Responsable = "Despachador");

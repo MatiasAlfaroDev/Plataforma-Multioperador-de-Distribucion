@@ -153,7 +153,7 @@
                                                     <label for="devolucion-@devolucion.Id" class="m-0 cursor-pointer font-semibold"><span class="codigo">@devolucion.ReferenciaExterna</span></label>
                                                     <span class="linea2">@devolucion.Localidad</span>
                                                 </td>
-                                                <td><span class="chip chip-peligro">@devolucion.Estado</span></td>
+                                                <td><span class="chip chip-peligro">@Formato.Estado(devolucion.Estado)</span></td>
                                                 <td class="num">@devolucion.PesoKg kg</td>
                                             </tr>
                                         }

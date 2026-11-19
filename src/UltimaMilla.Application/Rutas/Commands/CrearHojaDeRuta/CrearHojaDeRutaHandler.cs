@@ -385,7 +385,7 @@ public sealed class CrearHojaDeRutaHandler(
                         reglasPorEnvio[envio.Id],
                         ahora,
                         "Backoffice",
-                        "Despachador");
+                        command.Responsable);
                     break;
                 }
 

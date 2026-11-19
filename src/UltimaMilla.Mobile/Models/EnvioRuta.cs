@@ -134,5 +134,12 @@ public sealed class EnvioRuta
 
     public string DetalleBultos =>
         $"{CantidadBultos} {(CantidadBultos == 1 ? "bulto" : "bultos")}"
-        + (string.IsNullOrEmpty(Modalidad) ? string.Empty : $" · {Modalidad}");
+        + Modalidad switch
+        {
+            "" => string.Empty,
+            "Retiro" => " · Retiro en domicilio",
+            "DevolucionComercio" => " · Devolución",
+            "EntregaRetiroComercio" => " · Entrega al comercio",
+            _ => $" · {Modalidad}"
+        };
 }

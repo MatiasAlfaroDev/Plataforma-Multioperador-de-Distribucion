@@ -39,11 +39,14 @@ public sealed class SmtpEnviadorCorreo(IConfiguration configuration)
         var remitente = configuration["Correo:Remitente"]
             ?? usuario;
 
+        // Correo:Ssl=false para Mailpit en local (sin TLS ni credenciales).
+        var ssl = configuration["Correo:Ssl"] != "false";
+
         using var cliente = new SmtpClient(host, puerto)
         {
-            EnableSsl = true,
+            EnableSsl = ssl,
             UseDefaultCredentials = false,
-            Credentials = new NetworkCredential(usuario, password),
+            Credentials = ssl ? new NetworkCredential(usuario, password) : null,
             DeliveryMethod = SmtpDeliveryMethod.Network,
             Timeout = 30000
         };

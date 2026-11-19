@@ -892,7 +892,8 @@ api.MapGet("/envios", async (
 // POST /api/envios/{id}/eventos-movil → sincronización de la app del repartidor (entregado / no entregado).
 // 201 = guardado; 409 = ya estaba (reintento, la app lo toma como éxito); 400 = conflicto o datos inválidos.
 api.MapPost("/envios/{envioId:guid}/eventos-movil",
-    async (Guid envioId, EventoMovilRequest request, RegistrarEventoMovilHandler handler, CancellationToken ct) =>
+    async (Guid envioId, EventoMovilRequest request, HttpContext context, UserManager<Usuario> userManager,
+        RegistrarEventoMovilHandler handler, CancellationToken ct) =>
     {
         await handler.Handle(
             new RegistrarEventoMovilCommand(
@@ -915,7 +916,8 @@ api.MapPost("/envios/{envioId:guid}/eventos-movil",
                         b.Motivo,
                         b.Evidencia))
                     .ToArray(),
-                request.BultosDevueltos), ct);
+                request.BultosDevueltos,
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)), ct);
         return Results.Created($"/api/envios/{envioId}/eventos-movil/{request.IdEvento}", new { id = request.IdEvento });
     })
     .RequireAuthorization(policy => policy.RequireRole(Perfiles.Repartidor));
@@ -1678,6 +1680,7 @@ api.MapPut("/zonas/{zonaId:guid}", async (
 api.MapPost("/hojas-de-ruta", async (
     CrearHojaDeRutaRequest request,
     HttpContext context,
+    UserManager<Usuario> userManager,
     IAntiforgery antiforgery,
     ITenantContext tenant,
     CrearHojaDeRutaHandler handler,
@@ -1710,7 +1713,8 @@ api.MapPost("/hojas-de-ruta", async (
             request.EnviosIds ?? [],
             request.RetirosIds ?? [],
             request.DevolucionesIds ?? [],
-            request.EntregasRetirosIds ?? []),
+            request.EntregasRetirosIds ?? [],
+            await ResponsableDeSesion.ObtenerAsync(context, userManager)),
         ct);
 
     return Results.Created(
@@ -1761,6 +1765,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
     async (
         Guid hojaId,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         DespacharHojaDeRutaHandler handler,
@@ -1779,7 +1784,8 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/despachar",
         var cantidad = await handler.Handle(
             new DespacharHojaDeRutaCommand(
                 operadorId,
-                hojaId),
+                hojaId,
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.Ok(new
@@ -1866,6 +1872,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios",
         Guid hojaId,
         AgregarEnvioARutaRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         AgregarEnvioARutaHandler handler,
@@ -1891,7 +1898,8 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios",
                 hojaId,
                 request.EnvioId,
                 request.HoraEntregaDesde,
-                request.HoraEntregaHasta),
+                request.HoraEntregaHasta,
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.Ok(new
@@ -1909,6 +1917,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios-urgentes",
         Guid hojaId,
         AgregarEnvioARutaRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         AgregarEnvioUrgenteHandler handler,
@@ -1930,7 +1939,8 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/envios-urgentes",
                 hojaId,
                 request.EnvioId,
                 request.HoraEntregaDesde,
-                request.HoraEntregaHasta),
+                request.HoraEntregaHasta,
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.Ok(new { hojaDeRutaId = hojaId, paradasActivas = paradas });

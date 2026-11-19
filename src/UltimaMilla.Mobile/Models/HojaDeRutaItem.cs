@@ -15,16 +15,16 @@ public sealed record HojaDeRutaItem(
     /// <summary>Las paradas que faltan hacer (las resueltas en la jornada también llegan, para verlas hasta rendir).</summary>
     public IReadOnlyList<ParadaItem> ParadasActivas => Paradas.Where(p => p.Activa).ToList();
 
-    /// <summary>Los bultos que se cargan en el depósito: los de los retiros todavía están en los domicilios.</summary>
-    public int CantidadBultos => ParadasActivas.Where(p => p.TipoOperacion != "Retiro").Sum(p => p.Bultos.Count);
-
     /// <summary>RF 22: el repartidor ya la rindió (falte o no el control del depósito); la jornada de esta hoja terminó.</summary>
     public bool EsRendida => Estado is "Rendida" or "PendienteDeControl";
 
-    public string Titulo => HoraSalida is { } hora ? $"Salida {hora:HH}:{hora:mm}" : "Sin hora de salida";
+    // Con el código corto, el mismo que muestra el Backoffice: varias hojas del día pueden salir a la misma hora.
+    public string Titulo =>
+        (HoraSalida is { } hora ? $"Salida {hora:HH}:{hora:mm}" : "Sin hora de salida")
+        + $" · {Id.ToString()[..8].ToUpperInvariant()}";
 
     public string Detalle =>
-        $"{ParadasActivas.Count} {(ParadasActivas.Count == 1 ? "parada" : "paradas")}, {CantidadBultos} bultos"
+        $"{Paradas.Count} {(Paradas.Count == 1 ? "parada" : "paradas")}, {ParadasActivas.Count} por hacer"
         + (EsRendida ? " · rendida" : string.Empty);
 }
 

@@ -24,15 +24,15 @@ public partial class SeleccionBultosViewModel : ObservableObject
             Bultos.Add(new BultoParada(bulto, esRetiro));
     }
 
-    /// <summary>Retiro (RF 40): la misma pantalla sirve para escanear en el domicilio los bultos que se retiran.</summary>
+    /// <summary>Se escanean todos los bultos, sin motivos: retiro en domicilio (RF 40), entrega del retiro y devolución al comercio.</summary>
     public bool EsRetiro { get; }
 
-    public string Titulo => EsRetiro ? "Escaneá los bultos que retirás" : "¿Qué bultos se entregan?";
+    public string Titulo => EsRetiro ? "Escaneá los bultos" : "¿Qué bultos se entregan?";
     public string Instruccion => EsRetiro
-        ? "Escaneá o escribí el código de cada bulto que te entregan"
+        ? "Escaneá o escribí el código de cada bulto"
         : "Escaneá o escribí el código de cada bulto que entregás";
     public string TituloLista => EsRetiro
-        ? "Bultos del retiro (se marcan al escanearlos)"
+        ? "Bultos de la parada (se marcan al escanearlos)"
         : "Bultos del envío (se marcan al escanearlos)";
 
     public string Referencia { get; }

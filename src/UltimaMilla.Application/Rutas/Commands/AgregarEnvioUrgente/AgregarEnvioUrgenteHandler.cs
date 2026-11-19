@@ -10,7 +10,9 @@ public sealed record AgregarEnvioUrgenteCommand(
     Guid HojaDeRutaId,
     Guid EnvioId,
     TimeOnly HoraEntregaDesde,
-    TimeOnly HoraEntregaHasta);
+    TimeOnly HoraEntregaHasta,
+    // El usuario de la sesión; lo completa la API.
+    string Responsable = "Despachador");
 
 /// <summary>
 /// Reasignación urgente (letra 6.11 y opcional 7.3): el despachador suma un envío del depósito a una hoja que
@@ -60,8 +62,8 @@ public sealed class AgregarEnvioUrgenteHandler(
         hoja.AgregarEnvioUrgente(envio);
 
         var ahora = reloj.GetUtcNow();
-        envio.Aplicar(DisparadorEnvio.AsignarARuta, reglas, ahora, "Backoffice", "Despachador");
-        envio.Aplicar(DisparadorEnvio.Despachar, reglas, ahora, "Backoffice", hoja.RepartidorId.ToString());
+        envio.Aplicar(DisparadorEnvio.AsignarARuta, reglas, ahora, "Backoffice", command.Responsable);
+        envio.Aplicar(DisparadorEnvio.Despachar, reglas, ahora, "Backoffice", command.Responsable);
 
         await unitOfWork.GuardarCambiosAsync(ct);
 

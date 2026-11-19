@@ -21,4 +21,6 @@ public sealed record RegistrarEventoMovilCommand(
     string? EvidenciaFallo = null,
     IReadOnlyCollection<Guid>? BultosEntregados = null,
     IReadOnlyCollection<BultoNoEntregadoMovil>? BultosNoEntregados = null,
-    IReadOnlyCollection<Guid>? BultosDevueltos = null);
+    IReadOnlyCollection<Guid>? BultosDevueltos = null,
+    // El repartidor de la sesión; lo completa la API.
+    string Responsable = "Mobile");
