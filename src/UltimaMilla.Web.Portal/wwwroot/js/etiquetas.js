@@ -13,6 +13,10 @@ window.etiquetasPortal = {
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#39;");
 
+        if (!window.qrPortal) {
+            throw new Error("No se cargó el generador de códigos QR.");
+        }
+
         const etiquetas = datos.bultos.map((bulto, indice) => `
             <section class="etiqueta">
                 <header>
@@ -36,8 +40,12 @@ window.etiquetasPortal = {
                 </div>
 
                 <div class="identificacion">
-                    <small>IDENTIFICACIÓN DEL BULTO</small>
-                    <h2>${escapar(bulto.identificacion)}</h2>
+                    ${window.qrPortal.svg(bulto.identificacion, 30)}
+                    <div>
+                        <small>IDENTIFICACIÓN DEL BULTO</small>
+                        <h2>${escapar(bulto.identificacion)}</h2>
+                        <small>Escaneá el QR con la app del repartidor</small>
+                    </div>
                 </div>
 
                 <footer>
@@ -85,7 +93,7 @@ window.etiquetasPortal = {
                         padding: 9mm;
                         display: flex;
                         flex-direction: column;
-                        gap: 8mm;
+                        gap: 5mm;
                         break-after: page;
                         page-break-after: always;
                     }
@@ -134,8 +142,14 @@ window.etiquetasPortal = {
 
                     .identificacion {
                         border: 2px solid #111;
-                        padding: 5mm;
-                        text-align: center;
+                        padding: 3mm;
+                        display: flex;
+                        align-items: center;
+                        gap: 4mm;
+                    }
+
+                    .identificacion svg {
+                        flex: none;
                     }
 
                     footer {
