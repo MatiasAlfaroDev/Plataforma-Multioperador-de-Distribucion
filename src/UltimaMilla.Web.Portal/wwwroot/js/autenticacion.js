@@ -467,65 +467,6 @@ async obtenerDetalleEnvio(envioId) {
     }
 
     return await respuesta.json();
-},
-
-async confirmarDevolucion(envioId, datos) {
-    const respuestaToken = await fetch(
-        "/api/antiforgery/token",
-        {
-            method: "GET",
-            credentials: "same-origin",
-            cache: "no-store"
-        }
-    );
-
-    if (!respuestaToken.ok) {
-        throw new Error(
-            "No se pudo obtener el token de seguridad."
-        );
-    }
-
-    const { token } = await respuestaToken.json();
-
-    const respuesta = await fetch(
-        `/api/envios/${encodeURIComponent(envioId)}/confirmar-devolucion`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRF-TOKEN": token
-            },
-            credentials: "same-origin",
-            body: JSON.stringify(datos)
-        }
-    );
-
-    if (respuesta.status === 204) {
-        return {
-            exito: true,
-            mensaje: "Devolución confirmada correctamente."
-        };
-    }
-
-    let mensaje = `No se pudo confirmar la devolución (HTTP ${respuesta.status}).`;
-
-    try {
-        const problema = await respuesta.json();
-
-        mensaje =
-            problema.detail ??
-            problema.title ??
-            problema.mensaje ??
-            mensaje;
-    } catch {
-        // Mantener el mensaje original.
-    }
-
-    return {
-        exito: false,
-        mensaje
-    };
 }
-
 
 };

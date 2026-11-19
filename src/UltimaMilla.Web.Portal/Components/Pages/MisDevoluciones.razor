@@ -1,11 +1,11 @@
 
 @page "/mis-devoluciones"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.JSInterop
 @attribute [Authorize(Policy = "ComercioPortal")]
 @rendermode InteractiveServer
 @inject IJSRuntime JS
-@inject Notificaciones Notificaciones
 
 <PageTitle>Mis devoluciones - Última Milla</PageTitle>
 
@@ -25,7 +25,7 @@ else
         {
             <section class="tarjeta">
                 <h2 class="titulo-tarjeta">Devoluciones</h2>
-                <p class="vacio">No tenés devoluciones pendientes. Cuando el operador te devuelva paquetes, confirmás la recepción acá.</p>
+                <p class="vacio">No tenés devoluciones en curso. Cuando el operador te devuelva paquetes, los vas a ver acá; la recepción se confirma desde la app móvil.</p>
             </section>
         }
 
@@ -39,6 +39,7 @@ else
 
                 <dl class="datos">
                     <dt>Operador</dt><dd>@envio.OperadorNombre</dd>
+                    <dt>Responsable de recepción</dt><dd>@responsable</dd>
                     @* Una devolución puede venir de una entrega parcial: vuelven solo los bultos que no se entregaron. *@
                     @if (bultosQueVuelven.TryGetValue(envio.Id, out var queVuelven))
                     {
@@ -50,59 +51,6 @@ else
                         <dt>Bultos</dt><dd>@envio.CantidadBultos</dd>
                     }
                 </dl>
-
-                @if (envioSeleccionado == envio.Id && detalle is not null)
-                {
-                    <div class="mt-5 border-t border-borde pt-5">
-                        <h3 class="subtitulo mt-0">Marcá los bultos que recibiste</h3>
-                        <div class="casillas">
-                            @foreach (var bulto in detalle.Bultos.Where(b => b.Estado == "EnDevolucion"))
-                            {
-                                <label>
-                                    <input type="checkbox"
-                                           checked="@codigosSeleccionados.Contains(bulto.Identificacion)"
-                                           @onchange="e => CambiarSeleccion(bulto.Identificacion, e.Value is true)" />
-                                    <span class="codigo">@bulto.Identificacion</span>
-                                </label>
-                            }
-                        </div>
-
-                        <div class="mt-5 grid gap-4 sm:grid-cols-3">
-                            <div class="campo">
-                                <label for="modalidad-@envio.Id">Modalidad de devolución</label>
-                                <select id="modalidad-@envio.Id" @bind="modalidad">
-                                    <option value="">Elegí una modalidad…</option>
-                                    <option value="EntregaDirecta">Entrega directa</option>
-                                    <option value="RetiroEnDeposito">Retiro en depósito</option>
-                                    <option value="TransporteExterno">Transporte externo</option>
-                                </select>
-                            </div>
-                            <div class="campo">
-                                <label for="receptor-@envio.Id">Persona que recibe</label>
-                                <input id="receptor-@envio.Id" @bind="receptor" placeholder="Nombre del receptor" />
-                            </div>
-                            <div class="campo">
-                                <label for="constancia-@envio.Id">Referencia de constancia</label>
-                                <input id="constancia-@envio.Id" @bind="referenciaConstancia" placeholder="Número del comprobante" />
-                            </div>
-                        </div>
-
-                        <div class="acciones">
-                            <button type="button" class="primario h-[44px]" disabled="@procesando" @onclick="ConfirmarAsync">
-                                <i class="ph ph-check"></i>@(procesando ? "Confirmando…" : "Confirmar devolución")
-                            </button>
-                            <button type="button" class="h-[44px]" disabled="@procesando" @onclick="CerrarConfirmacion">Cancelar</button>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <div class="acciones">
-                        <button type="button" class="primario h-[44px]" disabled="@procesando" @onclick="() => AbrirConfirmacionAsync(envio.Id)">
-                            Confirmar recepción
-                        </button>
-                    </div>
-                }
             </section>
         }
     </div>
@@ -113,19 +61,11 @@ else
 
     // Por envío, los bultos que el operador devuelve (los que no se entregaron).
     private readonly Dictionary<Guid, List<string>> bultosQueVuelven = new();
-    private DetalleEnvioDto? detalle;
-
-    private Guid? envioSeleccionado;
-    private HashSet<string> codigosSeleccionados =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    private string modalidad = "";
-    private string receptor = "";
-    private string referenciaConstancia = "";
+    // Quien recibe la devolución por el comercio es el usuario de la sesión.
+    [CascadingParameter] private Task<AuthenticationState> EstadoAutenticacion { get; set; } = default!;
+    private string responsable = "";
 
     private bool cargando = true;
-    private bool procesando;
-
     private string? errorDeCarga;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -138,6 +78,7 @@ else
     {
         cargando = true;
         errorDeCarga = null;
+        responsable = (await EstadoAutenticacion).User.Identity?.Name ?? "";
 
         try
         {
@@ -164,7 +105,7 @@ else
                 }
                 catch (JSException)
                 {
-                    // Sin el detalle se muestra el total del envío; la confirmación igual lista los que vuelven.
+                    // Sin el detalle se muestra el total del envío.
                 }
             }
         }
@@ -179,111 +120,6 @@ else
         }
     }
 
-    private async Task AbrirConfirmacionAsync(Guid envioId)
-    {
-        detalle = null;
-        envioSeleccionado = null;
-        codigosSeleccionados.Clear();
-
-        try
-        {
-            detalle = await JS.InvokeAsync<DetalleEnvioDto>(
-                "autenticacionPortal.obtenerDetalleEnvio",
-                envioId);
-
-            envioSeleccionado = envioId;
-            modalidad = "";
-            receptor = "";
-            referenciaConstancia = "";
-        }
-        catch (JSException ex)
-        {
-            Notificaciones.Error("No se pudo abrir la devolución", ex.Message);
-        }
-    }
-
-    private void CambiarSeleccion(string codigo, bool seleccionado)
-    {
-        if (seleccionado)
-            codigosSeleccionados.Add(codigo);
-        else
-            codigosSeleccionados.Remove(codigo);
-    }
-
-    private async Task ConfirmarAsync()
-    {
-        if (procesando || detalle is null ||
-            envioSeleccionado is null)
-            return;
-
-        var esperados = detalle.Bultos
-            .Where(b => b.Estado == "EnDevolucion")
-            .Select(b => b.Identificacion)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        if (esperados.Count == 0 ||
-            !esperados.SetEquals(codigosSeleccionados))
-        {
-            Notificaciones.Error("Faltan bultos", "Marcá todos los bultos que vuelven antes de confirmar.");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(modalidad) ||
-            string.IsNullOrWhiteSpace(receptor) ||
-            string.IsNullOrWhiteSpace(referenciaConstancia))
-        {
-            Notificaciones.Error("Faltan datos", "Completá la modalidad, quién recibe y la constancia.");
-            return;
-        }
-
-        procesando = true;
-
-        try
-        {
-            var datos = new
-            {
-                cuentaComercialId = detalle.CuentaComercialId,
-                identificacionesEscaneadas =
-                    codigosSeleccionados.ToArray(),
-                responsable = receptor,
-                modalidad,
-                receptor,
-                referenciaConstancia
-            };
-
-            var resultado = await JS.InvokeAsync<ResultadoOperacion>(
-                "autenticacionPortal.confirmarDevolucion",
-                envioSeleccionado.Value,
-                datos);
-
-            if (resultado.Exito)
-            {
-                CerrarConfirmacion();
-                await CargarAsync();
-                Notificaciones.Exito("Devolución confirmada", resultado.Mensaje);
-            }
-            else
-            {
-                Notificaciones.Error("No se pudo confirmar la devolución", resultado.Mensaje);
-            }
-        }
-        catch (JSException ex)
-        {
-            Notificaciones.Error("No se pudo confirmar la devolución", ex.Message);
-        }
-        finally
-        {
-            procesando = false;
-        }
-    }
-
-    private void CerrarConfirmacion()
-    {
-        envioSeleccionado = null;
-        detalle = null;
-        codigosSeleccionados.Clear();
-    }
-
     private sealed class EnvioDto
     {
         public Guid Id { get; set; }
@@ -295,7 +131,6 @@ else
 
     private sealed class DetalleEnvioDto
     {
-        public Guid CuentaComercialId { get; set; }
         public List<BultoDto> Bultos { get; set; } = new();
     }
 
@@ -303,11 +138,5 @@ else
     {
         public string Identificacion { get; set; } = "";
         public string Estado { get; set; } = "";
-    }
-
-    private sealed class ResultadoOperacion
-    {
-        public bool Exito { get; set; }
-        public string Mensaje { get; set; } = "";
     }
 }
