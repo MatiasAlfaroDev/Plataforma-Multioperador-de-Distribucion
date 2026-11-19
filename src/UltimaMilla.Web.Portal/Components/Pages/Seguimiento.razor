@@ -69,12 +69,17 @@ else
         {
             <p class="aviso ok" role="status">Registramos tu pedido de reprogramación. El operador lo va a revisar.</p>
         }
-        else if (disponibilidad?.PuedeSolicitar == true)
+        else if (disponibilidad is not null && seguimiento.Estado is not ("Entregado" or "Devuelto" or "EnDevolucion" or "Extraviado"))
         {
             <section class="tarjeta">
                 <h2 class="titulo-tarjeta">¿Necesitás reprogramar la entrega?</h2>
-                <p class="nota mb-4">Podés pedir un nuevo intento de entrega. El operador revisa la solicitud.</p>
-                <button type="button" class="primario h-[44px]" disabled="@solicitandoReprogramacion" @onclick="SolicitarReprogramacion">
+                <p class="nota mb-4">
+                    @(disponibilidad.PuedeSolicitar
+                        ? "Podés pedir un nuevo intento de entrega. El operador revisa la solicitud."
+                        : disponibilidad.Motivo)
+                </p>
+                <button type="button" class="primario h-[44px]"
+                        disabled="@(solicitandoReprogramacion || !disponibilidad.PuedeSolicitar)" @onclick="SolicitarReprogramacion">
                     @(solicitandoReprogramacion ? "Enviando solicitud…" : "Solicitar reprogramación")
                 </button>
             </section>

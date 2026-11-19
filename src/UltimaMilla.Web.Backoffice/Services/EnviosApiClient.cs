@@ -145,7 +145,6 @@ public sealed class EnviosApiClient(HttpClient http)
 
     public async Task IniciarDevolucionAsync(
         Guid envioId,
-        string responsable,
         CancellationToken ct = default)
     {
         // 1. Obtener token antiforgery de la API.
@@ -196,10 +195,7 @@ public sealed class EnviosApiClient(HttpClient http)
         }
 
         // 5. Preparar el cuerpo de la solicitud.
-        solicitud.Content = JsonContent.Create(new
-        {
-            Responsable = responsable
-        });
+        solicitud.Content = JsonContent.Create(new { });
 
         // 6. Enviar solicitud a la API.
         using var respuesta = await http.SendAsync(
@@ -219,16 +215,11 @@ public sealed class EnviosApiClient(HttpClient http)
     public async Task<ResultadoRecepcionItem> RecibirEnDepositoAsync(
         Guid envioId,
         IReadOnlyList<string> identificaciones,
-        string responsable,
         CancellationToken ct = default)
     {
         using var respuesta = await http.PostAsJsonAsync(
             $"api/envios/{envioId}/recepcion",
-            new
-            {
-                IdentificacionesEscaneadas = identificaciones,
-                Responsable = responsable
-            },
+            new { IdentificacionesEscaneadas = identificaciones },
             ct);
 
         if (!respuesta.IsSuccessStatusCode)
@@ -247,16 +238,11 @@ public sealed class EnviosApiClient(HttpClient http)
     public async Task RetornarADepositoAsync(
         Guid envioId,
         IReadOnlyList<string> identificaciones,
-        string responsable,
         CancellationToken ct = default)
     {
         using var respuesta = await http.PostAsJsonAsync(
             $"api/envios/{envioId}/retorno-deposito",
-            new
-            {
-                IdentificacionesEscaneadas = identificaciones,
-                Responsable = responsable
-            },
+            new { IdentificacionesEscaneadas = identificaciones },
             ct);
 
         respuesta.EnsureSuccessStatusCode();
@@ -266,12 +252,11 @@ public sealed class EnviosApiClient(HttpClient http)
     public async Task DeclararExtravioAsync(
         Guid envioId,
         string justificacion,
-        string responsable,
         CancellationToken ct = default)
     {
         using var respuesta = await PostProtegidoAsync(
             $"api/envios/{envioId}/extravio",
-            new { Justificacion = justificacion, Responsable = responsable },
+            new { Justificacion = justificacion },
             ct);
 
         await VerificarAccionAsync(respuesta, ct);
@@ -280,16 +265,11 @@ public sealed class EnviosApiClient(HttpClient http)
     public async Task RegistrarReaparicionAsync(
         Guid envioId,
         IReadOnlyList<string> identificaciones,
-        string responsable,
         CancellationToken ct = default)
     {
         using var respuesta = await PostProtegidoAsync(
             $"api/envios/{envioId}/reaparicion",
-            new
-            {
-                IdentificacionesEscaneadas = identificaciones,
-                Responsable = responsable
-            },
+            new { IdentificacionesEscaneadas = identificaciones },
             ct);
 
         await VerificarAccionAsync(respuesta, ct);
@@ -299,12 +279,11 @@ public sealed class EnviosApiClient(HttpClient http)
         Guid envioId,
         string identificacion,
         string justificacion,
-        string responsable,
         CancellationToken ct = default)
     {
         using var respuesta = await PostProtegidoAsync(
             $"api/envios/{envioId}/bultos/{Uri.EscapeDataString(identificacion)}/extravio",
-            new { Justificacion = justificacion, Responsable = responsable },
+            new { Justificacion = justificacion },
             ct);
 
         await VerificarAccionAsync(respuesta, ct);
@@ -313,12 +292,11 @@ public sealed class EnviosApiClient(HttpClient http)
     public async Task RegistrarReaparicionBultoAsync(
         Guid envioId,
         string identificacion,
-        string responsable,
         CancellationToken ct = default)
     {
         using var respuesta = await PostProtegidoAsync(
             $"api/envios/{envioId}/bultos/{Uri.EscapeDataString(identificacion)}/reaparicion",
-            new { Responsable = responsable },
+            new { },
             ct);
 
         await VerificarAccionAsync(respuesta, ct);
@@ -457,12 +435,11 @@ public sealed class EnviosApiClient(HttpClient http)
 
     public async Task ConfirmarReprogramacionAsync(
         Guid solicitudId,
-        string responsable,
         CancellationToken ct = default)
     {
         using var respuesta = await PostProtegidoAsync(
             $"api/solicitudes-reprogramacion/{solicitudId}/confirmar",
-            new { Responsable = responsable },
+            new { },
             ct);
 
         await VerificarRespuestaReprogramacionAsync(

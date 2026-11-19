@@ -16,9 +16,6 @@ public sealed class RendicionModel(HojasDeRutaApiClient api) : PageModel
     [BindProperty]
     public string Escaneados { get; set; } = string.Empty;
 
-    [BindProperty]
-    public string Responsable { get; set; } = string.Empty;
-
     public RendicionApiDto? Rendicion { get; private set; }
 
     public string? Error { get; private set; }
@@ -27,9 +24,6 @@ public sealed class RendicionModel(HojasDeRutaApiClient api) : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(Responsable))
-            Responsable = User.Identity?.Name ?? string.Empty;
-
         await CargarAsync(ct);
     }
 
@@ -42,7 +36,7 @@ public sealed class RendicionModel(HojasDeRutaApiClient api) : PageModel
 
         try
         {
-            var resultado = await api.RendirAsync(HojaId, codigos, Responsable ?? string.Empty, ct);
+            var resultado = await api.RendirAsync(HojaId, codigos, ct);
 
             TempData["Exito"] =
                 $"Rendición controlada y hoja cerrada. {resultado.EnviosRetornados} envío(s) volvieron al depósito y " +

@@ -53,21 +53,10 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         if (solicitudId == Guid.Empty)
             return BadRequest();
 
-        var responsable = User.Identity?.Name;
-
-        if (string.IsNullOrWhiteSpace(responsable))
-        {
-            TempData["MensajeError"] =
-                "No se pudo identificar al usuario responsable.";
-
-            return RedirectToPage();
-        }
-
         try
         {
             await api.ConfirmarReprogramacionAsync(
                 solicitudId,
-                responsable,
                 ct);
 
             TempData["MensajeExito"] =
@@ -85,7 +74,6 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
     public async Task<IActionResult> OnPostRecibirAsync(
         Guid envioId,
         string identificaciones,
-        string responsable,
         CancellationToken ct)
     {
         var codigos = (identificaciones ?? string.Empty)
@@ -99,7 +87,6 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
             var resultado = await api.RecibirEnDepositoAsync(
                 envioId,
                 codigos,
-                responsable ?? string.Empty,
                 ct);
 
             var faltantes = resultado.Discrepancias
@@ -150,13 +137,12 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
 
     public async Task<IActionResult> OnPostReprogramarAsync(
         Guid envioId,
-        string responsable,
         CancellationToken ct)
     {
-        if (envioId == Guid.Empty || string.IsNullOrWhiteSpace(responsable))
+        if (envioId == Guid.Empty)
         {
             await CargarDatosAsync(ct);
-            Error = "Seleccioná un envío e ingresá el responsable de la reprogramación.";
+            Error = "Seleccioná un envío para reprogramar.";
             return Page();
         }
 
@@ -166,7 +152,7 @@ public sealed class IndexModel(EnviosApiClient api) : PageModel
         {
             solicitudId = await api.SolicitarReprogramacionAsync(envioId, ct);
             await api.ConfirmarReprogramacionAsync(
-                solicitudId.Value, responsable.Trim(), ct);
+                solicitudId.Value, ct);
 
             TempData["MensajeExito"] = "El envío fue reprogramado correctamente. Ya podés asignarlo a una nueva ruta.";
             return RedirectToPage();

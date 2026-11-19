@@ -1,4 +1,5 @@
 using UltimaMilla.Application.Abstractions;
+using UltimaMilla.Application.Envios.Commands.Reprogramacion;
 using UltimaMilla.Domain.Envios;
 
 namespace UltimaMilla.Application.Envios.Queries.ConsultarDisponibilidadReprogramacionPublica;
@@ -17,11 +18,11 @@ public sealed class ConsultarDisponibilidadReprogramacionPublicaHandler(
         if (envio is null)
             return new(false, "El envío no existe.");
 
-        if (envio.Estado != EstadoEnvio.EnDeposito)
-            return new(false, "El envío no está en depósito.");
-
-        if (envio.IntentosRealizados == 0)
-            return new(false, "El envío todavía no tiene intentos fallidos.");
+        if (!SolicitarReprogramacionHandler.EstadosQueAdmitenSolicitud.Contains(envio.Estado) ||
+            envio.IntentosRealizados == 0)
+        {
+            return new(false, "Vas a poder pedir una nueva fecha si un intento de entrega no se puede completar.");
+        }
 
         if (envio.VersionReglasOperativasId is not Guid versionId)
             return new(false, "El envío no tiene reglas operativas asignadas.");
@@ -37,11 +38,11 @@ public sealed class ConsultarDisponibilidadReprogramacionPublicaHandler(
         if (envio.IntentosRealizados >= reglas.MaximoIntentosEntrega ||
             envio.UltimoMotivoRequiereDevolucion)
         {
-            return new(false, "El envío no admite nuevos intentos de entrega.");
+            return new(false, "Este envío ya no admite nuevos intentos de entrega.");
         }
 
         if (await solicitudes.ExistePendienteAsync(envio.Id, ct))
-            return new(false, "Ya existe una solicitud pendiente.");
+            return new(false, "Ya pediste una reprogramación; el operador la está revisando.");
 
         return new(true, null);
     }

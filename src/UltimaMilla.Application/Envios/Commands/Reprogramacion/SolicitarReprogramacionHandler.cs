@@ -13,6 +13,11 @@ public sealed class SolicitarReprogramacionHandler(
     ITenantContext tenantContext,
     TimeProvider reloj)
 {
+    // RF 26: el destinatario puede pedirla apenas falla un intento, sin esperar a que el envío vuelva al
+    // depósito; el operador la confirma cuando ya está en depósito.
+    public static readonly EstadoEnvio[] EstadosQueAdmitenSolicitud =
+        [EstadoEnvio.NoEntregado, EstadoEnvio.EntregadoParcialmente, EstadoEnvio.EnDeposito];
+
     public async Task<Guid> Handle(
         SolicitarReprogramacionCommand command,
         CancellationToken ct)
@@ -33,9 +38,9 @@ public sealed class SolicitarReprogramacionHandler(
                 "El envío no existe para el operador seleccionado.");
         }
 
-        if (envio.Estado != EstadoEnvio.EnDeposito)
+        if (!EstadosQueAdmitenSolicitud.Contains(envio.Estado))
             throw new InvalidOperationException(
-                "Solo se puede solicitar la reprogramación de un envío en depósito.");
+                "Solo se puede solicitar la reprogramación después de un intento de entrega fallido.");
 
         if (envio.IntentosRealizados == 0)
             throw new InvalidOperationException(

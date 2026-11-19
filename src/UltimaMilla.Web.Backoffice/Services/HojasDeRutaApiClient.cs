@@ -183,13 +183,12 @@ public sealed class HojasDeRutaApiClient(HttpClient http)
     public async Task<ResultadoRendicionApiDto> RendirAsync(
         Guid hojaId,
         IReadOnlyList<string> bultosEscaneados,
-        string responsable,
         CancellationToken ct)
     {
         using var solicitud = await CrearSolicitudProtegidaAsync(
             HttpMethod.Post,
             $"api/hojas-de-ruta/{hojaId}/rendicion",
-            JsonContent.Create(new { bultosEscaneados, responsable }),
+            JsonContent.Create(new { bultosEscaneados }),
             ct);
 
         using var respuesta = await http.SendAsync(solicitud, ct);

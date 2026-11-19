@@ -174,10 +174,6 @@
                                         </label>
                                     }
                                 </div>
-                                <div class="campo">
-                                    <label for="responsableRetorno">Responsable de recepción</label>
-                                    <input type="text" id="responsableRetorno" name="responsable" maxlength="150" required />
-                                </div>
                                 <button type="submit" class="primario w-full">Confirmar retorno</button>
                             </form>
                         </section>
@@ -189,10 +185,6 @@
                             <h2 class="titulo-tarjeta">Iniciar devolución</h2>
                             <form method="post" asp-page-handler="IniciarDevolucion" asp-route-id="@envio.Id" class="grid gap-4">
                                 @Html.AntiForgeryToken()
-                                <div class="campo">
-                                    <label for="responsableDevolucion">Responsable</label>
-                                    <input type="text" id="responsableDevolucion" name="responsable" required maxlength="150" />
-                                </div>
                                 <p class="nota">Solo se inicia si se cumplen las reglas operativas del envío.</p>
                                 <button type="submit" class="primario w-full">Iniciar devolución</button>
                             </form>

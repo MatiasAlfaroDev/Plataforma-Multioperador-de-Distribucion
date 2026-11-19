@@ -67,15 +67,10 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         if (id == Guid.Empty)
             return BadRequest();
 
-        // El responsable es quien tiene la sesión iniciada.
-        var responsable = User.Identity?.Name;
+        // El responsable lo toma la API de la sesión.
         string? error = null;
 
-        if (string.IsNullOrWhiteSpace(responsable))
-        {
-            error = "No se pudo identificar al usuario de la sesión.";
-        }
-        else if (string.IsNullOrWhiteSpace(justificacion))
+        if (string.IsNullOrWhiteSpace(justificacion))
         {
             error = "Indicá la justificación del extravío.";
         }
@@ -84,7 +79,7 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
             try
             {
                 await api.DeclararExtravioAsync(
-                    id, justificacion.Trim(), responsable, ct);
+                    id, justificacion.Trim(), ct);
 
                 return RedirectToPage("/DetalleEnvio", new { id });
             }
@@ -110,14 +105,10 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         if (id == Guid.Empty)
             return BadRequest();
 
-        var responsable = User.Identity?.Name;
+        // El responsable lo toma la API de la sesión.
         string? error = null;
 
-        if (string.IsNullOrWhiteSpace(responsable))
-        {
-            error = "No se pudo identificar al usuario de la sesión.";
-        }
-        else if (string.IsNullOrWhiteSpace(justificacion))
+        if (string.IsNullOrWhiteSpace(justificacion))
         {
             error = "Indicá qué pasó y quién tenía el bulto.";
         }
@@ -126,7 +117,7 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
             try
             {
                 await api.DeclararExtravioBultoAsync(
-                    id, identificacion, justificacion.Trim(), responsable, ct);
+                    id, identificacion, justificacion.Trim(), ct);
 
                 return RedirectToPage("/DetalleEnvio", new { id });
             }
@@ -151,19 +142,13 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         if (id == Guid.Empty)
             return BadRequest();
 
-        var responsable = User.Identity?.Name;
         string? error = null;
 
-        if (string.IsNullOrWhiteSpace(responsable))
-        {
-            error = "No se pudo identificar al usuario de la sesión.";
-        }
-        else
         {
             try
             {
                 await api.RegistrarReaparicionBultoAsync(
-                    id, identificacion, responsable, ct);
+                    id, identificacion, ct);
 
                 return RedirectToPage("/DetalleEnvio", new { id });
             }
@@ -188,15 +173,10 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
         if (id == Guid.Empty)
             return BadRequest();
 
-        // El responsable es quien tiene la sesión iniciada.
-        var responsable = User.Identity?.Name;
+        // El responsable lo toma la API de la sesión.
         string? error = null;
 
-        if (string.IsNullOrWhiteSpace(responsable))
-        {
-            error = "No se pudo identificar al usuario de la sesión.";
-        }
-        else if (identificaciones is null || identificaciones.Count == 0)
+        if (identificaciones is null || identificaciones.Count == 0)
         {
             error = "Marcá los bultos encontrados.";
         }
@@ -205,7 +185,7 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
             try
             {
                 await api.RegistrarReaparicionAsync(
-                    id, identificaciones, responsable, ct);
+                    id, identificaciones, ct);
 
                 return RedirectToPage("/DetalleEnvio", new { id });
             }
@@ -224,23 +204,15 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
 
     public async Task<IActionResult> OnPostIniciarDevolucionAsync(
     Guid id,
-    string responsable,
     CancellationToken ct)
 {
     if (id == Guid.Empty)
         return BadRequest();
 
-    if (string.IsNullOrWhiteSpace(responsable))
-    {
-        Error = "Debe indicar un responsable.";
-        return await OnGetAsync(id, ct);
-    }
-
     try
     {
         await api.IniciarDevolucionAsync(
             id,
-            responsable.Trim(),
             ct);
 
         return RedirectToPage("/DetalleEnvio", new { id });
@@ -265,18 +237,13 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
 
         public async Task<IActionResult> OnPostRetornarDepositoAsync(
             Guid id,
-            string responsable,
             List<string> identificaciones,
             CancellationToken ct)
         {
             if (id == Guid.Empty)
                 return BadRequest();
 
-            if (string.IsNullOrWhiteSpace(responsable))
-            {
-                Error = "Debe indicar el responsable.";
-            }
-            else if (identificaciones is null ||
+            if (identificaciones is null ||
                     identificaciones.Count == 0)
             {
                 Error = "Debe seleccionar los bultos recibidos.";
@@ -288,7 +255,6 @@ public class DetalleEnvioModel(EnviosApiClient api) : PageModel
                     await api.RetornarADepositoAsync(
                         id,
                         identificaciones,
-                        responsable.Trim(),
                         ct);
 
                     return RedirectToPage("/DetalleEnvio", new { id });

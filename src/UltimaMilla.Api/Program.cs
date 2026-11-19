@@ -929,30 +929,11 @@ api.MapPost("/envios/{envioId:guid}/recepcion",
         RecibirEnDepositoHandler handler,
         CancellationToken ct) =>
     {
-        var usuarioId = context.User.FindFirstValue(
-            ClaimTypes.NameIdentifier);
-
-        if (string.IsNullOrWhiteSpace(usuarioId))
-            return Results.Unauthorized();
-
-        var usuario = await userManager.FindByIdAsync(usuarioId);
-
-        if (usuario is null || !usuario.Activo)
-            return Results.Unauthorized();
-
-        var responsable = usuario.NombreCompleto.Trim();
-
-        if (string.IsNullOrWhiteSpace(responsable))
-            return Results.BadRequest(new
-            {
-                mensaje = "El usuario no tiene un nombre registrado."
-            });
-
         var resultado = await handler.Handle(
             new RecibirEnDepositoCommand(
                 envioId,
                 request.IdentificacionesEscaneadas,
-                responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.Ok(resultado);
@@ -972,6 +953,8 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
     async (
         Guid envioId,
         RecibirEnDepositoRequest request,
+        HttpContext context,
+        UserManager<Usuario> userManager,
         RetornarADepositoHandler handler,
         CancellationToken ct) =>
     {
@@ -979,7 +962,7 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
             new RetornarADepositoCommand(
                 envioId,
                 request.IdentificacionesEscaneadas,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -990,8 +973,8 @@ api.MapPost("/envios/{envioId:guid}/retorno-deposito",
 api.MapPost("/envios/{envioId:guid}/iniciar-devolucion",
     async (
         Guid envioId,
-        IniciarDevolucionRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         IniciarDevolucionHandler handler,
@@ -1014,7 +997,7 @@ api.MapPost("/envios/{envioId:guid}/iniciar-devolucion",
         await handler.Handle(
             new IniciarDevolucionCommand(
                 envioId,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -1027,6 +1010,7 @@ api.MapPost("/envios/{envioId:guid}/confirmar-devolucion",
         Guid envioId,
         ConfirmarDevolucionRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ConfirmarDevolucionHandler handler,
         CancellationToken ct) =>
@@ -1043,7 +1027,7 @@ api.MapPost("/envios/{envioId:guid}/confirmar-devolucion",
                 request.CuentaComercialId,
                 envioId,
                 request.IdentificacionesEscaneadas,
-                request.Responsable,
+                await ResponsableDeSesion.ObtenerAsync(context, userManager),
                 request.Modalidad,
                 request.Receptor,
                 request.ReferenciaConstancia),
@@ -1116,6 +1100,7 @@ api.MapPost("/envios/{envioId:guid}/extravio",
         Guid envioId,
         DeclararExtravioRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         DeclararExtravioHandler handler,
@@ -1140,7 +1125,7 @@ api.MapPost("/envios/{envioId:guid}/extravio",
                 operadorId,
                 envioId,
                 request.Justificacion,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -1303,6 +1288,7 @@ api.MapPost("/envios/{envioId:guid}/reaparicion",
         Guid envioId,
         RegistrarReaparicionRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         RegistrarReaparicionHandler handler,
@@ -1327,7 +1313,7 @@ api.MapPost("/envios/{envioId:guid}/reaparicion",
                 operadorId,
                 envioId,
                 request.IdentificacionesEscaneadas,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -1341,6 +1327,7 @@ api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/extravio",
         string identificacion,
         DeclararExtravioBultoRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         DeclararExtravioBultoHandler handler,
@@ -1366,7 +1353,7 @@ api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/extravio",
                 envioId,
                 identificacion,
                 request.Justificacion,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -1378,8 +1365,8 @@ api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/reaparicion",
     async (
         Guid envioId,
         string identificacion,
-        ReaparicionBultoRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
         RegistrarReaparicionBultoHandler handler,
@@ -1404,7 +1391,7 @@ api.MapPost("/envios/{envioId:guid}/bultos/{identificacion}/reaparicion",
                 operadorId,
                 envioId,
                 identificacion,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -1454,8 +1441,8 @@ api.MapPost("/solicitudes-reprogramacion/{solicitudId:guid}/confirmar",
     async (
         Guid solicitudId,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
-        ConfirmarReprogramacionRequest request,
         ConfirmarReprogramacionHandler handler,
         CancellationToken ct) =>
     {
@@ -1470,7 +1457,7 @@ api.MapPost("/solicitudes-reprogramacion/{solicitudId:guid}/confirmar",
         await handler.Handle(
             new ConfirmarReprogramacionCommand(
                 solicitudId,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -1815,6 +1802,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
         Guid hojaId,
         RendirHojaDeRutaRequest request,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         RendirHojaDeRutaHandler handler,
         CancellationToken ct) =>
@@ -1827,7 +1815,7 @@ api.MapPost("/hojas-de-ruta/{hojaId:guid}/rendicion",
         }
 
         var resultado = await handler.Handle(
-            new RendirHojaDeRutaCommand(hojaId, request.BultosEscaneados ?? [], request.Responsable ?? string.Empty),
+            new RendirHojaDeRutaCommand(hojaId, request.BultosEscaneados ?? [], await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.Ok(resultado);
@@ -1839,9 +1827,9 @@ api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
         Guid hojaId,
         Guid envioId,
         HttpContext context,
+        UserManager<Usuario> userManager,
         IAntiforgery antiforgery,
         ITenantContext tenant,
-        [FromBody] QuitarEnvioDeRutaRequest request,
         QuitarEnvioDeRutaHandler handler,
         CancellationToken ct) =>
     {
@@ -1866,7 +1854,7 @@ api.MapDelete("/hojas-de-ruta/{hojaId:guid}/envios/{envioId:guid}",
                 operadorId,
                 hojaId,
                 envioId,
-                request.Responsable),
+                await ResponsableDeSesion.ObtenerAsync(context, userManager)),
             ct);
 
         return Results.NoContent();
@@ -2216,11 +2204,9 @@ public sealed record EventoMovilRequest(
     IReadOnlyCollection<Guid>? BultosEntregados = null,
     IReadOnlyCollection<BultoNoEntregadoRequest>? BultosNoEntregados = null,
     IReadOnlyCollection<Guid>? BultosDevueltos = null);
-public sealed record RecibirEnDepositoRequest( IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
+public sealed record RecibirEnDepositoRequest(IReadOnlyList<string> IdentificacionesEscaneadas);
 public sealed record RegistrarRecepcionRequest(
     IReadOnlyList<string> IdentificacionesEscaneadas);
-public sealed record ConfirmarReprogramacionRequest( string Responsable);
-public sealed record QuitarEnvioDeRutaRequest(string Responsable);
 public sealed record AgregarEnvioARutaRequest( Guid EnvioId, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta);
 
 /// <summary>Cuerpo de PUT /api/zonas/{id}; la zona viaja en la URL.</summary>
@@ -2236,20 +2222,18 @@ public sealed record EditarZonaRequest(
 public sealed record VerificarMiCargaRequest(IReadOnlyList<string>? BultosEscaneados);
 
 public sealed record CancelarRetiroRequest(string Motivo);
-public sealed record DeclararExtravioRequest( string Justificacion, string Responsable);
-public sealed record RegistrarReaparicionRequest(  IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable);
-public sealed record DeclararExtravioBultoRequest(string Justificacion, string Responsable);
-public sealed record ReaparicionBultoRequest(string Responsable);
-public sealed record IniciarDevolucionRequest( string Responsable);
+public sealed record DeclararExtravioRequest(string Justificacion);
+public sealed record RegistrarReaparicionRequest(IReadOnlyList<string> IdentificacionesEscaneadas);
+public sealed record DeclararExtravioBultoRequest(string Justificacion);
 
-public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Responsable, string Modalidad, string Receptor, string ReferenciaConstancia);
+public sealed record ConfirmarDevolucionRequest( Guid CuentaComercialId, IReadOnlyList<string> IdentificacionesEscaneadas, string Modalidad, string Receptor, string ReferenciaConstancia);
 
 public sealed record AgregarRetiroARutaRequest(Guid RetiroId);
 public sealed record EstadoSincronizacionRequest(int Pendientes);
 public sealed record CrearHojaDeRutaRequest( Guid RepartidorId, Guid VehiculoId, DateOnly Fecha, TimeOnly HoraSalida, TimeOnly HoraEntregaDesde, TimeOnly HoraEntregaHasta,  int MaximoParadas, IReadOnlyList<Guid>? EnviosIds, IReadOnlyList<Guid>? RetirosIds = null, IReadOnlyList<Guid>? DevolucionesIds = null, IReadOnlyList<Guid>? EntregasRetirosIds = null);
 
 /// <summary>RF 22: lo escaneado al volver al depósito y quién lo recibe.</summary>
-public sealed record RendirHojaDeRutaRequest(IReadOnlyList<string>? BultosEscaneados, string? Responsable);
+public sealed record RendirHojaDeRutaRequest(IReadOnlyList<string>? BultosEscaneados);
 
 /// <summary>Cuerpo de POST /api/repartidor/hojas-de-ruta/{id}/rendicion: lo que el repartidor trae de vuelta.</summary>
 public sealed record DeclararRendicionRequest(IReadOnlyList<string>? BultosEscaneados);

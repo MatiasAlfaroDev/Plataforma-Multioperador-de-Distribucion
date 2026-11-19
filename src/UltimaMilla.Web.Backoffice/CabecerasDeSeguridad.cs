@@ -13,7 +13,9 @@ public static class CabecerasDeSeguridad
                 var h = contexto.Response.Headers;
                 h["X-Content-Type-Options"] = "nosniff";
                 h["X-Frame-Options"] = "DENY";
-                h["Referrer-Policy"] = "no-referrer";
+                // Los tiles de OpenStreetMap rechazan pedidos sin Referer (política de uso); hacia otros sitios
+                // solo sale el origen, nunca la ruta.
+                h["Referrer-Policy"] = "strict-origin-when-cross-origin";
                 h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
                 // No restringe los scripts y estilos propios de las páginas; sí el iframe ajeno (clickjacking),
                 // el cambio de la base de los enlaces y el envío de formularios a otro sitio.

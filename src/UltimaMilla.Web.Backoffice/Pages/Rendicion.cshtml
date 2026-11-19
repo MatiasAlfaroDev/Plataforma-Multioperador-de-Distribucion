@@ -76,11 +76,6 @@
                                 <textarea asp-for="Escaneados" rows="6" placeholder="Un código por línea"></textarea>
                                 <span asp-validation-for="Escaneados"></span>
                             </div>
-                            <div class="campo">
-                                <label asp-for="Responsable">Recibe en el depósito</label>
-                                <input type="text" asp-for="Responsable" />
-                                <span asp-validation-for="Responsable"></span>
-                            </div>
                             <p class="nota">Si se perdió un bulto, declarar el extravío desde el detalle del envío y volver a controlar.</p>
                             <button type="submit" class="primario h-[44px] w-full" disabled="@(rendicion.ParadasSinResultado.Count > 0)">
                                 Confirmar y cerrar la hoja
