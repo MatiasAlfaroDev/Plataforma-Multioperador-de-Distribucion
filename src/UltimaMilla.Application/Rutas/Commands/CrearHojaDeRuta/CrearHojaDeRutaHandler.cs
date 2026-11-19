@@ -185,7 +185,8 @@ public sealed class CrearHojaDeRutaHandler(
                     envio.HoraEntregaDesde.HasValue ||
                     envio.HoraEntregaHasta.HasValue;
 
-                if (tieneCompromiso)
+                if (tieneCompromiso &&
+                    !envio.CompromisoEntregaVencido(HoraUruguay.ALocal(reloj.GetUtcNow())))
                 {
                     if (envio.FechaEntregaComprometida != command.Fecha ||
                         envio.HoraEntregaDesde != command.HoraEntregaDesde ||
@@ -248,6 +249,10 @@ public sealed class CrearHojaDeRutaHandler(
                 retiro.HojaDeRutaId.HasValue)
                 throw new InvalidOperationException(
                     "El retiro no está disponible para asignación.");
+
+            var ahoraLocal = HoraUruguay.ALocal(reloj.GetUtcNow());
+            if (retiro.FechaSolicitada < command.Fecha && retiro.Vencido(ahoraLocal))
+                retiro.MoverAFecha(command.Fecha, ahoraLocal);
 
             if (retiro.FechaSolicitada != command.Fecha)
                 throw new InvalidOperationException(

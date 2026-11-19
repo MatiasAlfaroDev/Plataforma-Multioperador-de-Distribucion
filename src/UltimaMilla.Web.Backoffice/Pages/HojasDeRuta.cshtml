@@ -8,10 +8,15 @@
     var zonaUruguay = TimeZoneInfo.FindSystemTimeZoneById(
         "America/Montevideo");
 
-    var hoy = DateOnly.FromDateTime(
-        TimeZoneInfo.ConvertTime(
-            DateTimeOffset.UtcNow,
-            zonaUruguay).DateTime);
+    var ahoraUruguay = TimeZoneInfo.ConvertTime(
+        DateTimeOffset.UtcNow,
+        zonaUruguay).DateTime;
+    var hoy = DateOnly.FromDateTime(ahoraUruguay);
+
+    // Un retiro vencido (su franja ya pasó) se puede llevar a una hoja de una fecha posterior.
+    bool RetiroVaEnHoja(RetiroRutaApiDto r, DateOnly fecha) =>
+        r.Fecha == fecha ||
+        (r.Fecha < fecha && r.Fecha.ToDateTime(r.HoraHasta) <= ahoraUruguay);
 }
 
 <partial name="_Toast" model="(false, Model.Error)" />
@@ -177,7 +182,8 @@
                                         <tbody>
                                             @foreach (var retiro in Model.Retiros)
                                             {
-                                                <tr data-fecha-retiro="@retiro.Fecha.ToString("yyyy-MM-dd")">
+                                                <tr data-fecha-retiro="@retiro.Fecha.ToString("yyyy-MM-dd")"
+                                                    data-retiro-vencido="@((retiro.Fecha.ToDateTime(retiro.HoraHasta) <= ahoraUruguay) ? "true" : "false")">
                                                     <td>
                                                         <input type="checkbox" name="Formulario.RetirosIds" value="@retiro.Id" id="retiro-@retiro.Id"
                                                                checked="@(Model.Formulario.RetirosIds.Contains(retiro.Id))" />
@@ -349,7 +355,7 @@
                                                 }
 
                                                 @* RF 39: mientras la hoja está en preparación se le puede sumar un retiro del mismo día. *@
-                                                var retirosDelDia = Model.Retiros.Where(r => r.Fecha == hoja.Fecha).ToList();
+                                                var retirosDelDia = Model.Retiros.Where(r => RetiroVaEnHoja(r, hoja.Fecha)).ToList();
                                                 @if (Model.RetiroHabilitado && retirosDelDia.Count > 0)
                                                 {
                                                     <details class="relative">
@@ -430,13 +436,14 @@
     </script>
 }
 
-@* Un retiro solo puede ir en una hoja de su misma fecha: se ocultan los de otros días. *@
+@* Un retiro va en una hoja de su misma fecha, o de una posterior si ya está vencido: se ocultan los demás. *@
 <script>
     (() => {
         const fecha = document.getElementById("Formulario_Fecha");
         if (!fecha) return;
         const filtrar = () => document.querySelectorAll("[data-fecha-retiro]").forEach(fila => {
-            const mismoDia = fila.dataset.fechaRetiro === fecha.value;
+            const mismoDia = fila.dataset.fechaRetiro === fecha.value ||
+                (fila.dataset.retiroVencido === "true" && fila.dataset.fechaRetiro < fecha.value);
             fila.hidden = !mismoDia;
             if (!mismoDia) fila.querySelector("input").checked = false;
         });

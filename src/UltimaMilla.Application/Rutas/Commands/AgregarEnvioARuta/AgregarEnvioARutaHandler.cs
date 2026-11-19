@@ -193,7 +193,8 @@ public sealed class AgregarEnvioARutaHandler(
                 nuevo.HoraEntregaDesde.HasValue ||
                 nuevo.HoraEntregaHasta.HasValue;
 
-            if (tieneCompromiso)
+            if (tieneCompromiso &&
+                !nuevo.CompromisoEntregaVencido(HoraUruguay.ALocal(reloj.GetUtcNow())))
             {
                 if (nuevo.FechaEntregaComprometida != hoja.Fecha ||
                     nuevo.HoraEntregaDesde != command.HoraEntregaDesde ||

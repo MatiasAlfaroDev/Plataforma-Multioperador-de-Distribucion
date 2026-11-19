@@ -75,6 +75,10 @@ public sealed class AgregarRetiroARutaHandler(
                 "El retiro no está disponible para asignación.");
         }
 
+        var ahoraLocal = HoraUruguay.ALocal(reloj.GetUtcNow());
+        if (retiro.FechaSolicitada < hoja.Fecha && retiro.Vencido(ahoraLocal))
+            retiro.MoverAFecha(hoja.Fecha, ahoraLocal);
+
         if (retiro.FechaSolicitada != hoja.Fecha)
             throw new InvalidOperationException(
                 "El retiro corresponde a otra fecha.");

@@ -617,4 +617,16 @@ public class EnvioMaquinaReglasTests
             e => e.Disparador == DisparadorEnvio.DeclararExtraviado &&
                 e.Justificacion == "Bulto extraviado");
     }
+
+    [Fact]
+    public void Compromiso_vence_al_terminar_su_franja()
+    {
+        var (envio, reglas) = Preparar();
+        Aplicar(envio, reglas, DisparadorEnvio.RecibirEnDeposito);
+        envio.EstablecerCompromisoEntrega(
+            new DateOnly(2026, 11, 18), new TimeOnly(9, 0), new TimeOnly(13, 0));
+
+        Assert.False(envio.CompromisoEntregaVencido(new DateTime(2026, 11, 18, 12, 59, 0)));
+        Assert.True(envio.CompromisoEntregaVencido(new DateTime(2026, 11, 18, 13, 0, 0)));
+    }
 }

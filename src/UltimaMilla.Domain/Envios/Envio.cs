@@ -182,6 +182,15 @@ public class Envio : AuditableEntity, ITenantEntity
         VersionReglasOperativasId = versionReglasOperativasId;
     }
 
+    /// <summary>
+    /// El compromiso ya no se puede cumplir: terminó su franja. Queda de una planificación anterior
+    /// y no tiene que impedir planificar el envío para otra fecha.
+    /// </summary>
+    public bool CompromisoEntregaVencido(DateTime ahoraLocal) =>
+        FechaEntregaComprometida is DateOnly fecha &&
+        HoraEntregaHasta is TimeOnly hasta &&
+        fecha.ToDateTime(hasta) <= ahoraLocal;
+
     public void EstablecerCompromisoEntrega(
         DateOnly fecha,
         TimeOnly horaDesde,

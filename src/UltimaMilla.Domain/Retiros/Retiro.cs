@@ -116,6 +116,27 @@ public sealed class Retiro : AuditableEntity, ITenantEntity
         return retiro;
     }
 
+    /// <summary>
+    /// Solicitado y con la franja ya pasada sin que nadie lo planificara: se puede asignar a una hoja de otra fecha.
+    /// </summary>
+    public bool Vencido(DateTime ahoraLocal) =>
+        Estado == EstadoRetiro.Solicitado &&
+        FechaSolicitada.ToDateTime(HoraHasta) <= ahoraLocal;
+
+    /// <summary>Lleva un retiro vencido a la fecha de la hoja que lo va a buscar; conserva la franja.</summary>
+    public void MoverAFecha(DateOnly fecha, DateTime ahoraLocal)
+    {
+        if (!Vencido(ahoraLocal))
+            throw new InvalidOperationException(
+                "Solo un retiro vencido puede pasar a otra fecha.");
+
+        if (fecha <= FechaSolicitada)
+            throw new InvalidOperationException(
+                "La nueva fecha del retiro tiene que ser posterior a la solicitada.");
+
+        FechaSolicitada = fecha;
+    }
+
     public void AsignarARuta(Guid hojaDeRutaId)
     {
         if (hojaDeRutaId == Guid.Empty)
