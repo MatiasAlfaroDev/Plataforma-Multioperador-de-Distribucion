@@ -49,7 +49,7 @@ public class VersionReglasOperativas : AuditableEntity, ITenantEntity
         if (horasMinimasEntreIntentos < 0)
             throw new ArgumentException("El intervalo entre intentos no puede ser negativo.");
 
-        if (diasMaximosParaDevolucion < 1)
+        if (diasMaximosParaDevolucion < 0)
             throw new ArgumentException("El plazo de devolución debe ser de al menos un día.",
                 nameof(diasMaximosParaDevolucion));
 
