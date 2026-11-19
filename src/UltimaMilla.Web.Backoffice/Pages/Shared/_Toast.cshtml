@@ -4,7 +4,7 @@
 {
     <div class="toast @(Model.Exito ? null : "toast-error")" role="@(Model.Exito ? "status" : "alert")" data-toast>
         <i class="ph @(Model.Exito ? "ph-check-circle" : "ph-warning-circle") text-xl"></i>
-        <div>@Model.Mensaje</div>
+        <div>@ErrorDeApi.Limpiar(Model.Mensaje)</div>
         <button type="button" title="Cerrar" data-cerrar-toast><i class="ph ph-x"></i></button>
     </div>
 }

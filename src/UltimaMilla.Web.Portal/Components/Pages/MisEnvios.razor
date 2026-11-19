@@ -136,7 +136,7 @@ else
         }
         catch (JSException ex)
         {
-            error = ex.Message;
+            error = Notificaciones.Limpiar(ex.Message);
         }
         finally
         {
@@ -160,7 +160,7 @@ else
         }
         catch (JSException ex)
         {
-            errorDetalle = ex.Message;
+            errorDetalle = Notificaciones.Limpiar(ex.Message);
         }
         finally
         {

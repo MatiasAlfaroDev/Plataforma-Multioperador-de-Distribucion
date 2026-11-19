@@ -209,13 +209,8 @@ public sealed class EnviosApiClient(HttpClient http)
         // 7. Controlar errores.
         if (!respuesta.IsSuccessStatusCode)
         {
-            var detalle = await respuesta.Content
-                .ReadAsStringAsync(ct);
-
             throw new HttpRequestException(
-                string.IsNullOrWhiteSpace(detalle)
-                    ? $"No se pudo iniciar la devolución (HTTP {(int)respuesta.StatusCode})."
-                    : $"La API respondió: {detalle}",
+                await ErrorDeApi.LeerAsync(respuesta, "No se pudo iniciar la devolución", ct),
                 null,
                 respuesta.StatusCode);
         }
@@ -238,13 +233,8 @@ public sealed class EnviosApiClient(HttpClient http)
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var detalle = await respuesta.Content
-                .ReadAsStringAsync(ct);
-
             throw new HttpRequestException(
-                string.IsNullOrWhiteSpace(detalle)
-                    ? $"La API rechazó la recepción (HTTP {(int)respuesta.StatusCode})."
-                    : $"La API respondió: {detalle}",
+                await ErrorDeApi.LeerAsync(respuesta, "La API rechazó la recepción", ct),
                 null,
                 respuesta.StatusCode);
         }
@@ -342,26 +332,8 @@ public sealed class EnviosApiClient(HttpClient http)
         if (respuesta.IsSuccessStatusCode)
             return;
 
-        var cuerpo = await respuesta.Content.ReadAsStringAsync(ct);
-        string? motivo = null;
-
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(cuerpo);
-            if (doc.RootElement.TryGetProperty("detail", out var d) &&
-                d.ValueKind == System.Text.Json.JsonValueKind.String)
-                motivo = d.GetString();
-            else if (doc.RootElement.TryGetProperty("title", out var t) &&
-                t.ValueKind == System.Text.Json.JsonValueKind.String)
-                motivo = t.GetString();
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            // El cuerpo no es JSON: se usa el mensaje genérico.
-        }
-
         throw new HttpRequestException(
-            motivo ?? $"La API rechazó la operación (HTTP {(int)respuesta.StatusCode}).",
+            await ErrorDeApi.LeerAsync(respuesta, "La API rechazó la operación", ct),
             null,
             respuesta.StatusCode);
     }
@@ -405,11 +377,8 @@ public sealed class EnviosApiClient(HttpClient http)
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var detalle = await respuesta.Content.ReadAsStringAsync(ct);
             throw new HttpRequestException(
-                string.IsNullOrWhiteSpace(detalle)
-                    ? $"La API rechazó la operación (HTTP {(int)respuesta.StatusCode})."
-                    : $"La API respondió: {detalle}",
+                await ErrorDeApi.LeerAsync(respuesta, "La API rechazó la operación", ct),
                 null,
                 respuesta.StatusCode);
         }
@@ -508,12 +477,8 @@ public sealed class EnviosApiClient(HttpClient http)
         if (respuesta.IsSuccessStatusCode)
             return;
 
-        var detalle = await respuesta.Content.ReadAsStringAsync(ct);
-
         throw new HttpRequestException(
-            string.IsNullOrWhiteSpace(detalle)
-                ? $"Error de reprogramación (HTTP {(int)respuesta.StatusCode})."
-                : $"La API respondió: {detalle}",
+                await ErrorDeApi.LeerAsync(respuesta, "Error de reprogramación", ct),
             null,
             respuesta.StatusCode);
     }

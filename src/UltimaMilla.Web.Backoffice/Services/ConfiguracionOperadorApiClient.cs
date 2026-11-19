@@ -59,7 +59,7 @@ public sealed class ConfiguracionOperadorApiClient(HttpClient http)
         if (!respuesta.IsSuccessStatusCode)
         {
             throw new HttpRequestException(
-                await respuesta.Content.ReadAsStringAsync(ct),
+                await ErrorDeApi.LeerAsync(respuesta, "No se pudo guardar el color", ct),
                 null,
                 respuesta.StatusCode);
         }

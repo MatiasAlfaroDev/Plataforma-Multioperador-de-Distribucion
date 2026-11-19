@@ -111,7 +111,7 @@ else
         }
         catch (JSException ex)
         {
-            errorDeCarga = ex.Message;
+            errorDeCarga = Notificaciones.Limpiar(ex.Message);
         }
         finally
         {

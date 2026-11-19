@@ -127,12 +127,8 @@ public sealed class VinculacionesApiClient(HttpClient http)
         if (respuesta.IsSuccessStatusCode)
             return;
 
-        var detalle = await respuesta.Content.ReadAsStringAsync(ct);
-
         throw new HttpRequestException(
-            string.IsNullOrWhiteSpace(detalle)
-                ? $"La API respondió HTTP {(int)respuesta.StatusCode}."
-                : detalle,
+            await ErrorDeApi.LeerAsync(respuesta, "La API rechazó la operación", ct),
             null,
             respuesta.StatusCode);
     }

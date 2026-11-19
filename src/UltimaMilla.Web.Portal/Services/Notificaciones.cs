@@ -22,7 +22,26 @@ public sealed class Notificaciones
         _ = Task.Delay(DuracionExito).ContinueWith(_ => Cerrar(n.Id), TaskScheduler.Default);
     }
 
-    public void Error(string titulo, string mensaje) => Agregar(false, titulo, mensaje);
+    public void Error(string titulo, string mensaje) => Agregar(false, titulo, Limpiar(mensaje));
+
+    /// <summary>
+    /// El mensaje de un <c>JSException</c> trae pegado el stack de JavaScript ("…\nError: …\n    at …").
+    /// Al usuario se le muestra solo el texto del error.
+    /// </summary>
+    public static string Limpiar(string? mensaje)
+    {
+        if (string.IsNullOrWhiteSpace(mensaje))
+            return mensaje ?? "";
+
+        var texto = mensaje.Replace("\r", "");
+        var corte = texto.IndexOf("\nError:", StringComparison.Ordinal);
+        if (corte < 0)
+            corte = texto.IndexOf("\n    at ", StringComparison.Ordinal);
+        if (corte < 0)
+            corte = texto.IndexOf(" at Object.", StringComparison.Ordinal);
+
+        return (corte > 0 ? texto[..corte] : texto).Trim();
+    }
 
     public void Cerrar(Guid id)
     {

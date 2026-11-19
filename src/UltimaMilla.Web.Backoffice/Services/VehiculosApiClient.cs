@@ -41,7 +41,7 @@ public sealed class VehiculosApiClient(HttpClient http)
     {
         using var respuesta = await http.SendAsync(solicitud, ct);
         if (!respuesta.IsSuccessStatusCode)
-            throw new HttpRequestException(await respuesta.Content.ReadAsStringAsync(ct), null, respuesta.StatusCode);
+            throw new HttpRequestException(await ErrorDeApi.LeerAsync(respuesta, "No se pudo guardar el vehículo", ct), null, respuesta.StatusCode);
     }
 
     private sealed record TokenAntiforgery(string Token);

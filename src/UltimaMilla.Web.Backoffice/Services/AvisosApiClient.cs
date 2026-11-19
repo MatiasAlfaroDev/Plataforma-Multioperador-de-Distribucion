@@ -31,12 +31,8 @@ public sealed class AvisosApiClient(HttpClient http)
 
         if (!respuesta.IsSuccessStatusCode)
         {
-            var detalle = await respuesta.Content.ReadAsStringAsync(ct);
-
             throw new HttpRequestException(
-                string.IsNullOrWhiteSpace(detalle)
-                    ? $"La API rechazó el reenvío (HTTP {(int)respuesta.StatusCode})."
-                    : $"La API respondió: {detalle}",
+                await ErrorDeApi.LeerAsync(respuesta, "La API rechazó el reenvío", ct),
                 null,
                 respuesta.StatusCode);
         }
