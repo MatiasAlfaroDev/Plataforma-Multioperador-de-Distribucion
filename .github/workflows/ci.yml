@@ -154,7 +154,14 @@ jobs:
             URL_SEGUIMIENTO=https://portal.$DOMINIO/seguimiento
             EOF
             if [ -n "$FIREBASE_JSON" ]; then printf '%s' "$FIREBASE_JSON" > docker/secretos/firebase-cuenta-servicio.json; fi
-            docker compose -f docker-compose.yml -f docker-compose.nube.yml up -d --build --remove-orphans
+            # Si algo no arranca (p. ej. el inicializador), el log de Actions queda con su salida para diagnosticar.
+            if ! docker compose -f docker-compose.yml -f docker-compose.nube.yml up -d --build --remove-orphans; then
+              docker compose -f docker-compose.yml -f docker-compose.nube.yml ps -a || true
+              docker compose -f docker-compose.yml -f docker-compose.nube.yml logs --no-color --tail 200 inicializador || true
+              free -m || true
+              sudo -n dmesg 2>/dev/null | tail -30 || true
+              exit 1
+            fi
             docker image prune -f > /dev/null
 
       - name: Verificar que la API responde por HTTPS
