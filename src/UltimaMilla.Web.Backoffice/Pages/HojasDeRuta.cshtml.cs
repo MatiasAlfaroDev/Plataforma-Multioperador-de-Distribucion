@@ -41,8 +41,10 @@ public sealed class HojasDeRutaModel(
     public FormularioHojaRuta Formulario { get; set; } = new();
 
     
+
 public async Task OnGetAsync(
     Guid? envioId,
+    Guid? retiroId,
     Guid? entregaRetiroId,
     Guid? devolucionId,
     CancellationToken ct)
@@ -54,6 +56,13 @@ public async Task OnGetAsync(
         Envios.Any(x => x.Id == envioId.Value))
     {
         Formulario.EnviosIds = [envioId.Value];
+    }
+
+    // Preseleccionar retiro a domicilio.
+    if (retiroId.HasValue &&
+        Retiros.Any(x => x.Id == retiroId.Value))
+    {
+        Formulario.RetirosIds = [retiroId.Value];
     }
 
     // Preseleccionar entrega de retiro al comercio.
@@ -70,6 +79,7 @@ public async Task OnGetAsync(
         Formulario.DevolucionesIds = [devolucionId.Value];
     }
 }
+
 
     public async Task<IActionResult> OnPostAsync(
         CancellationToken ct)

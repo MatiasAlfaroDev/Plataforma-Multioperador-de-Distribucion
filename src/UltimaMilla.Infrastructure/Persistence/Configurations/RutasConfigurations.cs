@@ -192,8 +192,9 @@ public sealed class ParadaRutaConfiguration
             .HasFilter(
                 "\"EnvioId\" IS NOT NULL AND \"liberada_en\" IS NULL");
 
-        // Un retiro no puede estar activo en dos rutas.
-        builder.HasIndex(x => x.RetiroId)
+        // Un retiro puede tener una parada activa por tipo de operación.
+        // Permite el retiro a domicilio y la posterior entrega al comercio.
+        builder.HasIndex(x => new { x.RetiroId, x.TipoOperacion })
             .IsUnique()
             .HasFilter(
                 "\"RetiroId\" IS NOT NULL AND \"liberada_en\" IS NULL");

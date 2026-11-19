@@ -1872,13 +1872,13 @@ namespace UltimaMilla.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("\"EnvioId\" IS NOT NULL AND \"liberada_en\" IS NULL");
 
-                    b.HasIndex("RetiroId")
-                        .IsUnique()
-                        .HasFilter("\"RetiroId\" IS NOT NULL AND \"liberada_en\" IS NULL");
-
                     b.HasIndex("HojaDeRutaId", "Orden")
                         .IsUnique()
                         .HasFilter("\"liberada_en\" IS NULL");
+
+                    b.HasIndex("RetiroId", "TipoOperacion")
+                        .IsUnique()
+                        .HasFilter("\"RetiroId\" IS NOT NULL AND \"liberada_en\" IS NULL");
 
                     b.ToTable("paradas_ruta", null, t =>
                         {

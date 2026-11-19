@@ -1,3 +1,4 @@
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using UltimaMilla.Web.Backoffice.Services;
@@ -5,28 +6,58 @@ using UltimaMilla.Web.Backoffice.Services;
 namespace UltimaMilla.Web.Backoffice.Pages;
 
 /// <summary>
-/// Retiros a domicilio (RF 37 a 41): listado con filtros y las acciones que habilita cada estado.
+/// Retiros a domicilio: listado, filtros y gestión.
 /// </summary>
-public sealed class RetirosModel(EnviosApiClient api, HojasDeRutaApiClient hojas) : PageModel
+public sealed class RetirosModel(
+    EnviosApiClient api,
+    HojasDeRutaApiClient hojas) : PageModel
 {
     public static readonly string[] Estados =
-        ["Solicitado", "AsignadoARuta", "Retirado", "NoRetirado", "EnDeposito", "EntregadoAlComercio", "Cancelado"];
+    [
+        "Solicitado",
+        "AsignadoARuta",
+        "Retirado",
+        "NoRetirado",
+        "EnDeposito",
+        "EntregadoAlComercio",
+        "Cancelado"
+    ];
 
-    [BindProperty(SupportsGet = true)] public string? Estado { get; set; }
-    [BindProperty(SupportsGet = true)] public DateOnly? Desde { get; set; }
-    [BindProperty(SupportsGet = true)] public DateOnly? Hasta { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public string? Estado { get; set; }
 
-    public IReadOnlyList<RetiroTableroItem> Retiros { get; private set; } = [];
+    [BindProperty(SupportsGet = true)]
+    public DateOnly? Desde { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public DateOnly? Hasta { get; set; }
+
+    public IReadOnlyList<RetiroTableroItem> Retiros
+        { get; private set; } = [];
+
+    public IReadOnlyList<HojaRutaApiDto> HojasDisponibles
+        { get; private set; } = [];
+
     public string? Error { get; private set; }
 
+    public Guid OperadorIdSesion =>
+        Guid.TryParse(
+            User.FindFirst("operador_id")?.Value,
+            out var id)
+            ? id
+            : Guid.Empty;
+
     public bool EsDespacho =>
-        User.IsInRole("AdministradorOperador") || User.IsInRole("Despachador") || User.IsInRole("Operador");
+        User.IsInRole("AdministradorOperador") ||
+        User.IsInRole("Despachador") ||
+        User.IsInRole("Operador");
 
     public async Task OnGetAsync(CancellationToken ct)
     {
         try
         {
-            Retiros = (await api.ListarRetirosAsync(Estado, Desde, Hasta, ct))
+            Retiros = (await api.ListarRetirosAsync(
+                    Estado, Desde, Hasta, ct))
                 .OrderBy(r => r.FechaSolicitada)
                 .ThenBy(r => r.HoraDesde)
                 .ToList();
@@ -37,36 +68,114 @@ public sealed class RetirosModel(EnviosApiClient api, HojasDeRutaApiClient hojas
                 ? $"No se pudieron cargar los retiros (HTTP {(int)ex.StatusCode})."
                 : "No se pudo conectar con la API.";
         }
+
+        if (!EsDespacho || !Retiros.Any(r =>
+            r.Estado == "Solicitado"))
+            return;
+
+        if (OperadorIdSesion == Guid.Empty)
+        {
+            Error ??= "No hay un operador seleccionado en la sesión.";
+            return;
+        }
+
+        try
+        {
+            HojasDisponibles = (await hojas.ListarAsync(
+                    OperadorIdSesion, ct))
+                .Where(h =>
+                    !h.Despachada &&
+                    !h.Rendida &&
+                    !h.PendienteDeControl)
+                .OrderBy(h => h.Fecha)
+                .ThenBy(h => h.HoraSalida)
+                .ToList();
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException ||
+            ex is InvalidOperationException)
+        {
+            Error ??= $"No se pudieron cargar las hojas de ruta: {ex.Message}";
+        }
     }
 
-    /// <summary>accion: recibir-deposito, entregar-comercio o reprogramar.</summary>
-    public Task<IActionResult> OnPostAccionAsync(Guid retiroId, string accion, CancellationToken ct) =>
-        accion is "recibir-deposito" or "entregar-comercio" or "reprogramar"
-            ? EjecutarAsync(() => api.GestionarRetiroAsync(retiroId, accion, ct), "Retiro actualizado.")
+    public Task<IActionResult> OnPostAsignarARutaAsync(
+        Guid retiroId,
+        Guid hojaId,
+        CancellationToken ct)
+    {
+        if (!EsDespacho)
+            return Task.FromResult<IActionResult>(Forbid());
+
+        if (OperadorIdSesion == Guid.Empty)
+            return Task.FromResult<IActionResult>(Forbid());
+
+        if (retiroId == Guid.Empty || hojaId == Guid.Empty)
+            return Task.FromResult<IActionResult>(BadRequest());
+
+        return EjecutarAsync(
+            () => hojas.AgregarRetiroAsync(
+                hojaId, retiroId, ct),
+            "Retiro asignado correctamente a la hoja de ruta.");
+    }
+
+    public Task<IActionResult> OnPostAccionAsync(
+        Guid retiroId,
+        string accion,
+        CancellationToken ct) =>
+        accion is "recibir-deposito"
+            or "entregar-comercio"
+            or "reprogramar"
+            ? EjecutarAsync(
+                () => api.GestionarRetiroAsync(
+                    retiroId, accion, ct),
+                "Retiro actualizado.")
             : Task.FromResult<IActionResult>(BadRequest());
 
-    public Task<IActionResult> OnPostCancelarAsync(Guid retiroId, string motivo, CancellationToken ct) =>
+    public Task<IActionResult> OnPostCancelarAsync(
+        Guid retiroId,
+        string motivo,
+        CancellationToken ct) =>
         string.IsNullOrWhiteSpace(motivo)
-            ? EjecutarAsync(() => throw new InvalidOperationException("Indicá el motivo de la cancelación."), "")
-            : EjecutarAsync(() => api.CancelarRetiroAsync(retiroId, motivo.Trim(), ct), "Retiro cancelado.");
+            ? EjecutarAsync(
+                () => throw new InvalidOperationException(
+                    "Indicá el motivo de la cancelación."),
+                "")
+            : EjecutarAsync(
+                () => api.CancelarRetiroAsync(
+                    retiroId, motivo.Trim(), ct),
+                "Retiro cancelado.");
 
-    public Task<IActionResult> OnPostQuitarDeHojaAsync(Guid retiroId, Guid hojaId, CancellationToken ct) =>
-        EjecutarAsync(() => hojas.QuitarRetiroAsync(hojaId, retiroId, ct),
+    public Task<IActionResult> OnPostQuitarDeHojaAsync(
+        Guid retiroId,
+        Guid hojaId,
+        CancellationToken ct) =>
+        EjecutarAsync(
+            () => hojas.QuitarRetiroAsync(
+                hojaId, retiroId, ct),
             "Retiro quitado de la hoja de ruta: vuelve a estar solicitado.");
 
-    private async Task<IActionResult> EjecutarAsync(Func<Task> accion, string exito)
+    private async Task<IActionResult> EjecutarAsync(
+        Func<Task> accion,
+        string exito)
     {
         try
         {
             await accion();
             TempData["MensajeExito"] = exito;
         }
-        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+        catch (Exception ex) when (
+            ex is HttpRequestException ||
+            ex is InvalidOperationException)
         {
             TempData["MensajeError"] = ex.Message;
         }
 
-        // Conserva los filtros con los que se estaba trabajando.
-        return RedirectToPage(new { Estado, Desde, Hasta });
+        return RedirectToPage(new
+        {
+            Estado,
+            Desde,
+            Hasta
+        });
     }
 }
