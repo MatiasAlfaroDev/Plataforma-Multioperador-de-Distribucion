@@ -42,6 +42,18 @@ public sealed class ConfiguracionOperadorApiClient(HttpClient http)
 
         solicitud.Headers.Add("X-CSRF-TOKEN", token?.Token);
 
+        // La API valida el token contra su cookie antifalsificación: hay que reenviarla, como en HojasDeRutaApiClient.
+        if (respuestaToken.Headers.TryGetValues("Set-Cookie", out var cookies))
+        {
+            var cookieAntiforgery = cookies
+                .Select(c => c.Split(';')[0])
+                .FirstOrDefault(c => c.StartsWith(
+                    ".AspNetCore.Antiforgery.", StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(cookieAntiforgery))
+                solicitud.Options.Set(CookieAutenticacionHandler.CookieAntiforgeryKey, cookieAntiforgery);
+        }
+
         using var respuesta = await http.SendAsync(solicitud, ct);
 
         if (!respuesta.IsSuccessStatusCode)

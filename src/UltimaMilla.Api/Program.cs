@@ -383,10 +383,18 @@ api.MapGet("/operadores/mi-operador", async (
 
 api.MapPut("/operadores/mi-operador/color", async (
     HttpContext context,
+    IAntiforgery antiforgery,
     ActualizarColorOperadorHandler handler,
     ActualizarColorOperadorRequest request,
     CancellationToken ct) =>
 {
+    if (!await antiforgery.IsRequestValidAsync(context))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Token de seguridad inválido.");
+    }
+
     if (!Guid.TryParse(
             context.User.FindFirst("operador_id")?.Value,
             out var operadorId) ||

@@ -259,6 +259,15 @@ grupo.MapPost("/registro-operador", async (
         });
     }
 
+    // RF 5: el color va en atributos style del seguimiento y del correo; se valida antes de crear el usuario.
+    if (!System.Text.RegularExpressions.Regex.IsMatch(colorPrimario, @"^#[0-9A-Fa-f]{6}$"))
+    {
+        return Results.BadRequest(new
+        {
+            mensaje = "El color debe tener formato hexadecimal #RRGGBB."
+        });
+    }
+
     // 2. Verificar que el usuario no exista
     if (await userManager.FindByEmailAsync(email) is not null)
     {

@@ -34,6 +34,22 @@ public sealed class IdentidadVisualMultitenancyTests
         return cliente;
     }
 
+    // El PUT exige el token antifalsificación; el cliente de prueba guarda la cookie que lo acompaña.
+    private static async Task<HttpResponseMessage> CambiarColorAsync(HttpClient cliente, string color)
+    {
+        var token = await cliente.GetFromJsonAsync<TokenAntiforgery>("/api/antiforgery/token");
+
+        using var solicitud = new HttpRequestMessage(HttpMethod.Put, "/api/operadores/mi-operador/color")
+        {
+            Content = JsonContent.Create(new { ColorPrimario = color })
+        };
+        solicitud.Headers.Add("X-CSRF-TOKEN", token!.Token);
+
+        return await cliente.SendAsync(solicitud);
+    }
+
+    private sealed record TokenAntiforgery(string Token);
+
     private static (
         ApiSeguridadFactory Factory,
         IOperadorRepository Repositorio,
@@ -168,9 +184,7 @@ public sealed class IdentidadVisualMultitenancyTests
         await using var factory = escenario.Factory;
         using var cliente = CrearCliente(factory, OperadorAId);
 
-        var respuesta = await cliente.PutAsJsonAsync(
-            "/api/operadores/mi-operador/color",
-            new { ColorPrimario = "#FF5733" });
+        var respuesta = await CambiarColorAsync(cliente, "#FF5733");
 
         Assert.Equal(
             HttpStatusCode.NoContent,
@@ -200,7 +214,7 @@ public sealed class IdentidadVisualMultitenancyTests
     }
 
     [Fact]
-    public async Task ColorInvalido_DevuelveBadRequest()
+    public async Task CambiarColor_SinTokenAntifalsificacion_EsRechazado()
     {
         var escenario = PrepararEscenario();
 
@@ -209,7 +223,21 @@ public sealed class IdentidadVisualMultitenancyTests
 
         var respuesta = await cliente.PutAsJsonAsync(
             "/api/operadores/mi-operador/color",
-            new { ColorPrimario = "rojo" });
+            new { ColorPrimario = "#FF5733" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Equal("#2563EB", escenario.OperadorA.ColorPrimario);
+    }
+
+    [Fact]
+    public async Task ColorInvalido_DevuelveBadRequest()
+    {
+        var escenario = PrepararEscenario();
+
+        await using var factory = escenario.Factory;
+        using var cliente = CrearCliente(factory, OperadorAId);
+
+        var respuesta = await CambiarColorAsync(cliente, "rojo");
 
         Assert.Equal(
             HttpStatusCode.BadRequest,
